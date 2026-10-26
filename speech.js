@@ -28,7 +28,9 @@ const ERROR_MESSAGES = {
  *  - un minuteur de silence est relancé à chaque mot reconnu : à son terme,
  *    l'écoute est arrêtée et le texte final renvoyé ;
  *  - si personne ne parle, l'écoute s'arrête au bout de `noSpeechMs` ;
- *  - si le moteur s'interrompt de lui-même avant que l'on ait parlé, il est relancé ;
+ *  - sur iPhone, juste après une lecture à voix haute, le micro peut démarrer
+ *    « sourd » ou échouer : la session est alors relancée automatiquement,
+ *    en conservant ce qui a déjà été reconnu ;
  *  - si le moteur ne confirme pas l'arrêt, le texte déjà reconnu est conservé.
  */
 export class Listener {
@@ -44,42 +46,52 @@ export class Listener {
    * @param {object} opts
    * @param {string} opts.lang         locale BCP-47
    * @param {number} opts.silenceMs    délai de silence avant arrêt automatique
+   * @param {number} [opts.deafMs]     délai sans aucun son avant de relancer le micro
    * @param {(text: string) => void} [opts.onText]   texte reconnu en direct
-   * @param {() => void} [opts.onStart]
    * @returns {Promise<string>} texte reconnu ('' si rien)
    */
-  listen({ lang, silenceMs = 1200, noSpeechMs = 8000, maxMs = 90000, onText, onStart }) {
+  listen({ lang, silenceMs = 1200, noSpeechMs = 10000, maxMs = 90000, deafMs = 2500, onText }) {
     if (!SR) return Promise.reject(new SpeechError('unsupported', ERROR_MESSAGES.unsupported));
     this.cancel();
 
     return new Promise((resolve, reject) => {
+      const MAX_RESTARTS = 6;
       const s = {
         rec: null,
-        text: '',
+        base: '',       // texte des sessions précédentes (après relance)
+        current: '',    // texte de la session en cours
         settled: false,
         stopping: false,
         restarts: 0,
-        startedAt: Date.now(),
         timers: {},
+        get text() { return [this.base, this.current].filter(Boolean).join(' ').trim(); },
       };
       this.session = s;
 
       const clear = name => { clearTimeout(s.timers[name]); delete s.timers[name]; };
       const clearAll = () => Object.keys(s.timers).forEach(clear);
 
+      const release = (rec, abort) => {
+        if (!rec) return;
+        rec.onresult = rec.onend = rec.onerror = rec.onaudiostart = rec.onsoundstart = rec.onspeechstart = null;
+        if (abort && !rec._ended) { try { rec.abort(); } catch { /* déjà arrêté */ } }
+        rec._ended = true;
+      };
+
       const settle = (err) => {
         if (s.settled) return;
         s.settled = true;
         clearAll();
         if (this.session === s) this.session = null;
-        try { s.rec.onresult = s.rec.onend = s.rec.onerror = s.rec.onstart = null; s.rec.abort(); } catch { /* déjà arrêté */ }
-        if (err) reject(err); else resolve(s.text.trim());
+        release(s.rec, true);
+        if (err && !s.text) reject(err); else resolve(s.text);
       };
 
       const finish = () => {
         if (s.settled || s.stopping) return;
         s.stopping = true;
         clearAll();
+        if (s.rec._ended) { settle(); return; }
         try { s.rec.stop(); } catch { settle(); return; }
         // Le moteur doit confirmer l'arrêt (onend) ; sinon on garde ce qui a été entendu.
         s.timers.fallback = setTimeout(() => settle(), 1500);
@@ -93,6 +105,36 @@ export class Listener {
         s.timers.silence = setTimeout(finish, silenceMs);
       };
 
+      // Relance une nouvelle session micro en gardant le texte déjà reconnu.
+      const restart = (delay, err) => {
+        if (s.settled || s.stopping) return;
+        if (s.restarts >= MAX_RESTARTS) { settle(err); return; }
+        s.restarts++;
+        s.base = s.text;
+        s.current = '';
+        const old = s.rec;
+        release(old, true);
+        clear('deaf');
+        s.timers.restart = setTimeout(() => {
+          if (s.settled || s.stopping) return;
+          try {
+            s.rec = create();
+            s.rec.start();
+            armDeaf();
+          } catch {
+            restart(400, new SpeechError('start', 'Impossible de démarrer le micro. Réessayez.'));
+          }
+        }, delay);
+      };
+
+      // Micro « sourd » : aucun son capté peu après le démarrage → on relance.
+      const armDeaf = () => {
+        clear('deaf');
+        s.timers.deaf = setTimeout(() => {
+          if (!s.rec._heard && !s.current) restart(150);
+        }, deafMs);
+      };
+
       const create = () => {
         const rec = new SR();
         rec.lang = lang;
@@ -100,32 +142,38 @@ export class Listener {
         rec.interimResults = true;
         rec.maxAlternatives = 1;
 
-        rec.onstart = () => onStart?.();
+        const heard = () => { rec._heard = true; clear('deaf'); };
+        rec.onaudiostart = () => { /* le micro est ouvert, mais il peut encore être sourd */ };
+        rec.onsoundstart = heard;
+        rec.onspeechstart = heard;
 
         rec.onresult = (e) => {
+          heard();
           const text = assemble(e.results);
-          if (!text || text === s.text) return;
-          s.text = text;
-          onText?.(text);
+          if (!text || text === s.current) return;
+          s.current = text;
+          onText?.(s.text);
           if (!s.stopping) armSilence();
         };
 
         rec.onerror = (e) => {
-          if (e.error === 'aborted') return;
+          if (s.rec !== rec || e.error === 'aborted') return;
           if (e.error === 'no-speech') return; // géré par onend
-          if (s.text && (e.error === 'network' || e.error === 'audio-capture')) { settle(); return; }
-          settle(new SpeechError(e.error, ERROR_MESSAGES[e.error] || 'La reconnaissance vocale a échoué. Réessayez.'));
+          const err = new SpeechError(e.error, ERROR_MESSAGES[e.error] || `La reconnaissance vocale a échoué (${e.error}). Réessayez.`);
+          // Erreurs définitives : inutile d'insister.
+          if (e.error === 'language-not-supported') { settle(err); return; }
+          if ((e.error === 'not-allowed' || e.error === 'service-not-allowed') && s.restarts >= 1) { settle(err); return; }
+          // Sur iPhone, ces erreurs sont souvent passagères (micro encore pris par la lecture).
+          restart(450, err);
         };
 
         rec.onend = () => {
-          if (s.settled) return;
-          const elapsed = Date.now() - s.startedAt;
-          // Arrêt spontané du moteur avant toute parole : on relance l'écoute.
-          if (!s.stopping && !s.text && elapsed < noSpeechMs && s.restarts < 4) {
-            s.restarts++;
-            try { s.rec = create(); s.rec.start(); return; } catch { /* on termine */ }
-          }
-          settle();
+          rec._ended = true;
+          if (s.settled || s.rec !== rec) return;
+          if (s.stopping) { settle(); return; }
+          // Arrêt spontané du moteur : on relance tant que l'écoute doit continuer.
+          // (Le minuteur de silence ou de non-parole décidera de la fin.)
+          restart(250);
         };
         return rec;
       };
@@ -134,9 +182,9 @@ export class Listener {
         s.rec = create();
         s.rec.start();
       } catch {
-        settle(new SpeechError('start', 'Impossible de démarrer le micro. Réessayez.'));
-        return;
+        restart(400, new SpeechError('start', 'Impossible de démarrer le micro. Réessayez.'));
       }
+      armDeaf();
 
       s.timers.noSpeech = setTimeout(finish, noSpeechMs);
       s.timers.max = setTimeout(finish, maxMs);
@@ -150,7 +198,8 @@ export class Listener {
   cancel() {
     const s = this.session;
     if (!s) return;
-    s.text = '';
+    s.base = '';
+    s.current = '';
     s.settle();
   }
 }
@@ -187,6 +236,7 @@ class SpeakerImpl {
     this.audio.preload = 'auto';
     this.token = 0;
     this.unlocked = false;
+    this.lastSound = 0;
     this.loadVoices();
     synth?.addEventListener?.('voiceschanged', () => this.loadVoices());
   }
@@ -241,9 +291,26 @@ class SpeakerImpl {
 
   cancel() {
     this.token++;
+    if (this.current != null) this.lastSound = Date.now();
     this.current = null;
     try { synth?.cancel(); } catch { /* rien */ }
-    try { this.audio.pause(); } catch { /* rien */ }
+    this.releaseAudio();
+  }
+
+  /** Libère le lecteur audio pour que le micro retrouve la main (iPhone). */
+  releaseAudio() {
+    try {
+      if (!this.audio.paused) this.audio.pause();
+      if (this.audio.src && !this.audio.src.startsWith('data:')) {
+        this.audio.removeAttribute('src');
+        this.audio.load();
+      }
+    } catch { /* rien */ }
+  }
+
+  /** Une lecture vient-elle d'avoir lieu ? */
+  playedRecently(ms = 3000) {
+    return this.current != null || Date.now() - this.lastSound < ms;
   }
 
   /**
@@ -267,7 +334,11 @@ class SpeakerImpl {
         await this.speakOnline(text, engine, rate, token);
       }
     } finally {
-      if (this.current === token) this.current = null;
+      if (this.current === token) {
+        this.current = null;
+        this.lastSound = Date.now();
+        this.releaseAudio();
+      }
     }
   }
 

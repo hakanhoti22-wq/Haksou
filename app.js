@@ -396,6 +396,7 @@ function spokenSourceCode() {
 async function onMicText() {
   Speaker.unlock();
   if (listener.active) { listener.stop(); return; }
+  const deafMs = Speaker.playedRecently() ? 1300 : 2500;
   stopSpeaking();
   const run = ++voiceRun;
 
@@ -408,6 +409,7 @@ async function onMicText() {
     text = await listener.listen({
       lang: speechLocale(spoken),
       silenceMs: settings.silence * 1000,
+      deafMs,
       onText: t => { live.update(t); heard(el.mic); },
     });
   } catch (err) {
@@ -436,6 +438,7 @@ async function onMicConv(side) {
 }
 
 async function converse(side, chained) {
+  const deafMs = Speaker.playedRecently() ? 1300 : 2500;
   stopSpeaking();
   const run = ++voiceRun;
   const btn = side === 'a' ? el.convA : el.convB;
@@ -453,6 +456,7 @@ async function converse(side, chained) {
     text = await listener.listen({
       lang: speechLocale(from),
       silenceMs: settings.silence * 1000,
+      deafMs,
       onText: t => { live.update(t); heard(btn); },
     });
   } catch (err) {
