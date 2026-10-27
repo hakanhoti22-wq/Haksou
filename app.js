@@ -10,6 +10,8 @@ import { ttsProviderFor, ttsSupports, PROVIDER_NAMES } from './tts.js';
 
 const $ = id => document.getElementById(id);
 
+export const APP_VERSION = '8';
+
 // ---------------------------------------------------------------------------
 // Stockage local
 // ---------------------------------------------------------------------------
@@ -1330,6 +1332,7 @@ function initSettings() {
   if (!Listener.supported) notes.push('La reconnaissance vocale n\'est pas disponible dans ce navigateur : utilisez Safari sur iPhone ou Chrome.');
   if (!window.speechSynthesis) notes.push('La synthèse vocale de l\'appareil est indisponible : une voix en ligne sera utilisée.');
   notes.push(`${LANGUAGES.length} langues disponibles en traduction. L'icône micro indique les langues reconnues à l'oral.`);
+  notes.push(`Version ${APP_VERSION}.`);
   $('envNote').textContent = notes.join(' ');
 }
 
@@ -1483,7 +1486,20 @@ function init() {
   handleIncomingLinks();
 
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-    navigator.serviceWorker.register('sw.js').catch(() => { /* fonctionne sans */ });
+    // Une nouvelle version prend le relais : on recharge une fois pour l'afficher.
+    const hadController = Boolean(navigator.serviceWorker.controller);
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadController || reloaded || voiceActive()) return;
+      reloaded = true;
+      location.reload();
+    });
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+      .then(reg => {
+        reg.update().catch(() => {});
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); });
+      })
+      .catch(() => { /* fonctionne sans */ });
   }
 }
 

@@ -1,5 +1,5 @@
 // Service worker : l'interface fonctionne hors ligne, la traduction passe par le réseau.
-const CACHE = 'haksou-v7';
+const CACHE = 'haksou-v8';
 const SHELL = [
   './',
   'index.html',
@@ -38,8 +38,9 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   if (event.request.method !== 'GET' || url.origin !== location.origin) return;
+  // « no-cache » : toujours vérifier auprès du serveur, pour recevoir les mises à jour tout de suite.
   event.respondWith(
-    fetch(event.request)
+    fetch(url.href, { cache: 'no-cache', credentials: 'same-origin' })
       .then(res => {
         const copy = res.clone();
         caches.open(CACHE).then(c => c.put(event.request, copy));
