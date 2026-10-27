@@ -1,6 +1,9 @@
 // Traduction : moteur principal Google (endpoint public), repli MyMemory,
-// puis, si une clé Groq/OpenAI est enregistrée, un modèle de langage en dernier recours.
+// puis, si une clé Groq/OpenAI ou le relais familial est disponible, un modèle
+// de langage en dernier recours.
 // Chaque requête a un délai maximal et est retentée avant de basculer.
+
+import { apiFetch } from './api.js';
 
 const TIMEOUT_MS = 6000;
 const GOOGLE_MAX = 1200;
@@ -14,11 +17,11 @@ export class TranslationError extends Error {}
 /**
  * Traduit `text` de `from` (code moteur ou 'auto') vers `to`.
  * @param {object} [opts]
- * @param {string} [opts.key]  clé Groq (gsk_…) ou OpenAI (sk-…) pour le dernier recours
+ * @param {import('./api.js').Cred} [opts.cred]  accès Groq/OpenAI pour le dernier recours
  * @param {(code: string) => string} [opts.nameOf]  nom lisible d'une langue
  * @returns {Promise<{ text: string, detected: string|null }>}
  */
-export async function translate(text, from, to, { key = '', nameOf = c => c } = {}) {
+export async function translate(text, from, to, { cred = null, nameOf = c => c } = {}) {
   const clean = text.trim();
   if (!clean) return { text: '', detected: null };
   if (from !== 'auto' && from === to) return { text: clean, detected: from };
@@ -31,7 +34,7 @@ export async function translate(text, from, to, { key = '', nameOf = c => c } = 
   const engines = googleFirst
     ? [() => google(clean, from, to), () => withRetry(() => myMemory(clean, from, to), 2)]
     : [() => myMemory(clean, from, to), () => google(clean, from, to)];
-  if (key) engines.push(() => llm(clean, from, to, key, nameOf));
+  if (cred) engines.push(() => llm(clean, from, to, cred, nameOf));
 
   let result;
   for (const [i, run] of engines.entries()) {
@@ -94,19 +97,19 @@ async function google(text, from, to) {
 }
 
 const LLM = {
-  groq: { url: 'https://api.groq.com/openai/v1/chat/completions', model: 'llama-3.3-70b-versatile' },
-  openai: { url: 'https://api.openai.com/v1/chat/completions', model: 'gpt-4o-mini' },
+  groq: { path: '/openai/v1/chat/completions', model: 'llama-3.3-70b-versatile' },
+  openai: { path: '/v1/chat/completions', model: 'gpt-4o-mini' },
 };
 
-async function llm(text, from, to, key, nameOf) {
-  const p = key.startsWith('gsk_') ? LLM.groq : LLM.openai;
+async function llm(text, from, to, cred, nameOf) {
+  const p = LLM[cred.provider];
   const source = from === 'auto' ? 'the source language (detect it)' : `${nameOf(from)} (${from})`;
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 12000);
   try {
-    const res = await fetch(p.url, {
+    const res = await apiFetch(cred, p.path, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' },
       signal: ctrl.signal,
       body: JSON.stringify({
         model: p.model,

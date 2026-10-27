@@ -744,6 +744,7 @@ textarea::placeholder { color: var(--ink-3); }
 .row-btn svg { width: 19px; height: 19px; }
 .row-btn.accent { color: var(--amber); }
 .row-btn.danger { color: var(--danger); }
+.row-btn:disabled { opacity: .4; }
 button.row:active { background: color-mix(in srgb, var(--ink) 5%, transparent); }
 .row.links { justify-content: flex-start; gap: 18px; flex-wrap: wrap; min-height: 46px; }
 .row.links a { font-size: 14px; font-weight: 650; color: var(--amber); text-decoration: none; }

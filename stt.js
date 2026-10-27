@@ -1,5 +1,7 @@
-// Transcription de l'audio enregistré (Whisper), via Groq (clé gsk_…) ou OpenAI (clé sk-…).
-// La clé reste sur l'appareil et n'est envoyée qu'au service choisi.
+// Transcription de l'audio enregistré (Whisper), via Groq (clé gsk_…) ou OpenAI (clé sk-…),
+// directement ou via le relais familial.
+
+import { apiFetch, authMessage } from './api.js';
 
 export class SttError extends Error {
   constructor(code, message) {
@@ -11,8 +13,8 @@ export class SttError extends Error {
 const TIMEOUT_MS = 20000;
 
 const PROVIDERS = {
-  groq: { url: 'https://api.groq.com/openai/v1/audio/transcriptions', model: 'whisper-large-v3-turbo' },
-  openai: { url: 'https://api.openai.com/v1/audio/transcriptions', model: 'whisper-1' },
+  groq: { path: '/openai/v1/audio/transcriptions', model: 'whisper-large-v3-turbo' },
+  openai: { path: '/v1/audio/transcriptions', model: 'whisper-1' },
 };
 
 export const providerFor = key => (key.trim().startsWith('gsk_') ? 'groq' : 'openai');
@@ -42,11 +44,11 @@ function extensionFor(type) {
 /**
  * @param {Blob} blob   audio enregistré
  * @param {string} langCode  code de la langue parlée (moteur de traduction)
- * @param {string} key  clé API
+ * @param {import('./api.js').Cred} cred  clé ou relais (fournisseur groq ou openai)
  * @returns {Promise<string>} texte reconnu ('' si rien)
  */
-export async function transcribe(blob, langCode, key) {
-  const provider = PROVIDERS[providerFor(key)];
+export async function transcribe(blob, langCode, cred) {
+  const provider = PROVIDERS[cred.provider];
   const language = whisperLanguage(langCode);
 
   const send = async (withLanguage) => {
@@ -61,9 +63,8 @@ export async function transcribe(blob, langCode, key) {
     const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
     let res;
     try {
-      res = await fetch(provider.url, {
+      res = await apiFetch(cred, provider.path, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${key.trim()}` },
         body: form,
         signal: ctrl.signal,
       });
@@ -74,7 +75,7 @@ export async function transcribe(blob, langCode, key) {
     } finally {
       clearTimeout(timer);
     }
-    if (res.status === 401 || res.status === 403) throw new SttError('key', 'Clé de reconnaissance vocale invalide. Vérifiez-la dans les réglages.');
+    if (res.status === 401 || res.status === 403) throw new SttError('key', authMessage(cred, 'de reconnaissance vocale'));
     if (res.status === 429) throw new SttError('quota', 'Limite du service vocal atteinte. Réessayez dans une minute.');
     if (res.status === 400 && withLanguage && language) return send(false); // langue refusée : détection automatique
     if (!res.ok) throw new SttError('server', `Le service de reconnaissance vocale a échoué (${res.status}). Réessayez.`);

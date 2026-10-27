@@ -22,6 +22,11 @@ La solution : l'app enregistre elle-même la voix, détecte le silence, puis fai
 
 La clé reste sur le téléphone et n'est envoyée qu'à Groq. Elle sert aussi de traduction de secours si les services gratuits ne répondent pas. Une clé OpenAI (`sk-…`) fonctionne aussi.
 
+## Relais familial (aucune clé chez vos proches)
+
+Le dossier [`relay/`](relay/) contient un petit serveur gratuit (Cloudflare Worker) qui garde vos clés cachées. Vos proches ouvrent votre **lien famille** et le micro fiable + la voix naturelle fonctionnent sans clé.
+Mise en place pas à pas : [`relay/LISEZMOI.md`](relay/LISEZMOI.md).
+
 ## Voix naturelle (IA)
 
 Pour une voix humaine, chaleureuse et pas robotique : ⚙︎ Réglages → **Voix naturelle (IA)** → coller une clé.
@@ -67,6 +72,8 @@ Puis ouvrir `http://localhost:8000`. Aucune dépendance, aucune étape de compil
 | `stt.js` | Transcription Whisper (Groq ou OpenAI) |
 | `tts.js` | Voix naturelles (ElevenLabs ou OpenAI) |
 | `audio.js` | Moteur audio partagé (Web Audio) |
+| `api.js` | Accès aux services d'IA (clé directe ou relais familial) |
+| `relay/worker.js` | Relais familial à déployer sur Cloudflare |
 | `translator.js` | Traduction avec délai maximal, cache et moteur de secours |
 | `languages.js` | Liste des langues et locales vocales |
 | `sw.js`, `manifest.webmanifest`, `icons/` | Installation sur l'écran d'accueil et hors ligne |

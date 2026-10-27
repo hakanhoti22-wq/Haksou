@@ -2,7 +2,8 @@ import { LANGUAGES, AUTO, findLanguage, engineCode, speechLocale, nativeName, fl
 import { translate } from './translator.js';
 import { Listener, Speaker } from './speech.js';
 import { VoiceRecorder } from './recorder.js';
-import { transcribe } from './stt.js';
+import { transcribe, providerFor } from './stt.js';
+import { relayStatus } from './api.js';
 import { ttsProviderFor, ttsSupports, PROVIDER_NAMES } from './tts.js';
 
 const $ = id => document.getElementById(id);
@@ -41,6 +42,9 @@ const settings = {
   sttKey: '',
   ttsKey: '',
   voiceGender: 'female',
+  relayUrl: '',
+  relayCode: '',
+  relayInfo: null,
   ...store.get('settings', {}),
 };
 const saveSettings = () => store.set('settings', settings);
@@ -333,7 +337,7 @@ async function runTranslation(mode, m) {
   m.status = 'pending';
   try {
     const res = await translate(m.original, m.auto ? 'auto' : engineCode(lang(m.from)), engineCode(lang(m.to)), {
-      key: settings.sttKey,
+      cred: sttCred(),
       nameOf: code => findLanguage(code)?.name || code,
     });
     if (m.auto && res.detected) {
@@ -412,6 +416,72 @@ async function speakMessage(m, delay = 0) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Accès aux services d'IA : clé sur l'appareil, sinon relais familial
+// ---------------------------------------------------------------------------
+
+const relay = () => (settings.relayUrl && settings.relayCode ? { url: settings.relayUrl, code: settings.relayCode } : null);
+
+/** Accès pour le micro fiable (Whisper) et la traduction de secours. */
+function sttCred() {
+  if (settings.sttKey) return { provider: providerFor(settings.sttKey), key: settings.sttKey };
+  if (relay() && settings.relayInfo?.stt) return { provider: settings.relayInfo.stt, relay: relay() };
+  return null;
+}
+
+/** Accès pour la voix naturelle. */
+function ttsCred() {
+  const key = voiceKey();
+  const provider = ttsProviderFor(key);
+  if (provider) return { provider, key };
+  if (relay() && settings.relayInfo?.tts) return { provider: settings.relayInfo.tts, relay: relay() };
+  return null;
+}
+
+/** Interroge le relais et mémorise ce qu'il propose. */
+async function connectRelay({ quiet = false } = {}) {
+  const r = relay();
+  if (!r) { settings.relayInfo = null; saveSettings(); return null; }
+  try {
+    const info = await relayStatus(r);
+    settings.relayInfo = { stt: info.stt || null, tts: info.tts || null };
+    saveSettings();
+    if (!quiet) {
+      const parts = [settings.relayInfo.stt ? 'micro fiable ✓' : 'micro fiable ✗', settings.relayInfo.tts ? 'voix naturelle ✓' : 'voix naturelle ✗'];
+      toast(`Relais familial connecté : ${parts.join(' · ')}`);
+    }
+    return settings.relayInfo;
+  } catch (err) {
+    if (!quiet) toast(err.message || 'Relais injoignable.');
+    return null;
+  } finally {
+    refreshSettingsStatus();
+  }
+}
+
+/** Lien qui configure l'app d'un proche en un toucher. */
+function familyLink() {
+  const params = new URLSearchParams({ relais: settings.relayUrl, code: settings.relayCode });
+  return `${location.origin}${location.pathname}#${params}`;
+}
+
+/** Applique un lien famille (#relais=…&code=…) ouvert sur cet appareil. */
+function applyFamilyLink() {
+  const params = new URLSearchParams(location.hash.slice(1));
+  const url = params.get('relais');
+  const code = params.get('code');
+  if (!url || !code) return false;
+  // Le lien reste dans l'adresse : l'icône « Sur l'écran d'accueil » le garde ainsi.
+  const changed = url !== settings.relayUrl || code !== settings.relayCode;
+  settings.relayUrl = url;
+  settings.relayCode = code;
+  saveSettings();
+  connectRelay({ quiet: !changed });
+  return true;
+}
+
+let refreshSettingsStatus = () => {};
+
 /** Clé de voix naturelle : celle des réglages, ou la clé OpenAI du micro. */
 function voiceKey() {
   if (settings.ttsKey) return settings.ttsKey;
@@ -422,12 +492,11 @@ const englishNames = (() => { try { return new Intl.DisplayNames(['en'], { type:
 
 /** Paramètres de la voix IA pour une langue, ou null (voix de l'appareil). */
 function neuralVoiceFor(language) {
-  const key = voiceKey();
-  const provider = ttsProviderFor(key);
-  if (!provider || !ttsSupports(provider, language.code)) return null;
+  const cred = ttsCred();
+  if (!cred || !ttsSupports(cred.provider, language.code)) return null;
   let langName = language.name;
   try { langName = englishNames?.of(language.iso || language.code.split('-')[0]) || langName; } catch { /* nom français */ }
-  return { key, langCode: language.code, langName, gender: settings.voiceGender };
+  return { cred, langCode: language.code, langName, gender: settings.voiceGender };
 }
 
 let neuralErrorShown = false;
@@ -462,7 +531,7 @@ function refreshPlaying() {
  *    devient « sourde » après la première dictée (bug d'iOS) ;
  *  - sinon, la reconnaissance vocale intégrée au navigateur.
  */
-const useWhisper = () => Boolean(settings.sttKey) && VoiceRecorder.supported;
+const useWhisper = () => Boolean(sttCred()) && VoiceRecorder.supported;
 const voiceActive = () => listener.active || recorder.active;
 function voiceStop() { listener.stop(); recorder.stop(); }
 function voiceCancel() { listener.cancel(); recorder.cancel(); }
@@ -482,7 +551,7 @@ async function captureSpeech(language, live, btn, deafMs) {
     live.pending();
     showStatus('Transcription…');
     try {
-      return await transcribe(res.blob, language.code, settings.sttKey);
+      return await transcribe(res.blob, language.code, sttCred());
     } finally {
       if (!document.querySelector('.listening')) hideStatus();
     }
@@ -866,9 +935,9 @@ function initSettings() {
   const sttKey = $('optSttKey');
   const sttStatus = $('sttStatus');
   const showStt = () => {
-    const on = Boolean(settings.sttKey);
-    sttStatus.textContent = on ? 'Activé' : 'Désactivé';
-    sttStatus.classList.toggle('on', on);
+    const cred = sttCred();
+    sttStatus.textContent = cred ? (cred.relay ? 'Via le relais' : 'Activé') : 'Désactivé';
+    sttStatus.classList.toggle('on', Boolean(cred));
   };
   sttKey.value = settings.sttKey;
   showStt();
@@ -883,9 +952,11 @@ function initSettings() {
   const ttsKey = $('optTtsKey');
   const ttsStatus = $('ttsStatus');
   const showTts = () => {
-    const provider = ttsProviderFor(voiceKey());
-    ttsStatus.textContent = provider ? PROVIDER_NAMES[provider] : (settings.ttsKey ? 'Clé non reconnue' : 'Voix de l\'iPhone');
-    ttsStatus.classList.toggle('on', Boolean(provider));
+    const cred = ttsCred();
+    ttsStatus.textContent = cred
+      ? `${PROVIDER_NAMES[cred.provider]}${cred.relay ? ' · relais' : ''}`
+      : (settings.ttsKey ? 'Clé non reconnue' : 'Voix de l\'iPhone');
+    ttsStatus.classList.toggle('on', Boolean(cred));
   };
   ttsKey.value = settings.ttsKey;
   showTts();
@@ -896,6 +967,41 @@ function initSettings() {
     showTts();
   });
   sttKey.addEventListener('input', showTts);
+
+  // Relais familial
+  const relayUrl = $('optRelayUrl');
+  const relayCode = $('optRelayCode');
+  const relayState = $('relayStatus');
+  const shareBtn = $('shareFamilyBtn');
+  const showRelay = () => {
+    const r = relay();
+    const info = settings.relayInfo;
+    relayState.textContent = !r ? 'Non configuré' : info ? 'Connecté' : 'Non connecté';
+    relayState.classList.toggle('on', Boolean(r && info));
+    shareBtn.disabled = !(r && info);
+  };
+  relayUrl.value = settings.relayUrl;
+  relayCode.value = settings.relayCode;
+  const onRelayChange = () => {
+    settings.relayUrl = relayUrl.value.trim();
+    settings.relayCode = relayCode.value.trim();
+    settings.relayInfo = null;
+    saveSettings();
+    showRelay();
+    if (relay()) connectRelay();
+  };
+  relayUrl.addEventListener('change', onRelayChange);
+  relayCode.addEventListener('change', onRelayChange);
+  shareBtn.addEventListener('click', async () => {
+    const link = familyLink();
+    if (navigator.share) {
+      try { await navigator.share({ title: 'Haksou', text: 'Mon traducteur Haksou : ouvre ce lien dans Safari, puis Partager → Sur l\'écran d\'accueil.', url: link }); return; } catch { /* partage annulé : on copie */ }
+    }
+    await copyText(link);
+    toast('Lien famille copié. Envoie-le à tes proches !');
+  });
+  refreshSettingsStatus = () => { showRelay(); showStt(); showTts(); };
+  showRelay();
 
   const genderButtons = [...document.querySelectorAll('#optGender [role="radio"]')];
   const showGender = () => genderButtons.forEach(b => b.setAttribute('aria-checked', String(b.dataset.value === settings.voiceGender)));
@@ -1056,8 +1162,10 @@ function init() {
     el.input.addEventListener('focus', () => setTimeout(() => scrollToBottom(true), 300));
   }
 
+  const fromLink = applyFamilyLink();
   initSettings();
   applyMode();
+  if (!fromLink && relay()) connectRelay({ quiet: true });
 
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     navigator.serviceWorker.register('sw.js').catch(() => { /* fonctionne sans */ });

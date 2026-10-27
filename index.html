@@ -148,6 +148,22 @@
     </div>
     <div class="sheet-body">
 
+      <div class="group-title">Relais familial</div>
+      <div class="group">
+        <div class="row row-col">
+          <span class="row-text">
+            <span>Mon relais <span class="pill-status" id="relayStatus"></span></span>
+            <small>Vos clés restent cachées sur votre relais Cloudflare : vos proches n'ont besoin d'aucune clé. Normalement rempli automatiquement par le lien famille.</small>
+          </span>
+          <input class="text-input" id="optRelayUrl" type="url" inputmode="url" placeholder="https://haksou-relais.….workers.dev" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+          <input class="text-input" id="optRelayCode" type="text" placeholder="Code famille" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+        </div>
+        <button class="row row-btn accent" id="shareFamilyBtn" disabled>
+          <svg viewBox="0 0 24 24"><path d="M12 15V3m0 0L8 7m4-4 4 4"/><path d="M7 11H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-1"/></svg>
+          Partager le lien famille
+        </button>
+      </div>
+
       <div class="group-title">Voix naturelle (IA)</div>
       <div class="group">
         <div class="row row-col">

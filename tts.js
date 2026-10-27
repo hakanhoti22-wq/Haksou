@@ -1,6 +1,7 @@
-// Voix naturelles (IA) : ElevenLabs (clé sk_…) ou OpenAI (clé sk-…).
-// La clé reste sur l'appareil et n'est envoyée qu'au service choisi.
-// En cas d'échec, l'app reprend automatiquement la voix de l'iPhone.
+// Voix naturelles (IA) : ElevenLabs (clé sk_…) ou OpenAI (clé sk-…), directement
+// ou via le relais familial. En cas d'échec, l'app reprend la voix de l'iPhone.
+
+import { apiFetch, authMessage } from './api.js';
 
 export class TtsError extends Error {
   constructor(code, message) {
@@ -48,16 +49,15 @@ const cache = new Map();
  * Génère l'audio (MP3) d'un texte.
  * @param {string} text
  * @param {object} o
- * @param {string} o.key       clé du service
+ * @param {import('./api.js').Cred} o.cred  clé ou relais (elevenlabs ou openai)
  * @param {string} o.langCode  code de la langue (moteur de traduction)
  * @param {string} o.langName  nom de la langue (pour les consignes de diction)
  * @param {'female'|'male'} [o.gender]
  * @param {number} [o.rate]    vitesse (1 = normale)
  * @returns {Promise<ArrayBuffer>}
  */
-export async function synthesize(text, { key, langCode, langName, gender = 'female', rate = 1 }) {
-  const provider = ttsProviderFor(key);
-  if (!provider) throw new TtsError('key', 'Clé de voix non reconnue.');
+export async function synthesize(text, { cred, langCode, langName, gender = 'female', rate = 1 }) {
+  const provider = cred.provider;
   const cacheKey = `${provider}|${gender}|${rate}|${langCode}|${text}`;
   if (cache.has(cacheKey)) return cache.get(cacheKey).slice(0);
 
@@ -66,14 +66,14 @@ export async function synthesize(text, { key, langCode, langName, gender = 'fema
   let res;
   try {
     res = provider === 'elevenlabs'
-      ? await elevenLabs(text, key.trim(), langCode, gender, rate, ctrl.signal)
-      : await openAi(text, key.trim(), langName, gender, rate, ctrl.signal);
+      ? await elevenLabs(text, cred, langCode, gender, rate, ctrl.signal)
+      : await openAi(text, cred, langName, gender, rate, ctrl.signal);
   } catch {
     throw new TtsError('network', 'Voix naturelle injoignable.');
   } finally {
     clearTimeout(timer);
   }
-  if (res.status === 401 || res.status === 403) throw new TtsError('key', `Clé ${PROVIDER_NAMES[provider]} invalide.`);
+  if (res.status === 401 || res.status === 403) throw new TtsError('key', authMessage(cred, PROVIDER_NAMES[provider]));
   if (res.status === 402 || res.status === 429) throw new TtsError('quota', `Crédit ${PROVIDER_NAMES[provider]} épuisé pour le moment.`);
   if (!res.ok) throw new TtsError('server', `Voix ${PROVIDER_NAMES[provider]} indisponible (${res.status}).`);
 
@@ -83,12 +83,12 @@ export async function synthesize(text, { key, langCode, langName, gender = 'fema
   return buf.slice(0);
 }
 
-function elevenLabs(text, key, langCode, gender, rate, signal) {
+function elevenLabs(text, cred, langCode, gender, rate, signal) {
   const iso = isoOf(langCode);
-  return fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVEN_VOICES[gender] || ELEVEN_VOICES.female}?output_format=mp3_44100_128`, {
+  return apiFetch(cred, `/v1/text-to-speech/${ELEVEN_VOICES[gender] || ELEVEN_VOICES.female}?output_format=mp3_44100_128`, {
     method: 'POST',
     signal,
-    headers: { 'xi-api-key': key, 'Content-Type': 'application/json', Accept: 'audio/mpeg' },
+    headers: { 'Content-Type': 'application/json', Accept: 'audio/mpeg' },
     body: JSON.stringify({
       text,
       model_id: 'eleven_flash_v2_5',
@@ -103,12 +103,12 @@ function elevenLabs(text, key, langCode, gender, rate, signal) {
   });
 }
 
-function openAi(text, key, langName, gender, rate, signal) {
+function openAi(text, cred, langName, gender, rate, signal) {
   const pace = rate < 0.9 ? ' Speak a little slowly and clearly.' : rate > 1.1 ? ' Speak at a lively, slightly fast pace.' : '';
-  return fetch('https://api.openai.com/v1/audio/speech', {
+  return apiFetch(cred, '/v1/audio/speech', {
     method: 'POST',
     signal,
-    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: 'gpt-4o-mini-tts',
       voice: OPENAI_VOICES[gender] || OPENAI_VOICES.female,
