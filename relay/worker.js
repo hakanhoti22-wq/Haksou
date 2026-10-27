@@ -245,6 +245,16 @@ async function accountRoutes(path, request, env, token, reply) {
     return reply({ token: user.token, account: publicAccount(user, await computeAccess(env, user)) });
   }
 
+  // Supprimer son compte et ses données (droit à l'effacement)
+  if (path === '/account/delete' && request.method === 'POST') {
+    const access = await computeAccess(env, user, { force: true });
+    if (access.kind === 'sub' && !user.cancelAtPeriodEnd) {
+      return reply({ error: 'Résiliez d\'abord votre abonnement (Gérer ou résilier), puis supprimez le compte.' }, 409);
+    }
+    await deleteUser(env, user);
+    return reply({ ok: true });
+  }
+
   // Gérer / résilier l'abonnement (portail Stripe)
   if (path === '/billing/portal' && request.method === 'POST') {
     if (!user.customer) return reply({ error: 'Aucun abonnement à gérer.' }, 400);
@@ -317,6 +327,46 @@ function publicAccount(user, access) {
 async function adminRoutes(path, request, env, reply) {
   const body = request.method === 'POST' ? await request.json().catch(() => ({})) : {};
 
+  // Tableau de bord : nombre d'utilisateurs par statut et liste des comptes
+  if (path === '/admin/stats') {
+    const now = Date.now();
+    const invites = new Map();
+    for (const k of await listAll(env, 'invite:')) {
+      const inv = await env.HAKSOU.get(k, 'json');
+      if (inv) invites.set(inv.code, inv);
+    }
+    const counts = { total: 0, trial: 0, monthly: 0, yearly: 0, family: 0, expired: 0, newThisWeek: 0 };
+    const users = [];
+    for (const k of await listAll(env, 'user:')) {
+      const u = await env.HAKSOU.get(k, 'json');
+      if (!u) continue;
+      const status = quickStatus(u, invites, now);
+      counts.total++;
+      counts[status]++;
+      if (u.created && now - u.created < 7 * DAY) counts.newThisWeek++;
+      users.push({
+        token: u.token,
+        email: u.email || null,
+        name: u.name || null,
+        status,
+        created: u.created || null,
+        trialEndsAt: u.trialEndsAt || null,
+        periodEnd: u.periodEnd || null,
+        cancelAtPeriodEnd: Boolean(u.cancelAtPeriodEnd),
+      });
+    }
+    users.sort((a, b) => (b.created || 0) - (a.created || 0));
+    return reply({ counts, users });
+  }
+
+  // Supprimer le compte d'une personne (à sa demande)
+  if (path === '/admin/delete' && request.method === 'POST') {
+    const user = await getUser(env, String(body.token || ''));
+    if (!user) return reply({ error: 'Compte introuvable.' }, 404);
+    await deleteUser(env, user);
+    return reply({ ok: true });
+  }
+
   if (path === '/admin/invite' && request.method === 'POST') {
     const name = String(body.name || '').trim().slice(0, 40) || 'Proche';
     const invite = { code: newToken(), name, created: Date.now(), devices: [], revoked: false };
@@ -356,6 +406,39 @@ async function getUser(env, token) {
   return env.HAKSOU.get(`user:${token}`, 'json');
 }
 const putUser = (env, user) => env.HAKSOU.put(`user:${user.token}`, JSON.stringify(user));
+
+/** Statut d'un compte sans appeler Stripe (pour le tableau de bord). */
+function quickStatus(u, invites, now) {
+  if (u.kind === 'family') {
+    const inv = invites.get(u.invite);
+    return inv && !inv.revoked ? 'family' : 'expired';
+  }
+  if (u.subscription && ACTIVE_SUB.has(u.subStatus) && (!u.periodEnd || u.periodEnd + 3 * DAY > now)) {
+    return u.plan === 'yearly' ? 'yearly' : 'monthly';
+  }
+  if (u.trialEndsAt && u.trialEndsAt > now) return 'trial';
+  return 'expired';
+}
+
+/** Toutes les clés KV d'un préfixe (avec pagination). */
+async function listAll(env, prefix) {
+  const names = [];
+  let cursor;
+  do {
+    const page = await env.HAKSOU.list({ prefix, cursor });
+    names.push(...page.keys.map(k => k.name));
+    cursor = page.list_complete === false ? page.cursor : undefined;
+  } while (cursor);
+  return names;
+}
+
+/** Efface un compte et l'e-mail associé. */
+async function deleteUser(env, user) {
+  await env.HAKSOU.delete(`user:${user.token}`);
+  if (user.email && (await env.HAKSOU.get(`email:${user.email}`)) === user.token) {
+    await env.HAKSOU.delete(`email:${user.email}`);
+  }
+}
 
 async function withinDailyLimit(env, token) {
   const limit = parseInt(env.DAILY_LIMIT || '300', 10) || 300;

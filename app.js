@@ -10,7 +10,7 @@ import { ttsProviderFor, ttsSupports, PROVIDER_NAMES } from './tts.js';
 
 const $ = id => document.getElementById(id);
 
-export const APP_VERSION = '12';
+export const APP_VERSION = '13';
 
 // ---------------------------------------------------------------------------
 // Stockage local
@@ -561,6 +561,71 @@ async function handleIncomingLinks() {
   if (billingOn() && !account.token) openAccountSheet('welcome');
 }
 
+const STATUS_LABELS = { trial: 'Essai', monthly: 'Mensuel', yearly: 'Annuel', family: 'Famille', expired: 'Expiré' };
+
+/** Tableau de bord du propriétaire : chiffres clés et liste des comptes. */
+async function renderStats() {
+  accountSheet.title.textContent = 'Statistiques';
+  const body = accountSheet.body;
+  body.innerHTML = '<div class="acct-hero"><span class="typing"><i></i><i></i><i></i></span></div>';
+  let data;
+  try {
+    data = await adminCall(relayBase(), settings.relayCode, '/admin/stats');
+  } catch (err) {
+    body.innerHTML = `<div class="acct-hero"><p>${escapeHtml(err.message)}</p></div>`;
+    return;
+  }
+  const c = data.counts;
+  const day = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' });
+  const paying = c.monthly + c.yearly;
+  const revenue = (c.monthly * 0.95 + c.yearly * 9.95 / 12).toFixed(2).replace('.', ',');
+  body.innerHTML = `
+    <div class="stats-grid">
+      <div class="stat hl"><b>${c.total}</b><span>Utilisateurs</span></div>
+      <div class="stat"><b>${c.newThisWeek}</b><span>Nouveaux (7 j)</span></div>
+      <div class="stat hl"><b>${paying}</b><span>Abonnés</span></div>
+      <div class="stat"><b>${c.trial}</b><span>En essai</span></div>
+      <div class="stat"><b>${c.monthly} / ${c.yearly}</b><span>Mensuel / Annuel</span></div>
+      <div class="stat"><b>${c.family}</b><span>Famille</span></div>
+    </div>
+    <p class="fine" style="margin:0 0 12px">≈ ${revenue} CHF de revenus par mois (avant frais Stripe) · ${c.expired} essai(s) expiré(s)</p>
+    <input class="text-input stats-search" id="statsSearch" type="search" placeholder="Rechercher un e-mail" autocomplete="off" autocapitalize="off">
+    <div class="group" id="statsList"></div>`;
+  const list = $('statsList');
+  const detail = u => {
+    if (u.status === 'trial' && u.trialEndsAt) return `Essai jusqu'au ${day.format(new Date(u.trialEndsAt))}`;
+    if ((u.status === 'monthly' || u.status === 'yearly') && u.periodEnd) return `${u.cancelAtPeriodEnd ? 'Se termine' : 'Renouvellement'} le ${day.format(new Date(u.periodEnd))}`;
+    if (u.status === 'family') return u.name ? `Invité : ${u.name}` : 'Invité';
+    return u.created ? `Inscrit le ${day.format(new Date(u.created))}` : '';
+  };
+  const draw = (q = '') => {
+    const rows = data.users.filter(u => !q || (u.email || u.name || '').toLowerCase().includes(q));
+    if (!rows.length) { list.innerHTML = '<div class="no-result">Aucun utilisateur</div>'; return; }
+    list.replaceChildren(...rows.map(u => {
+      const row = node('div', 'row user-row');
+      const txt = node('span', 'row-text');
+      txt.append(node('span', '', escapeHtml(u.email || u.name || 'Proche invité')), node('small', '', escapeHtml(detail(u))));
+      const right = node('span', 'lang-tags');
+      right.append(node('span', `badge ${u.status}`, STATUS_LABELS[u.status] || u.status));
+      const del = node('button', 'small-btn', '✕');
+      del.setAttribute('aria-label', 'Supprimer ce compte');
+      del.addEventListener('click', async () => {
+        if (!confirm(`Supprimer définitivement le compte ${u.email || u.name || ''} et ses données ?`)) return;
+        try {
+          await adminCall(relayBase(), settings.relayCode, '/admin/delete', { token: u.token });
+          toast('Compte supprimé.');
+          renderStats();
+        } catch (err) { toast(err.message); }
+      });
+      right.append(del);
+      row.append(txt, right);
+      return row;
+    }));
+  };
+  $('statsSearch').addEventListener('input', e => draw(e.target.value.trim().toLowerCase()));
+  draw();
+}
+
 const accountSheet = { sheet: $('accountSheet'), backdrop: $('accountBackdrop'), body: $('accountBody'), title: $('accountTitle') };
 let selectedPlan = 'yearly';
 
@@ -591,6 +656,7 @@ function renderAccount(view) {
       <input class="text-input" id="acctEmail" type="email" inputmode="email" placeholder="Votre e-mail" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false">
       <button class="cta" id="acctStart">Commencer l'essai gratuit</button>
       <button class="link-btn" id="acctToRestore">J'ai déjà un compte</button>
+      <p class="fine">En continuant, vous acceptez la <a href="privacy.html" target="_blank" rel="noopener">politique de confidentialité</a>.</p>
       <p class="fine">Astuce iPhone : ajoutez d'abord Haksou à l'écran d'accueil (Partager → Sur l'écran d'accueil), puis lancez l'essai depuis l'icône.</p>`;
     const start = $('acctStart');
     start.addEventListener('click', async () => {
@@ -638,6 +704,11 @@ function renderAccount(view) {
         btn.disabled = false;
       }
     });
+    return;
+  }
+
+  if (view === 'stats') {
+    renderStats();
     return;
   }
 
@@ -1204,6 +1275,7 @@ function initSettings() {
       : info ? 'Connecté' : 'Non connecté';
     relayState.classList.toggle('on', Boolean(info && (isOwner() || !settings.relayCode)));
     inviteBtn.hidden = !(isOwner() && info?.family);
+    $('statsBtn').hidden = inviteBtn.hidden;
     if (inviteBtn.hidden) familyList.replaceChildren();
     // Propriétaire sans base de données : on explique ce qui manque sur Cloudflare.
     $('relayHint').hidden = !(isOwner() && info && !info.family);
@@ -1297,8 +1369,23 @@ function initSettings() {
     $('subscribeBtn').textContent = kind === 'none' ? 'Commencer l\'essai gratuit' : 'S\'abonner';
     $('manageSubBtn').hidden = !i?.canManage;
     $('copyRecoveryBtn').hidden = !account.token;
+    $('deleteAccountBtn').hidden = !account.token;
   };
   $('subscribeBtn').addEventListener('click', () => openAccountSheet(account.token ? 'paywall' : 'welcome'));
+  $('statsBtn').addEventListener('click', () => openAccountSheet('stats'));
+  $('deleteAccountBtn').addEventListener('click', async () => {
+    if (!confirm('Supprimer définitivement votre compte Haksou et vos données (e-mail, essai, statut) ? Cette action est irréversible.')) return;
+    try {
+      await account.call('/account/delete', {});
+      account.forget();
+      store.set('history.text', []);
+      store.set('history.conv', []);
+      toast('Compte et données supprimés.');
+      setTimeout(() => location.reload(), 1200);
+    } catch (err) {
+      toast(err.message);
+    }
+  });
   $('restoreBtn').addEventListener('click', () => openAccountSheet('restore'));
   $('copyRecoveryBtn').addEventListener('click', async () => {
     await copyText(account.token);

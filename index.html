@@ -161,6 +161,7 @@
           <button class="row row-btn" id="manageSubBtn" hidden>Gérer ou résilier l'abonnement</button>
           <button class="row row-btn" id="copyRecoveryBtn" hidden>Copier mon code de récupération</button>
           <button class="row row-btn" id="restoreBtn">Restaurer un compte</button>
+          <button class="row row-btn danger" id="deleteAccountBtn" hidden>Supprimer mon compte et mes données</button>
         </div>
         <p class="group-note">Le code de récupération permet de retrouver votre abonnement sur un autre appareil. Gardez-le précieusement.</p>
       </div>
@@ -181,6 +182,10 @@
         <button class="row row-btn accent" id="inviteBtn" hidden>
           <svg viewBox="0 0 24 24"><path d="M12 15V3m0 0L8 7m4-4 4 4"/><path d="M7 11H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-1"/></svg>
           Inviter un proche (gratuit)
+        </button>
+        <button class="row row-btn accent" id="statsBtn" hidden>
+          <svg viewBox="0 0 24 24"><path d="M4 20V10m6 10V4m6 16v-7m4 7H3"/></svg>
+          Statistiques et utilisateurs
         </button>
         <div id="familyList"></div>
         <div class="row" id="relayHint" hidden>
@@ -261,6 +266,7 @@
       </div>
 
       <p class="foot-note" id="envNote"></p>
+      <p class="foot-note"><a href="privacy.html" target="_blank" rel="noopener">Politique de confidentialité</a></p>
     </div>
   </section>
 

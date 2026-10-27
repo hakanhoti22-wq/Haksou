@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Haksou — Politique de confidentialité</title>
+  <meta name="theme-color" content="#F3E9DA">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap">
+  <style>
+    :root {
+      --bg: #F3E9DA; --ink: #26190F; --ink-2: #6B5644; --amber: #E38A2B; --card: rgba(255, 251, 245, .82);
+      --line: rgba(70, 45, 25, .12);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #120D09; --ink: #F6EBDB; --ink-2: #C2AC93; --card: rgba(48, 35, 25, .86); --line: rgba(255, 225, 185, .1); }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 16px/1.6 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    main { max-width: 720px; margin: 0 auto; padding: calc(env(safe-area-inset-top) + 28px) 18px 60px; }
+    .back { display: inline-block; margin-bottom: 18px; color: var(--amber); font-weight: 650; text-decoration: none; }
+    h1 { margin: 0 0 4px; font: 400 40px/1.05 "Instrument Serif", Georgia, serif; }
+    .updated { margin: 0 0 22px; color: var(--ink-2); font-size: 14px; }
+    section { margin: 0 0 14px; padding: 18px 20px; border-radius: 20px; background: var(--card); border: 1px solid var(--line); }
+    h2 { margin: 0 0 8px; font: 400 25px/1.15 "Instrument Serif", Georgia, serif; }
+    p, li { color: var(--ink); }
+    ul { margin: 6px 0 0; padding-left: 20px; }
+    li { margin: 4px 0; }
+    small { color: var(--ink-2); }
+    a { color: var(--amber); }
+  </style>
+</head>
+<body>
+<main>
+  <a class="back" href="./">← Retour à Haksou</a>
+  <h1>Politique de confidentialité</h1>
+  <p class="updated">Dernière mise à jour : 27 octobre 2026</p>
+
+  <section>
+    <h2>En bref</h2>
+    <ul>
+      <li>Nous collectons le strict minimum : votre e-mail et l'état de votre abonnement.</li>
+      <li>Vos phrases et votre voix servent uniquement à les traduire, sur le moment. Nous ne les conservons pas sur nos serveurs.</li>
+      <li>Pas de publicité, pas de revente de données, pas de traçage publicitaire.</li>
+      <li>Vous pouvez supprimer votre compte à tout moment depuis l'app.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Responsable du traitement</h2>
+    <p>Haksou est édité par <b id="ownerName">[Nom du responsable]</b>, Suisse.<br>
+      Contact pour toute question sur vos données : <b id="ownerEmail">[e-mail de contact]</b>.</p>
+  </section>
+
+  <section>
+    <h2>Données que nous traitons</h2>
+    <ul>
+      <li><b>Compte</b> : adresse e-mail, date d'inscription, fin de l'essai gratuit, statut d'abonnement (mensuel ou annuel, date de renouvellement) ou accès familial, et un code de compte (« code de récupération »).</li>
+      <li><b>Utilisation</b> : un compteur du nombre de requêtes par jour, pour éviter les abus. Il est effacé automatiquement après 2 jours.</li>
+      <li><b>Paiement</b> : géré entièrement par Stripe. Nous ne voyons jamais votre numéro de carte.</li>
+      <li><b>Sur votre appareil uniquement</b> : historique des traductions et réglages (stockage local du navigateur). Ces données ne nous sont pas envoyées.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Traduction, voix et micro</h2>
+    <p>Pour fonctionner, l'app envoie au moment de l'utilisation :</p>
+    <ul>
+      <li>le <b>texte à traduire</b> à un service de traduction (Google Traduction, MyMemory ou, en secours, Groq) ;</li>
+      <li>l'<b>enregistrement de votre voix</b>, lorsque vous parlez, à Groq (modèle Whisper) pour le transformer en texte ;</li>
+      <li>le <b>texte traduit</b> à ElevenLabs ou OpenAI pour le lire avec une voix naturelle.</li>
+    </ul>
+    <p>Ces envois passent par notre relais technique (Cloudflare), qui ne les enregistre pas. Chaque prestataire les traite selon sa propre politique de confidentialité. Évitez de dicter des informations très sensibles (données médicales, mots de passe, etc.).</p>
+  </section>
+
+  <section>
+    <h2>Pourquoi nous utilisons ces données</h2>
+    <ul>
+      <li>Fournir le service de traduction que vous demandez (exécution du contrat).</li>
+      <li>Gérer votre essai gratuit, votre abonnement ou votre accès familial (exécution du contrat).</li>
+      <li>Empêcher les abus et assurer la sécurité du service (intérêt légitime).</li>
+      <li>Respecter nos obligations légales, notamment comptables, via Stripe.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Prestataires et transferts à l'étranger</h2>
+    <p>Nous faisons appel à : Cloudflare (relais et base de données), GitHub (hébergement de l'app), Stripe (paiements, en tant que revendeur officiel via Stripe Managed Payments), Groq, ElevenLabs, OpenAI, Google et MyMemory (traduction et voix). Certains sont situés aux États-Unis ou dans l'Union européenne. Ces transferts sont encadrés par les garanties prévues par la loi (clauses contractuelles types ou mécanismes équivalents).</p>
+  </section>
+
+  <section>
+    <h2>Durée de conservation</h2>
+    <ul>
+      <li>Compte : tant qu'il existe. Supprimé immédiatement si vous le supprimez.</li>
+      <li>Compteur d'utilisation : 2 jours.</li>
+      <li>Données de paiement : conservées par Stripe selon ses obligations légales.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Vos droits</h2>
+    <p>Conformément à la loi suisse sur la protection des données (nLPD) et, le cas échéant, au RGPD européen, vous pouvez demander l'accès à vos données, leur rectification, leur suppression ou leur portabilité, et vous opposer à certains traitements.</p>
+    <ul>
+      <li><b>Supprimer votre compte</b> : dans l'app, Réglages ⚙︎ → Mon abonnement → « Supprimer mon compte et mes données » (résiliez d'abord un abonnement en cours).</li>
+      <li><b>Toute autre demande</b> : écrivez-nous à l'adresse de contact ci-dessus.</li>
+      <li><b>Réclamation</b> : auprès du Préposé fédéral à la protection des données et à la transparence (PFPDT, <a href="https://www.edoeb.admin.ch" target="_blank" rel="noopener">edoeb.admin.ch</a>) ou de l'autorité de votre pays.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Modifications</h2>
+    <p>Nous pouvons mettre à jour cette politique. La date en haut de page indique la dernière version. En cas de changement important, nous vous en informerons dans l'app.</p>
+    <p><small>Ce document est fourni à titre informatif et ne remplace pas un conseil juridique.</small></p>
+  </section>
+</main>
+</body>
+</html>
