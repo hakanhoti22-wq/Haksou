@@ -29,7 +29,7 @@ Pour une voix humaine, chaleureuse et pas robotique : ⚙︎ Réglages → **Voi
 - **ElevenLabs** (clé `sk_…`) : la voix la plus naturelle. Offre gratuite limitée (environ 10 minutes de voix par mois), puis à partir de 6 $/mois.
 - **OpenAI** (clé `sk-…`) : très naturelle, environ 0,015 $ par minute de voix.
 
-Sans clé, ou si le service ne répond pas, l'app utilise la meilleure voix de l'iPhone. Pour une voix iPhone gratuite bien plus naturelle : Réglages → Accessibilité → Contenu énoncé → Voix → télécharger une voix « Premium ».
+Sans clé, ou si le service ne répond pas, l'app utilise la meilleure voix de l'iPhone. Pour une voix iPhone gratuite bien plus naturelle : Réglages → rechercher « Voix » (menu « Lire et énoncer » sur iOS 26, « Contenu énoncé » avant) → choisir la langue → télécharger une voix « Premium » ou « Améliorée ».
 
 ## Mise en ligne (GitHub Pages)
 
