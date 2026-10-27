@@ -10,7 +10,7 @@ import { ttsProviderFor, ttsSupports, PROVIDER_NAMES } from './tts.js';
 
 const $ = id => document.getElementById(id);
 
-export const APP_VERSION = '14';
+export const APP_VERSION = '15';
 
 // ---------------------------------------------------------------------------
 // Stockage local
@@ -439,18 +439,18 @@ function relay() {
 
 /** Accès pour le micro fiable (Whisper) et la traduction de secours. */
 function sttCred() {
-  if (settings.sttKey) return { provider: providerFor(settings.sttKey), key: settings.sttKey };
+  // Le relais passe en priorité : une ancienne clé restée sur l'appareil ne doit pas le court-circuiter.
   if (relay() && settings.relayInfo?.stt) return { provider: settings.relayInfo.stt, relay: relay() };
+  if (settings.sttKey) return { provider: providerFor(settings.sttKey), key: settings.sttKey };
   return null;
 }
 
 /** Accès pour la voix naturelle. */
 function ttsCred() {
+  if (relay() && settings.relayInfo?.tts) return { provider: settings.relayInfo.tts, relay: relay() };
   const key = voiceKey();
   const provider = ttsProviderFor(key);
-  if (provider) return { provider, key };
-  if (relay() && settings.relayInfo?.tts) return { provider: settings.relayInfo.tts, relay: relay() };
-  return null;
+  return provider ? { provider, key } : null;
 }
 
 /** Interroge le relais et mémorise ce qu'il propose. */
@@ -1270,7 +1270,7 @@ function initSettings() {
   const showStt = () => {
     const cred = sttCred();
     // Fourni par le relais Haksou : rien à configurer, on masque le champ de clé.
-    const included = Boolean(relayBase() && settings.relayInfo?.stt && !settings.sttKey);
+    const included = Boolean(relayBase() && settings.relayInfo?.stt);
     sttStatus.textContent = cred ? (cred.relay ? 'Inclus ✓' : 'Activé') : included ? 'Inclus' : 'Désactivé';
     sttStatus.classList.toggle('on', Boolean(cred || included));
     $('sttDesc').textContent = included ? 'Inclus dans Haksou : rien à configurer.' : sttDefaultDesc;
@@ -1292,7 +1292,7 @@ function initSettings() {
   const ttsDefaultDesc = $('ttsDesc').textContent;
   const showTts = () => {
     const cred = ttsCred();
-    const included = Boolean(relayBase() && settings.relayInfo?.tts && !settings.ttsKey);
+    const included = Boolean(relayBase() && settings.relayInfo?.tts);
     // App publiée avec un relais : seul le propriétaire saisit des clés.
     const keysHidden = included || Boolean(relayBase() && !isOwner() && !settings.ttsKey);
     ttsStatus.textContent = cred

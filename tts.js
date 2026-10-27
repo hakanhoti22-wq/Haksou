@@ -27,6 +27,8 @@ export const PROVIDER_NAMES = { elevenlabs: 'ElevenLabs', openai: 'OpenAI' };
 const ELEVEN_VOICES = { female: 'EXAVITQu4vr4xnSDxMaL', male: 'JBFqnCBsd6RMkjVDRZzb' }; // Sarah, George
 const OPENAI_VOICES = { female: 'coral', male: 'ash' };
 
+// Langues du modèle ElevenLabs Multilingual v2, le plus naturel et expressif.
+const ELEVEN_MULTI = new Set('en ja zh de hi fr ko pt it es id nl tr fil pl sv bg ro ar cs el fi hr ms sk da ta uk ru'.split(' '));
 // Langues prises en charge par ElevenLabs Flash v2.5 (codes ISO 639-1).
 const ELEVEN_LANGS = new Set('en ja zh de hi fr ko pt it es id nl tr fil pl sv bg ro ar cs el fi hr ms sk da ta uk ru hu no vi'.split(' '));
 // Langues que les voix OpenAI prononcent correctement (langues de Whisper).
@@ -84,18 +86,21 @@ export async function synthesize(text, { cred, langCode, langName, gender = 'fem
 }
 
 function elevenLabs(text, cred, langCode, gender, rate, signal) {
-  const iso = isoOf(langCode);
+  const iso = isoOf(langCode) === 'tl' ? 'fil' : isoOf(langCode);
+  // Multilingual v2 : voix la plus humaine ; Flash v2.5 pour les quelques langues qu'il est seul à parler.
+  const multi = ELEVEN_MULTI.has(iso);
   return apiFetch(cred, `/v1/text-to-speech/${ELEVEN_VOICES[gender] || ELEVEN_VOICES.female}?output_format=mp3_44100_128`, {
     method: 'POST',
     signal,
     headers: { 'Content-Type': 'application/json', Accept: 'audio/mpeg' },
     body: JSON.stringify({
       text,
-      model_id: 'eleven_flash_v2_5',
-      language_code: iso === 'tl' ? 'fil' : iso,
+      model_id: multi ? 'eleven_multilingual_v2' : 'eleven_flash_v2_5',
+      language_code: iso,
       voice_settings: {
-        stability: 0.45,
+        stability: multi ? 0.38 : 0.45,
         similarity_boost: 0.8,
+        style: multi ? 0.25 : 0,
         use_speaker_boost: true,
         speed: Math.min(1.2, Math.max(0.7, rate)),
       },
