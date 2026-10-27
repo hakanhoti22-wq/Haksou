@@ -193,9 +193,9 @@
         <div class="row row-col">
           <span class="row-text">
             <span>Clé de voix <span class="pill-status" id="ttsStatus"></span></span>
-            <small>Une voix humaine, chaleureuse, pas robotique. Clé ElevenLabs (sk_…, la plus naturelle) ou OpenAI (sk-…). Elle reste sur cet appareil.</small>
+            <small id="ttsDesc">Une voix humaine, chaleureuse, pas robotique. Clé ElevenLabs (sk_…, la plus naturelle) ou OpenAI (sk-…). Elle reste sur cet appareil.</small>
           </span>
-          <div class="key-field">
+          <div class="key-field" id="ttsKeyField">
             <input class="text-input" id="optTtsKey" type="password" placeholder="Coller la clé ici" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
             <button class="paste-btn" data-paste="optTtsKey" type="button">Coller</button>
           </div>
@@ -211,7 +211,7 @@
           <svg viewBox="0 0 24 24"><path d="M11 5 6.5 9H3.5v6h3L11 19z"/><path d="M15.5 9.2a4 4 0 0 1 0 5.6M18.4 6.4a8 8 0 0 1 0 11.2"/></svg>
           Écouter la voix
         </button>
-        <div class="row links">
+        <div class="row links" id="ttsLinks">
           <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank" rel="noopener">Clé ElevenLabs</a>
           <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">Clé OpenAI</a>
         </div>
@@ -243,14 +243,14 @@
         <div class="row row-col">
           <span class="row-text">
             <span>Micro fiable (Whisper) <span class="pill-status" id="sttStatus"></span></span>
-            <small>Recommandé sur iPhone : la voix est enregistrée puis transcrite par Whisper, sans le blocage du micro de Safari. Clé gratuite Groq (gsk_…) ou OpenAI (sk-…).</small>
+            <small id="sttDesc">Recommandé sur iPhone : la voix est enregistrée puis transcrite par Whisper, sans le blocage du micro de Safari. Clé gratuite Groq (gsk_…) ou OpenAI (sk-…).</small>
           </span>
-          <div class="key-field">
+          <div class="key-field" id="sttKeyField">
             <input class="text-input" id="optSttKey" type="password" placeholder="Coller la clé ici" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
             <button class="paste-btn" data-paste="optSttKey" type="button">Coller</button>
           </div>
         </div>
-        <div class="row links">
+        <div class="row links" id="sttLinks">
           <a href="https://console.groq.com/keys" target="_blank" rel="noopener">Obtenir une clé Groq gratuite</a>
         </div>
       </div>

@@ -10,7 +10,7 @@ import { ttsProviderFor, ttsSupports, PROVIDER_NAMES } from './tts.js';
 
 const $ = id => document.getElementById(id);
 
-export const APP_VERSION = '11';
+export const APP_VERSION = '12';
 
 // ---------------------------------------------------------------------------
 // Stockage local
@@ -1141,10 +1141,16 @@ function initSettings() {
 
   const sttKey = $('optSttKey');
   const sttStatus = $('sttStatus');
+  const sttDefaultDesc = $('sttDesc').textContent;
   const showStt = () => {
     const cred = sttCred();
-    sttStatus.textContent = cred ? (cred.relay ? 'Via le relais' : 'Activé') : 'Désactivé';
-    sttStatus.classList.toggle('on', Boolean(cred));
+    // Fourni par le relais Haksou : rien à configurer, on masque le champ de clé.
+    const included = Boolean(relayBase() && settings.relayInfo?.stt && !settings.sttKey);
+    sttStatus.textContent = cred ? (cred.relay ? 'Inclus ✓' : 'Activé') : included ? 'Inclus' : 'Désactivé';
+    sttStatus.classList.toggle('on', Boolean(cred || included));
+    $('sttDesc').textContent = included ? 'Inclus dans Haksou : rien à configurer.' : sttDefaultDesc;
+    $('sttKeyField').hidden = included;
+    $('sttLinks').hidden = included;
   };
   sttKey.value = settings.sttKey;
   showStt();
@@ -1158,12 +1164,21 @@ function initSettings() {
   // Voix naturelle
   const ttsKey = $('optTtsKey');
   const ttsStatus = $('ttsStatus');
+  const ttsDefaultDesc = $('ttsDesc').textContent;
   const showTts = () => {
     const cred = ttsCred();
+    const included = Boolean(relayBase() && settings.relayInfo?.tts && !settings.ttsKey);
+    // App publiée avec un relais : seul le propriétaire saisit des clés.
+    const keysHidden = included || Boolean(relayBase() && !isOwner() && !settings.ttsKey);
     ttsStatus.textContent = cred
-      ? `${PROVIDER_NAMES[cred.provider]}${cred.relay ? ' · relais' : ''}`
-      : (settings.ttsKey ? 'Clé non reconnue' : 'Voix de l\'iPhone');
-    ttsStatus.classList.toggle('on', Boolean(cred));
+      ? (cred.relay ? 'Incluse ✓' : PROVIDER_NAMES[cred.provider])
+      : included ? 'Incluse' : (settings.ttsKey ? 'Clé non reconnue' : 'Voix de l\'iPhone');
+    ttsStatus.classList.toggle('on', Boolean(cred || included));
+    $('ttsDesc').textContent = included
+      ? 'Voix naturelle incluse dans Haksou : rien à configurer.'
+      : keysHidden ? 'La voix de l\'iPhone est utilisée. Astuce ci-dessous pour une voix plus naturelle.' : ttsDefaultDesc;
+    $('ttsKeyField').hidden = keysHidden;
+    $('ttsLinks').hidden = keysHidden;
   };
   ttsKey.value = settings.ttsKey;
   showTts();
