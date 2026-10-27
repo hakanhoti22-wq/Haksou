@@ -10,7 +10,7 @@ import { ttsProviderFor, ttsSupports, PROVIDER_NAMES } from './tts.js';
 
 const $ = id => document.getElementById(id);
 
-export const APP_VERSION = '9';
+export const APP_VERSION = '10';
 
 // ---------------------------------------------------------------------------
 // Stockage local
@@ -1190,6 +1190,8 @@ function initSettings() {
     relayState.classList.toggle('on', Boolean(info && (isOwner() || !settings.relayCode)));
     inviteBtn.hidden = !(isOwner() && info?.family);
     if (inviteBtn.hidden) familyList.replaceChildren();
+    // Propriétaire sans base de données : on explique ce qui manque sur Cloudflare.
+    $('relayHint').hidden = !(isOwner() && info && !info.family);
   };
   relayUrl.value = settings.relayUrl || RELAY_URL;
   relayCode.value = settings.relayCode;
@@ -1251,7 +1253,12 @@ function initSettings() {
       toast(err.message);
     }
   });
-  $('settingsBtn').addEventListener('click', () => { loadFamily(); if (billingOn() && account.token) account.refresh().then(showSub, () => {}); });
+  // À l'ouverture des réglages : resynchronise avec le relais (nouvelles options, famille, abonnement).
+  $('settingsBtn').addEventListener('click', async () => {
+    if (relayBase()) await connectRelay({ quiet: true });
+    loadFamily();
+    if (billingOn() && account.token) account.refresh().then(showSub, () => {});
+  });
 
   // Mon abonnement
   const dateFmt = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -1334,6 +1341,7 @@ function initSettings() {
   notes.push(`${LANGUAGES.length} langues disponibles en traduction. L'icône micro indique les langues reconnues à l'oral.`);
   notes.push(`Version ${APP_VERSION}.`);
   $('envNote').textContent = notes.join(' ');
+
 }
 
 // ---------------------------------------------------------------------------
