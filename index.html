@@ -155,7 +155,10 @@
             <span>Mon relais <span class="pill-status" id="relayStatus"></span></span>
             <small>Vos clés restent cachées sur votre relais Cloudflare : vos proches n'ont besoin d'aucune clé. Normalement rempli automatiquement par le lien famille.</small>
           </span>
-          <input class="text-input" id="optRelayUrl" type="url" inputmode="url" placeholder="https://haksou-relais.….workers.dev" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+          <div class="key-field">
+            <input class="text-input" id="optRelayUrl" type="url" inputmode="url" placeholder="https://haksou-relais.….workers.dev" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+            <button class="paste-btn" data-paste="optRelayUrl" type="button">Coller</button>
+          </div>
           <input class="text-input" id="optRelayCode" type="text" placeholder="Code famille" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
         </div>
         <button class="row row-btn accent" id="shareFamilyBtn" disabled>
@@ -171,7 +174,10 @@
             <span>Clé de voix <span class="pill-status" id="ttsStatus"></span></span>
             <small>Une voix humaine, chaleureuse, pas robotique. Clé ElevenLabs (sk_…, la plus naturelle) ou OpenAI (sk-…). Elle reste sur cet appareil.</small>
           </span>
-          <input class="text-input" id="optTtsKey" type="password" placeholder="Coller la clé ici" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+          <div class="key-field">
+            <input class="text-input" id="optTtsKey" type="password" placeholder="Coller la clé ici" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+            <button class="paste-btn" data-paste="optTtsKey" type="button">Coller</button>
+          </div>
         </div>
         <div class="row">
           <span class="row-text"><span>Timbre</span></span>
@@ -218,7 +224,10 @@
             <span>Micro fiable (Whisper) <span class="pill-status" id="sttStatus"></span></span>
             <small>Recommandé sur iPhone : la voix est enregistrée puis transcrite par Whisper, sans le blocage du micro de Safari. Clé gratuite Groq (gsk_…) ou OpenAI (sk-…).</small>
           </span>
-          <input class="text-input" id="optSttKey" type="password" placeholder="Coller la clé ici" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+          <div class="key-field">
+            <input class="text-input" id="optSttKey" type="password" placeholder="Coller la clé ici" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+            <button class="paste-btn" data-paste="optSttKey" type="button">Coller</button>
+          </div>
         </div>
         <div class="row links">
           <a href="https://console.groq.com/keys" target="_blank" rel="noopener">Obtenir une clé Groq gratuite</a>

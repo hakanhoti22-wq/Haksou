@@ -1109,8 +1109,36 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 function fitViewport() {
   const vv = window.visualViewport;
   if (!vv) return;
-  el.app.style.height = `${vv.height}px`;
   if (vv.offsetTop) window.scrollTo(0, 0);
+  // Hauteur cachée par le clavier : les feuilles (réglages, langues) remontent au-dessus.
+  const kb = Math.max(0, Math.round(window.innerHeight - vv.height));
+  const root = document.documentElement.style;
+  root.setProperty('--vvh', `${vv.height}px`);
+  root.setProperty('--kb', `${kb}px`);
+  document.querySelectorAll('.sheet').forEach(sh => sh.classList.toggle('kb-open', kb > 80));
+  el.app.style.height = `${vv.height}px`;
+}
+
+/** Garde le champ touché visible au-dessus du clavier, dans une feuille. */
+function revealField(e) {
+  const field = e.target;
+  if (!field.matches?.('input, textarea') || !field.closest('.sheet')) return;
+  setTimeout(() => field.scrollIntoView({ block: 'center', behavior: 'smooth' }), 350);
+}
+
+/** Boutons « Coller » : remplit le champ depuis le presse-papiers, sans clavier. */
+async function pasteInto(input) {
+  try {
+    const text = (await navigator.clipboard.readText()).trim();
+    if (!text) { toast('Le presse-papiers est vide. Copiez d\'abord la clé.'); return; }
+    input.value = text;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    toast('Collé ✓');
+  } catch {
+    input.focus();
+    toast('Touchez le champ, puis « Coller ».');
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1137,6 +1165,8 @@ function init() {
   el.convB.addEventListener('click', () => onMicConv('b'));
 
   langSheet.search.addEventListener('input', renderLangList);
+  document.addEventListener('focusin', revealField);
+  document.querySelectorAll('[data-paste]').forEach(btn => btn.addEventListener('click', () => pasteInto($(btn.dataset.paste))));
   bindSheet(langSheet.sheet, langSheet.backdrop);
   bindSheet(settingsSheet.sheet, settingsSheet.backdrop);
   $('settingsBtn').addEventListener('click', () => openSheet(settingsSheet.sheet, settingsSheet.backdrop));
