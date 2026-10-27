@@ -270,6 +270,34 @@
     </div>
   </section>
 
+  <!-- Feuille : installer sur l'écran d'accueil -->
+  <div class="sheet-backdrop" id="installBackdrop" hidden></div>
+  <section class="sheet install-sheet" id="installSheet" role="dialog" aria-modal="true" aria-labelledby="installTitle" hidden>
+    <div class="sheet-grabber" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <h2 id="installTitle">Installer Haksou</h2>
+      <button class="text-btn" id="installClose" aria-label="Fermer">✕</button>
+    </div>
+    <div class="sheet-body">
+      <p class="install-lead">Ajoutez Haksou à votre écran d'accueil : il s'ouvrira comme une vraie app, en plein écran, en un toucher.</p>
+      <p class="install-warn" id="installInApp" hidden>Ouvrez d'abord ce lien dans <b>Safari</b> : touchez <b>⋯</b> ou <b>⇱</b> puis « Ouvrir dans Safari ».</p>
+      <ol class="install-steps" id="installSteps">
+        <li><span class="step-icon"><svg viewBox="0 0 24 24"><path d="M12 15V3m0 0L8 7m4-4 4 4"/><path d="M7 10H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-1"/></svg></span>
+          <span>Touchez <b>Partager</b> <small id="installShareWhere">(en bas de Safari)</small></span></li>
+        <li><span class="step-icon"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8v8M8 12h8"/></svg></span>
+          <span>Choisissez <b>Sur l'écran d'accueil</b> <small>(faites défiler si besoin)</small></span></li>
+        <li><span class="step-icon"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span>
+          <span>Touchez <b>Ajouter</b>, puis ouvrez Haksou depuis son icône</span></li>
+      </ol>
+      <button class="cta" id="installNow" hidden>Installer l'app</button>
+      <button class="cta" id="installOk">C'est compris</button>
+      <div class="install-actions">
+        <button class="link-btn" id="installLater">Me le rappeler plus tard</button>
+        <button class="link-btn muted" id="installNever">Ne plus afficher</button>
+      </div>
+    </div>
+  </section>
+
   <!-- Feuille : compte (bienvenue, abonnement) -->
   <div class="sheet-backdrop" id="accountBackdrop" hidden></div>
   <section class="sheet account-sheet" id="accountSheet" role="dialog" aria-modal="true" aria-labelledby="accountTitle" hidden>

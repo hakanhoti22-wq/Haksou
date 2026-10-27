@@ -10,7 +10,7 @@ import { ttsProviderFor, ttsSupports, PROVIDER_NAMES } from './tts.js';
 
 const $ = id => document.getElementById(id);
 
-export const APP_VERSION = '13';
+export const APP_VERSION = '14';
 
 // ---------------------------------------------------------------------------
 // Stockage local
@@ -526,7 +526,7 @@ async function handleIncomingLinks() {
     if (hash.get('code')) settings.relayCode = hash.get('code');
     saveSettings();
   }
-  if (!relayBase()) return;
+  if (!relayBase()) { await offerInstall(); return; }
   await connectRelay({ quiet: true });
 
   // Invitation famille : le lien reste dans l'adresse pour l'icône de l'écran d'accueil.
@@ -558,6 +558,7 @@ async function handleIncomingLinks() {
     await account.refresh().catch(() => {});
   }
   refreshSettingsStatus();
+  await offerInstall();
   if (billingOn() && !account.token) openAccountSheet('welcome');
 }
 
@@ -624,6 +625,59 @@ async function renderStats() {
   };
   $('statsSearch').addEventListener('input', e => draw(e.target.value.trim().toLowerCase()));
   draw();
+}
+
+// ---------------------------------------------------------------------------
+// Installer sur l'écran d'accueil (première visite)
+// ---------------------------------------------------------------------------
+
+const isStandalone = () => window.navigator.standalone === true || window.matchMedia?.('(display-mode: standalone)').matches;
+const isMobile = isIOS || /Android/i.test(navigator.userAgent);
+const isInAppBrowser = /FBAN|FBAV|Instagram|Line\/|Snapchat|TikTok|LinkedInApp/i.test(navigator.userAgent);
+let installPromptEvent = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installPromptEvent = e; });
+
+/** Faut-il proposer l'installation ? (mobile, pas déjà installée, pas refusée) */
+function shouldOfferInstall() {
+  if (isStandalone() || !isMobile) return false;
+  const pref = store.get('installHint', null);
+  if (pref?.never) return false;
+  return !(pref?.until && Date.now() < pref.until);
+}
+
+/** Affiche la marche à suivre ; se résout quand la personne la ferme. */
+function offerInstall() {
+  if (!shouldOfferInstall()) return Promise.resolve();
+  const sheet = $('installSheet');
+  const backdrop = $('installBackdrop');
+  $('installInApp').hidden = !isInAppBrowser;
+  $('installShareWhere').textContent = /CriOS/.test(navigator.userAgent) ? '(en haut, dans la barre d\'adresse)'
+    : /Android/i.test(navigator.userAgent) ? '(menu ⋮ du navigateur → « Installer l\'application »)'
+    : '(en bas de Safari)';
+  // Android/Chrome : installation directe possible
+  $('installNow').hidden = !installPromptEvent;
+  $('installSteps').hidden = Boolean(installPromptEvent);
+  $('installOk').hidden = Boolean(installPromptEvent);
+  openSheet(sheet, backdrop);
+  return new Promise(resolve => {
+    const done = (choice) => {
+      if (choice === 'never') store.set('installHint', { never: true });
+      else store.set('installHint', { until: Date.now() + (choice === 'later' ? 2 : 7) * 864e5 });
+      [backdrop, $('installClose'), $('installLater'), $('installNever'), $('installOk'), $('installNow')].forEach(b => { b.onclick = null; });
+      closeSheet(sheet, backdrop);
+      setTimeout(resolve, 260);
+    };
+    backdrop.onclick = () => done('later');
+    $('installClose').onclick = () => done('later');
+    $('installLater').onclick = () => done('later');
+    $('installNever').onclick = () => done('never');
+    $('installOk').onclick = () => done('ok');
+    $('installNow').onclick = async () => {
+      try { installPromptEvent.prompt(); await installPromptEvent.userChoice; } catch { /* annulé */ }
+      installPromptEvent = null;
+      done('ok');
+    };
+  });
 }
 
 const accountSheet = { sheet: $('accountSheet'), backdrop: $('accountBackdrop'), body: $('accountBody'), title: $('accountTitle') };

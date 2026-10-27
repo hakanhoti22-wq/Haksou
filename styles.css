@@ -893,6 +893,50 @@ button.row:active { background: color-mix(in srgb, var(--ink) 5%, transparent); 
 .badge.monthly, .badge.yearly { background: #D9EDD3; color: #255A1B; }
 .badge.family { background: #E6DBF5; color: #4B2A7A; }
 
+/* Installer sur l'écran d'accueil */
+#installSheet { height: auto; max-height: calc(var(--vvh, 100dvh) - var(--safe-top) - 20px); }
+.install-lead { margin: 0 4px 14px; font-size: 15.5px; line-height: 1.45; color: var(--ink-2); }
+.install-warn { margin: 0 4px 14px; padding: 10px 12px; border-radius: 14px; font-size: 14.5px; background: color-mix(in srgb, var(--honey) 22%, transparent); }
+.install-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; counter-reset: step; }
+.install-steps li {
+  counter-increment: step;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  font-size: 15.5px;
+  line-height: 1.35;
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-sm);
+}
+.install-steps li small { color: var(--ink-3); }
+.step-icon {
+  position: relative;
+  flex: none;
+  width: 40px; height: 40px;
+  border-radius: 12px;
+  display: grid; place-items: center;
+  color: #0A84FF;
+  background: color-mix(in srgb, #0A84FF 12%, transparent);
+}
+.step-icon svg { width: 22px; height: 22px; stroke-width: 2; }
+.step-icon::after {
+  content: counter(step);
+  position: absolute;
+  top: -6px; left: -6px;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--thumb-text);
+  background: var(--thumb-bg);
+}
+.install-actions { display: flex; justify-content: center; gap: 22px; flex-wrap: wrap; }
+.link-btn.muted { color: var(--ink-3); }
+
 /* Interrupteur */
 .switch {
   -webkit-appearance: none;
