@@ -4,6 +4,8 @@ import { Listener, Speaker } from './speech.js';
 import { VoiceRecorder } from './recorder.js';
 import { transcribe, providerFor } from './stt.js';
 import { relayStatus } from './api.js';
+import { Account, adminCall } from './account.js';
+import { RELAY_URL, PRICES } from './config.js';
 import { ttsProviderFor, ttsSupports, PROVIDER_NAMES } from './tts.js';
 
 const $ = id => document.getElementById(id);
@@ -175,7 +177,7 @@ function emptyState() {
     for (const phrase of QUICK_PHRASES) {
       const c = node('button', 'chip');
       c.textContent = phrase;
-      c.addEventListener('click', () => { Speaker.unlock(); translateTyped(phrase, { from: 'fr', spoken: true }); });
+      c.addEventListener('click', () => { Speaker.unlock(); if (ensureAccess()) translateTyped(phrase, { from: 'fr', spoken: true }); });
       chips.append(c);
     }
     box.append(chips);
@@ -420,7 +422,18 @@ async function speakMessage(m, delay = 0) {
 // Accès aux services d'IA : clé sur l'appareil, sinon relais familial
 // ---------------------------------------------------------------------------
 
-const relay = () => (settings.relayUrl && settings.relayCode ? { url: settings.relayUrl, code: settings.relayCode } : null);
+const relayBase = () => (settings.relayUrl || RELAY_URL || '').trim();
+const account = new Account(relayBase);
+const isOwner = () => Boolean(settings.relayCode && settings.relayInfo?.owner);
+
+/** Accès au relais : code propriétaire, sinon compte (essai, abonné, famille). */
+function relay() {
+  const url = relayBase();
+  if (!url) return null;
+  if (isOwner()) return { url, code: settings.relayCode };
+  if (account.token) return { url, token: account.token };
+  return null;
+}
 
 /** Accès pour le micro fiable (Whisper) et la traduction de secours. */
 function sttCred() {
@@ -440,15 +453,26 @@ function ttsCred() {
 
 /** Interroge le relais et mémorise ce qu'il propose. */
 async function connectRelay({ quiet = false } = {}) {
-  const r = relay();
-  if (!r) { settings.relayInfo = null; saveSettings(); return null; }
+  const url = relayBase();
+  if (!url) { settings.relayInfo = null; saveSettings(); refreshSettingsStatus(); return null; }
   try {
-    const info = await relayStatus(r);
-    settings.relayInfo = { stt: info.stt || null, tts: info.tts || null };
+    const info = await relayStatus({ url, code: settings.relayCode });
+    settings.relayInfo = {
+      stt: info.stt || null,
+      tts: info.tts || null,
+      billing: Boolean(info.billing),
+      family: Boolean(info.family),
+      trialDays: info.trialDays ?? 7,
+      plans: info.plans || {},
+      owner: Boolean(info.owner),
+    };
     saveSettings();
     if (!quiet) {
-      const parts = [settings.relayInfo.stt ? 'micro fiable ✓' : 'micro fiable ✗', settings.relayInfo.tts ? 'voix naturelle ✓' : 'voix naturelle ✗'];
-      toast(`Relais familial connecté : ${parts.join(' · ')}`);
+      if (settings.relayCode && !info.owner) toast('Code propriétaire incorrect.');
+      else if (isOwner()) {
+        const parts = [info.stt ? 'micro fiable ✓' : 'micro fiable ✗', info.tts ? 'voix naturelle ✓' : 'voix naturelle ✗'];
+        toast(`Propriétaire connecté : ${parts.join(' · ')}`);
+      } else toast('Relais connecté.');
     }
     return settings.relayInfo;
   } catch (err) {
@@ -459,25 +483,202 @@ async function connectRelay({ quiet = false } = {}) {
   }
 }
 
-/** Lien qui configure l'app d'un proche en un toucher. */
-function familyLink() {
-  const params = new URLSearchParams({ relais: settings.relayUrl, code: settings.relayCode });
-  return `${location.origin}${location.pathname}#${params}`;
+// ---------------------------------------------------------------------------
+// Abonnement : essai gratuit, paiement, accès famille
+// ---------------------------------------------------------------------------
+
+/** Les abonnements s'appliquent-ils à cet appareil ? */
+const billingOn = () => Boolean(relayBase() && settings.relayInfo?.billing && !isOwner());
+
+/** Cet appareil peut-il utiliser l'app ? Sinon, ouvre l'accueil ou l'abonnement. */
+function ensureAccess() {
+  if (!billingOn()) return true;
+  if (account.token && account.info?.active) return true;
+  openAccountSheet(account.token ? 'paywall' : 'welcome');
+  return false;
 }
 
-/** Applique un lien famille (#relais=…&code=…) ouvert sur cet appareil. */
-function applyFamilyLink() {
-  const params = new URLSearchParams(location.hash.slice(1));
-  const url = params.get('relais');
-  const code = params.get('code');
-  if (!url || !code) return false;
-  // Le lien reste dans l'adresse : l'icône « Sur l'écran d'accueil » le garde ainsi.
-  const changed = url !== settings.relayUrl || code !== settings.relayCode;
-  settings.relayUrl = url;
-  settings.relayCode = code;
-  saveSettings();
-  connectRelay({ quiet: !changed });
-  return true;
+/** Le relais a refusé un appel (abonnement expiré) : on met à jour et on propose l'abonnement. */
+async function onPaymentRequired() {
+  await account.refresh().catch(() => {});
+  refreshSettingsStatus();
+  openAccountSheet('paywall');
+}
+
+const appUrl = () => location.origin + location.pathname;
+
+/** Lien d'invitation famille (contient l'adresse du relais si elle n'est pas dans config.js). */
+function inviteLink(code) {
+  const params = new URLSearchParams({ invite: code });
+  if (!RELAY_URL) params.set('relais', relayBase());
+  return `${appUrl()}#${params}`;
+}
+
+/** Traite les liens entrants : invitation famille, ancien lien relais, retour de paiement. */
+async function handleIncomingLinks() {
+  const hash = new URLSearchParams(location.hash.slice(1));
+  const linkRelay = hash.get('relais');
+  if (linkRelay) {
+    settings.relayUrl = linkRelay;
+    // Ancien lien famille (#relais=…&code=…) : accès par code
+    if (hash.get('code')) settings.relayCode = hash.get('code');
+    saveSettings();
+  }
+  if (!relayBase()) return;
+  await connectRelay({ quiet: true });
+
+  // Invitation famille : le lien reste dans l'adresse pour l'icône de l'écran d'accueil.
+  const invite = hash.get('invite');
+  if (invite && !isOwner()) {
+    const wasFamily = account.info?.kind === 'family';
+    try {
+      const data = await account.joinFamily(invite);
+      if (!wasFamily) toast(`Bienvenue${data.account?.name ? ' ' + data.account.name : ''} ! Accès familial gratuit activé.`);
+    } catch (err) {
+      toast(err.message);
+    }
+  }
+
+  // Retour de Stripe après paiement
+  const query = new URLSearchParams(location.search);
+  const paid = query.get('paid');
+  if (paid) {
+    window.history.replaceState(null, '', location.pathname + location.hash);
+    if (account.token) {
+      try {
+        await account.confirm(paid);
+        toast('Merci ! Votre abonnement Haksou est actif. 🎉');
+      } catch (err) {
+        toast(err.message);
+      }
+    }
+  } else if (billingOn() && account.token && !invite) {
+    await account.refresh().catch(() => {});
+  }
+  refreshSettingsStatus();
+  if (billingOn() && !account.token) openAccountSheet('welcome');
+}
+
+const accountSheet = { sheet: $('accountSheet'), backdrop: $('accountBackdrop'), body: $('accountBody'), title: $('accountTitle') };
+let selectedPlan = 'yearly';
+
+function openAccountSheet(view) {
+  renderAccount(view);
+  openSheet(accountSheet.sheet, accountSheet.backdrop);
+}
+const closeAccountSheet = () => closeSheet(accountSheet.sheet, accountSheet.backdrop);
+
+function renderAccount(view) {
+  const info = settings.relayInfo || {};
+  const body = accountSheet.body;
+  const days = info.trialDays ?? 7;
+
+  if (view === 'welcome') {
+    accountSheet.title.textContent = 'Bienvenue';
+    body.innerHTML = `
+      <div class="acct-hero">
+        <div class="empty-orb"></div>
+        <h3>Essayez Haksou<br><em>${days} jours gratuits</em></h3>
+        <p>Sans carte bancaire. Ensuite ${PRICES.monthly.label} ${PRICES.monthly.period} ou ${PRICES.yearly.label} ${PRICES.yearly.period}.</p>
+      </div>
+      <ul class="acct-perks">
+        <li>Micro fiable qui s'arrête tout seul</li>
+        <li>Voix naturelle, humaine et chaleureuse</li>
+        <li>193 langues et mode conversation</li>
+      </ul>
+      <input class="text-input" id="acctEmail" type="email" inputmode="email" placeholder="Votre e-mail" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <button class="cta" id="acctStart">Commencer l'essai gratuit</button>
+      <button class="link-btn" id="acctToRestore">J'ai déjà un compte</button>
+      <p class="fine">Astuce iPhone : ajoutez d'abord Haksou à l'écran d'accueil (Partager → Sur l'écran d'accueil), puis lancez l'essai depuis l'icône.</p>`;
+    const start = $('acctStart');
+    start.addEventListener('click', async () => {
+      const email = $('acctEmail').value.trim();
+      if (!email) { toast('Entrez votre e-mail.'); return; }
+      start.disabled = true;
+      try {
+        const data = await account.start(email);
+        closeAccountSheet();
+        refreshSettingsStatus();
+        toast(data.account?.active ? `C'est parti ! ${days} jours gratuits.` : 'Votre essai est terminé : choisissez une formule.');
+        if (!data.account?.active) setTimeout(() => openAccountSheet('paywall'), 400);
+      } catch (err) {
+        toast(err.message);
+      } finally {
+        start.disabled = false;
+      }
+    });
+    $('acctToRestore').addEventListener('click', () => renderAccount('restore'));
+    return;
+  }
+
+  if (view === 'restore') {
+    accountSheet.title.textContent = 'Restaurer';
+    body.innerHTML = `
+      <div class="acct-hero"><p>Entrez votre code de récupération (il commence par <b>HK-</b>). Vous le trouvez dans Réglages → Mon abonnement sur votre ancien appareil.</p></div>
+      <div class="key-field">
+        <input class="text-input" id="acctCode" type="text" placeholder="HK-XXXX-XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false">
+        <button class="paste-btn" data-paste="acctCode" type="button">Coller</button>
+      </div>
+      <button class="cta" id="acctRestore">Restaurer mon compte</button>`;
+    body.querySelector('[data-paste]').addEventListener('click', () => pasteInto($('acctCode')));
+    const btn = $('acctRestore');
+    btn.addEventListener('click', async () => {
+      const code = $('acctCode').value.trim();
+      if (!code) { toast('Entrez votre code.'); return; }
+      btn.disabled = true;
+      try {
+        const data = await account.restore(code);
+        refreshSettingsStatus();
+        if (data.account?.active) { closeAccountSheet(); toast('Compte restauré ✓'); } else renderAccount('paywall');
+      } catch (err) {
+        toast(err.status === 401 ? 'Code de récupération inconnu.' : err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+    return;
+  }
+
+  // Abonnement
+  accountSheet.title.textContent = 'Abonnement';
+  const plans = ['yearly', 'monthly'].filter(p => info.plans?.[p] !== false);
+  if (!plans.includes(selectedPlan)) selectedPlan = plans[0];
+  const expired = account.info && !account.info.active;
+  body.innerHTML = `
+    <div class="acct-hero">
+      <div class="empty-orb"></div>
+      <h3>${expired ? 'Votre essai est terminé.<br><em>Continuez avec Haksou.</em>' : 'Haksou,<br><em>sans limite.</em>'}</h3>
+      <p>Micro fiable, voix naturelle et 193 langues. Résiliable à tout moment.</p>
+    </div>
+    <div class="plans" role="radiogroup" aria-label="Formule">
+      ${plans.map(p => `
+        <button class="plan" role="radio" data-plan="${p}" aria-checked="${p === selectedPlan}">
+          ${PRICES[p].badge ? `<span class="plan-badge">${PRICES[p].badge}</span>` : ''}
+          <span><span class="plan-name">${p === 'yearly' ? 'Annuel' : 'Mensuel'}</span><br><span class="plan-sub">${p === 'yearly' ? 'Le meilleur prix' : 'Sans engagement'}</span></span>
+          <span class="plan-price">${PRICES[p].label}<br><small>${PRICES[p].period}</small></span>
+        </button>`).join('')}
+    </div>
+    <button class="cta" id="acctPay">Continuer</button>
+    <button class="link-btn" id="acctToRestore">Restaurer un abonnement</button>
+    <p class="fine">Paiement sécurisé par Stripe (carte, Apple Pay, Google Pay). Gérer ou résilier : Réglages → Mon abonnement.</p>`;
+  body.querySelectorAll('.plan').forEach(btn => btn.addEventListener('click', () => {
+    selectedPlan = btn.dataset.plan;
+    body.querySelectorAll('.plan').forEach(b => b.setAttribute('aria-checked', String(b === btn)));
+  }));
+  const pay = $('acctPay');
+  pay.addEventListener('click', async () => {
+    if (!account.token) { renderAccount('welcome'); return; }
+    pay.disabled = true;
+    pay.textContent = 'Ouverture du paiement…';
+    try {
+      location.href = await account.checkoutUrl(selectedPlan, appUrl());
+    } catch (err) {
+      toast(err.message);
+      pay.disabled = false;
+      pay.textContent = 'Continuer';
+    }
+  });
+  $('acctToRestore').addEventListener('click', () => renderAccount('restore'));
 }
 
 let refreshSettingsStatus = () => {};
@@ -590,6 +791,7 @@ function spokenSourceCode() {
 async function onMicText() {
   Speaker.unlock();
   if (voiceActive()) { voiceStop(); return; }
+  if (!ensureAccess()) return;
   const deafMs = Speaker.playedRecently() ? 1300 : 2500;
   stopSpeaking();
   const run = ++voiceRun;
@@ -604,7 +806,8 @@ async function onMicText() {
   } catch (err) {
     live.remove();
     setListening(el.mic, false);
-    if (run === voiceRun) toast(err.message);
+    if (run !== voiceRun) return;
+    if (err.code === 'payment') onPaymentRequired(); else toast(err.message);
     return;
   }
   live.remove();
@@ -622,6 +825,7 @@ async function onMicConv(side) {
   Speaker.unlock();
   const btn = side === 'a' ? el.convA : el.convB;
   if (voiceActive() && btn.classList.contains('listening')) { voiceStop(); return; }
+  if (!ensureAccess()) return;
   voiceCancel();
   await converse(side, false);
 }
@@ -647,6 +851,7 @@ async function converse(side, chained) {
     live.remove();
     setListening(btn, false);
     if (run !== voiceRun) return;
+    if (err.code === 'payment') { onPaymentRequired(); return; }
     toast(chained && err.code === 'not-allowed' ? 'Touchez le micro pour répondre.' : err.message);
     return;
   }
@@ -968,40 +1173,119 @@ function initSettings() {
   });
   sttKey.addEventListener('input', showTts);
 
-  // Relais familial
+  // Propriétaire
   const relayUrl = $('optRelayUrl');
   const relayCode = $('optRelayCode');
   const relayState = $('relayStatus');
-  const shareBtn = $('shareFamilyBtn');
+  const inviteBtn = $('inviteBtn');
+  const familyList = $('familyList');
   const showRelay = () => {
-    const r = relay();
     const info = settings.relayInfo;
-    relayState.textContent = !r ? 'Non configuré' : info ? 'Connecté' : 'Non connecté';
-    relayState.classList.toggle('on', Boolean(r && info));
-    shareBtn.disabled = !(r && info);
+    relayState.textContent = !relayBase() ? 'Non configuré'
+      : isOwner() ? 'Propriétaire ✓'
+      : settings.relayCode && info ? 'Code incorrect'
+      : info ? 'Connecté' : 'Non connecté';
+    relayState.classList.toggle('on', Boolean(info && (isOwner() || !settings.relayCode)));
+    inviteBtn.hidden = !(isOwner() && info?.family);
+    if (inviteBtn.hidden) familyList.replaceChildren();
   };
-  relayUrl.value = settings.relayUrl;
+  relayUrl.value = settings.relayUrl || RELAY_URL;
   relayCode.value = settings.relayCode;
   const onRelayChange = () => {
-    settings.relayUrl = relayUrl.value.trim();
+    const url = relayUrl.value.trim();
+    settings.relayUrl = url === RELAY_URL ? '' : url;
     settings.relayCode = relayCode.value.trim();
     settings.relayInfo = null;
     saveSettings();
     showRelay();
-    if (relay()) connectRelay();
+    if (relayBase()) connectRelay().then(() => isOwner() && loadFamily());
   };
   relayUrl.addEventListener('change', onRelayChange);
   relayCode.addEventListener('change', onRelayChange);
-  shareBtn.addEventListener('click', async () => {
-    const link = familyLink();
+
+  // Famille : inviter, lister, retirer
+  const loadFamily = async () => {
+    if (!isOwner() || !settings.relayInfo?.family) return;
+    try {
+      const { invites } = await adminCall(relayBase(), settings.relayCode, '/admin/family');
+      familyList.replaceChildren(...invites.map(inv => {
+        const row = node('div', 'row family-row');
+        const txt = node('span', 'row-text');
+        txt.append(node('span', '', escapeHtml(inv.name)), node('small', '', inv.devices ? `${inv.devices} appareil${inv.devices > 1 ? 's' : ''}` : 'Invitation pas encore ouverte'));
+        const share = node('button', 'small-btn', 'Lien');
+        share.style.color = 'var(--amber)';
+        share.addEventListener('click', () => shareInvite(inv.name, inv.code));
+        const remove = node('button', 'small-btn', 'Retirer');
+        remove.addEventListener('click', async () => {
+          if (!confirm(`Retirer l'accès gratuit de ${inv.name} ?`)) return;
+          try { await adminCall(relayBase(), settings.relayCode, '/admin/revoke', { code: inv.code }); toast('Accès retiré.'); loadFamily(); } catch (err) { toast(err.message); }
+        });
+        const actions = node('span', 'lang-tags');
+        actions.append(share, remove);
+        row.append(txt, actions);
+        return row;
+      }));
+    } catch (err) {
+      toast(err.message);
+    }
+  };
+  const shareInvite = async (name, code) => {
+    const link = inviteLink(code);
+    const message = `${name}, voici Haksou, mon traducteur, offert ! Ouvre ce lien dans Safari, puis Partager → Sur l'écran d'accueil.`;
     if (navigator.share) {
-      try { await navigator.share({ title: 'Haksou', text: 'Mon traducteur Haksou : ouvre ce lien dans Safari, puis Partager → Sur l\'écran d\'accueil.', url: link }); return; } catch { /* partage annulé : on copie */ }
+      try { await navigator.share({ title: 'Haksou', text: message, url: link }); return; } catch { /* partage annulé : on copie */ }
     }
     await copyText(link);
-    toast('Lien famille copié. Envoie-le à tes proches !');
+    toast('Lien d\'invitation copié. Envoie-le à ton proche !');
+  };
+  inviteBtn.addEventListener('click', async () => {
+    const name = prompt('Prénom du proche à inviter ?');
+    if (name == null) return;
+    try {
+      const { invite } = await adminCall(relayBase(), settings.relayCode, '/admin/invite', { name: name.trim() || 'Proche' });
+      await shareInvite(invite.name, invite.code);
+      loadFamily();
+    } catch (err) {
+      toast(err.message);
+    }
   });
-  refreshSettingsStatus = () => { showRelay(); showStt(); showTts(); };
-  showRelay();
+  $('settingsBtn').addEventListener('click', () => { loadFamily(); if (billingOn() && account.token) account.refresh().then(showSub, () => {}); });
+
+  // Mon abonnement
+  const dateFmt = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+  const showSub = () => {
+    $('subSection').hidden = !billingOn();
+    const i = account.info;
+    const pill = $('subStatus');
+    const kind = !account.token ? 'none' : i?.kind || 'none';
+    pill.textContent = { none: 'Aucun compte', trial: 'Essai gratuit', sub: i?.plan === 'yearly' ? 'Annuel' : 'Mensuel', family: 'Famille', revoked: 'Accès retiré', expired: 'Expiré' }[kind];
+    pill.classList.toggle('on', Boolean(i?.active));
+    const daysLeft = i?.trialEndsAt ? Math.max(0, Math.ceil((i.trialEndsAt - Date.now()) / 864e5)) : 0;
+    $('subDetail').textContent = {
+      none: 'Commencez l\'essai gratuit pour utiliser Haksou.',
+      trial: `${daysLeft} jour${daysLeft > 1 ? 's' : ''} d'essai restant${daysLeft > 1 ? 's' : ''}.`,
+      sub: i?.periodEnd ? `${i.cancelAtPeriodEnd ? 'Se termine' : 'Renouvellement'} le ${dateFmt.format(new Date(i.periodEnd))}.` : 'Abonnement actif.',
+      family: `Accès familial gratuit${i?.name ? ` (${i.name})` : ''}. Merci qui ? 😉`,
+      revoked: 'L\'accès familial a été retiré. Vous pouvez vous abonner.',
+      expired: 'Abonnez-vous pour continuer à utiliser Haksou.',
+    }[kind];
+    $('subscribeBtn').hidden = kind === 'sub' || kind === 'family';
+    $('subscribeBtn').textContent = kind === 'none' ? 'Commencer l\'essai gratuit' : 'S\'abonner';
+    $('manageSubBtn').hidden = !i?.canManage;
+    $('copyRecoveryBtn').hidden = !account.token;
+  };
+  $('subscribeBtn').addEventListener('click', () => openAccountSheet(account.token ? 'paywall' : 'welcome'));
+  $('restoreBtn').addEventListener('click', () => openAccountSheet('restore'));
+  $('copyRecoveryBtn').addEventListener('click', async () => {
+    await copyText(account.token);
+    toast(`Code copié : ${account.token}`);
+  });
+  $('manageSubBtn').addEventListener('click', async () => {
+    try { location.href = await account.portalUrl(appUrl()); } catch (err) { toast(err.message); }
+  });
+
+  refreshSettingsStatus = () => { showRelay(); showStt(); showTts(); showSub(); };
+  refreshSettingsStatus();
 
   const genderButtons = [...document.querySelectorAll('#optGender [role="radio"]')];
   const showGender = () => genderButtons.forEach(b => b.setAttribute('aria-checked', String(b.dataset.value === settings.voiceGender)));
@@ -1062,6 +1346,7 @@ function autosize() {
 function submitInput() {
   const text = el.input.value;
   if (!text.trim()) return;
+  if (!ensureAccess()) return;
   el.input.value = '';
   autosize();
   stopSpeaking();
@@ -1192,10 +1477,10 @@ function init() {
     el.input.addEventListener('focus', () => setTimeout(() => scrollToBottom(true), 300));
   }
 
-  const fromLink = applyFamilyLink();
+  bindSheet(accountSheet.sheet, accountSheet.backdrop);
   initSettings();
   applyMode();
-  if (!fromLink && relay()) connectRelay({ quiet: true });
+  handleIncomingLinks();
 
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     navigator.serviceWorker.register('sw.js').catch(() => { /* fonctionne sans */ });

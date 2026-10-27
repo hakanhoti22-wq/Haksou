@@ -12,7 +12,7 @@ const BASES = {
  * @typedef {object} Cred
  * @property {'groq'|'openai'|'elevenlabs'} provider
  * @property {string} [key]    clé directe
- * @property {{ url: string, code: string }} [relay]  relais familial
+ * @property {{ url: string, code?: string, token?: string }} [relay]  relais : code propriétaire ou jeton de compte
  */
 
 /** Envoie une requête au service, directement ou via le relais. */
@@ -25,7 +25,8 @@ export function apiFetch(cred, path, init = {}) {
     else headers.set('Authorization', `Bearer ${cred.key.trim()}`);
   } else if (cred.relay?.url) {
     url = `${cred.relay.url.replace(/\/+$/, '')}/${cred.provider}${path}`;
-    headers.set('X-Haksou-Code', cred.relay.code || '');
+    if (cred.relay.code) headers.set('X-Haksou-Code', cred.relay.code);
+    else if (cred.relay.token) headers.set('X-Haksou-Token', cred.relay.token);
   } else {
     return Promise.reject(new Error('Aucune clé ni relais configuré.'));
   }
@@ -35,15 +36,15 @@ export function apiFetch(cred, path, init = {}) {
 /** Interroge le relais : quels services propose-t-il ? */
 export async function relayStatus(relay) {
   const res = await fetch(`${relay.url.replace(/\/+$/, '')}/status`, {
-    headers: { 'X-Haksou-Code': relay.code || '' },
+    headers: relay.code ? { 'X-Haksou-Code': relay.code } : {},
     cache: 'no-store',
   });
-  if (res.status === 401) throw new Error('Code famille incorrect.');
+  if (res.status === 401) throw new Error('Code propriétaire incorrect.');
   if (!res.ok) throw new Error(`Relais injoignable (${res.status}).`);
   return res.json();
 }
 
 /** Message clair pour un refus d'accès (clé ou code famille). */
 export const authMessage = (cred, name) => (cred.relay
-  ? 'Code famille incorrect, ou clé manquante sur le relais.'
+  ? 'Accès refusé par le relais (code ou compte non reconnu).'
   : `Clé ${name} invalide. Vérifiez-la dans les réglages.`);

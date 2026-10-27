@@ -148,23 +148,41 @@
     </div>
     <div class="sheet-body">
 
-      <div class="group-title">Relais familial</div>
+      <div id="subSection" hidden>
+        <div class="group-title">Mon abonnement</div>
+        <div class="group">
+          <div class="row row-col">
+            <span class="row-text">
+              <span>Haksou <span class="pill-status" id="subStatus"></span></span>
+              <small id="subDetail"></small>
+            </span>
+          </div>
+          <button class="row row-btn accent" id="subscribeBtn">S'abonner</button>
+          <button class="row row-btn" id="manageSubBtn" hidden>Gérer ou résilier l'abonnement</button>
+          <button class="row row-btn" id="copyRecoveryBtn" hidden>Copier mon code de récupération</button>
+          <button class="row row-btn" id="restoreBtn">Restaurer un compte</button>
+        </div>
+        <p class="group-note">Le code de récupération permet de retrouver votre abonnement sur un autre appareil. Gardez-le précieusement.</p>
+      </div>
+
+      <div class="group-title">Propriétaire</div>
       <div class="group">
         <div class="row row-col">
           <span class="row-text">
             <span>Mon relais <span class="pill-status" id="relayStatus"></span></span>
-            <small>Vos clés restent cachées sur votre relais Cloudflare : vos proches n'ont besoin d'aucune clé. Normalement rempli automatiquement par le lien famille.</small>
+            <small>Votre relais Cloudflare garde vos clés cachées. Avec votre code propriétaire, cet appareil a un accès illimité et peut inviter la famille gratuitement.</small>
           </span>
           <div class="key-field">
             <input class="text-input" id="optRelayUrl" type="url" inputmode="url" placeholder="https://haksou-relais.….workers.dev" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
             <button class="paste-btn" data-paste="optRelayUrl" type="button">Coller</button>
           </div>
-          <input class="text-input" id="optRelayCode" type="text" placeholder="Code famille" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+          <input class="text-input" id="optRelayCode" type="password" placeholder="Code propriétaire" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
         </div>
-        <button class="row row-btn accent" id="shareFamilyBtn" disabled>
+        <button class="row row-btn accent" id="inviteBtn" hidden>
           <svg viewBox="0 0 24 24"><path d="M12 15V3m0 0L8 7m4-4 4 4"/><path d="M7 11H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-1"/></svg>
-          Partager le lien famille
+          Inviter un proche (gratuit)
         </button>
+        <div id="familyList"></div>
       </div>
 
       <div class="group-title">Voix naturelle (IA)</div>
@@ -241,6 +259,17 @@
 
       <p class="foot-note" id="envNote"></p>
     </div>
+  </section>
+
+  <!-- Feuille : compte (bienvenue, abonnement) -->
+  <div class="sheet-backdrop" id="accountBackdrop" hidden></div>
+  <section class="sheet account-sheet" id="accountSheet" role="dialog" aria-modal="true" aria-labelledby="accountTitle" hidden>
+    <div class="sheet-grabber" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <h2 id="accountTitle">Bienvenue</h2>
+      <button class="text-btn" data-close>Fermer</button>
+    </div>
+    <div class="sheet-body" id="accountBody"></div>
   </section>
 
   <div class="toast" id="toast" role="status" hidden></div>

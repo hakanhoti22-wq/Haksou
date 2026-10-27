@@ -10,6 +10,7 @@
 | Code du relais à copier | https://raw.githubusercontent.com/hakanhoti22-wq/Haksou/claude/ios-translation-app-ipg6h5/relay/worker.js |
 | Clé OpenAI (voix naturelle, payant, quelques centimes/jour) | https://platform.openai.com/api-keys |
 | Clé ElevenLabs (voix la plus humaine) | https://elevenlabs.io/app/settings/api-keys |
+| Stripe (paiements) | https://dashboard.stripe.com |
 | Réglages GitHub Pages (mise en ligne) | https://github.com/hakanhoti22-wq/Haksou/settings/pages |
 | Mot de passe GitHub oublié | https://github.com/password_reset |
 
@@ -86,7 +87,17 @@ La page doit afficher : **« Relais Haksou opérationnel. »** → copie l'adres
 
 ---
 
-## 6. En cas de problème
+## 6. Abonnements et invitations famille
+
+Guide complet : **relay/ABONNEMENTS.md** (Stripe, base de données Cloudflare, tests, passage en vrais paiements).
+
+- Public : **7 jours gratuits**, puis **0,95 CHF / mois** ou **9,95 CHF / an**.
+- Famille : **⚙︎ → Propriétaire → Inviter un proche (gratuit)** → envoyer le lien → rien à configurer chez eux.
+- Retirer un proche : **⚙︎ → Propriétaire → Retirer**.
+
+---
+
+## 7. En cas de problème
 
 | Message | Solution |
 | --- | --- |

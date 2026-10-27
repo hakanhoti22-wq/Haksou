@@ -26,6 +26,7 @@ La clé reste sur le téléphone et n'est envoyée qu'à Groq. Elle sert aussi d
 
 Le dossier [`relay/`](relay/) contient un petit serveur gratuit (Cloudflare Worker) qui garde vos clés cachées. Vos proches ouvrent votre **lien famille** et le micro fiable + la voix naturelle fonctionnent sans clé.
 Mise en place pas à pas : [`relay/LISEZMOI.md`](relay/LISEZMOI.md).
+Essai gratuit de 7 jours, abonnements (0,95 CHF/mois, 9,95 CHF/an) et invitations famille : [`relay/ABONNEMENTS.md`](relay/ABONNEMENTS.md).
 
 ## Voix naturelle (IA)
 
@@ -73,6 +74,8 @@ Puis ouvrir `http://localhost:8000`. Aucune dépendance, aucune étape de compil
 | `tts.js` | Voix naturelles (ElevenLabs ou OpenAI) |
 | `audio.js` | Moteur audio partagé (Web Audio) |
 | `api.js` | Accès aux services d'IA (clé directe ou relais familial) |
+| `account.js` | Compte : essai, abonnement, accès famille |
+| `config.js` | Adresse du relais et prix affichés |
 | `relay/worker.js` | Relais familial à déployer sur Cloudflare |
 | `translator.js` | Traduction avec délai maximal, cache et moteur de secours |
 | `languages.js` | Liste des langues et locales vocales |

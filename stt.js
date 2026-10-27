@@ -76,6 +76,7 @@ export async function transcribe(blob, langCode, cred) {
       clearTimeout(timer);
     }
     if (res.status === 401 || res.status === 403) throw new SttError('key', authMessage(cred, 'de reconnaissance vocale'));
+    if (res.status === 402) throw new SttError('payment', 'Abonnement requis.');
     if (res.status === 429) throw new SttError('quota', 'Limite du service vocal atteinte. Réessayez dans une minute.');
     if (res.status === 400 && withLanguage && language) return send(false); // langue refusée : détection automatique
     if (!res.ok) throw new SttError('server', `Le service de reconnaissance vocale a échoué (${res.status}). Réessayez.`);
