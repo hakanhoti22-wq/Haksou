@@ -15,6 +15,7 @@
 //   PRICE_YEARLY       identifiant du prix annuel Stripe (price_…)
 //   TRIAL_DAYS         durée de l'essai gratuit (défaut : 7)
 //   DAILY_LIMIT        requêtes par personne et par jour (défaut : 300)
+//   STRIPE_API_VERSION version de l'API Stripe (défaut : 2025-03-31.basil)
 //   ALLOWED_ORIGIN     ex. https://votre-nom.github.io (n'autorise que votre app)
 //
 // ── Liaison (Settings → Bindings → Add → KV namespace) ───────────────────────
@@ -376,7 +377,12 @@ function newToken() {
 async function stripe(env, method, path, params) {
   const res = await fetch(`https://api.stripe.com/v1${path}`, {
     method,
-    headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: {
+      Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+      // Version récente requise notamment par Stripe Managed Payments.
+      'Stripe-Version': env.STRIPE_API_VERSION || '2025-03-31.basil',
+    },
     body: params ? new URLSearchParams(params) : undefined,
   });
   const data = await res.json();

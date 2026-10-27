@@ -10,7 +10,7 @@ import { ttsProviderFor, ttsSupports, PROVIDER_NAMES } from './tts.js';
 
 const $ = id => document.getElementById(id);
 
-export const APP_VERSION = '10';
+export const APP_VERSION = '11';
 
 // ---------------------------------------------------------------------------
 // Stockage local
@@ -509,10 +509,10 @@ async function onPaymentRequired() {
 
 const appUrl = () => location.origin + location.pathname;
 
-/** Lien d'invitation famille (contient l'adresse du relais si elle n'est pas dans config.js). */
+/** Lien d'invitation famille (contient l'adresse du relais si elle diffère de config.js). */
 function inviteLink(code) {
   const params = new URLSearchParams({ invite: code });
-  if (!RELAY_URL) params.set('relais', relayBase());
+  if (relayBase() !== RELAY_URL) params.set('relais', relayBase());
   return `${appUrl()}#${params}`;
 }
 
