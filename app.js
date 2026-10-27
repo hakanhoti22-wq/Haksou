@@ -1,6 +1,8 @@
 import { LANGUAGES, AUTO, findLanguage, engineCode, speechLocale, nativeName } from './languages.js';
 import { translate } from './translator.js';
 import { Listener, Speaker } from './speech.js';
+import { VoiceRecorder } from './recorder.js';
+import { transcribe } from './stt.js';
 
 const $ = id => document.getElementById(id);
 
@@ -35,6 +37,7 @@ const settings = {
   autoChain: false,
   recents: [],
   lastDetected: null,
+  sttKey: '',
   ...store.get('settings', {}),
 };
 const saveSettings = () => store.set('settings', settings);
@@ -82,6 +85,8 @@ const el = {
 };
 
 const listener = new Listener();
+const recorder = new VoiceRecorder();
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 let speakingId = null;
 let voiceRun = 0; // incrémenté à chaque nouvelle action vocale pour ignorer les suites obsolètes
 
@@ -257,11 +262,14 @@ function scrollToBottom(smooth) {
 }
 
 /** Bulle provisoire affichant la parole reconnue en direct. */
-function liveBubble(side) {
+const TYPING = '<span class="typing"><i></i><i></i><i></i></span>';
+const WAVE = '<span class="wave" aria-label="Enregistrement"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>';
+
+function liveBubble(side, recording) {
   el.inner.querySelector('.empty')?.remove();
   const wrap = node('div', 'exchange live-exchange');
   const row = node('div', `msg ${side === 'left' ? 'left other' : 'right'}`);
-  const b = node('div', 'bubble live', '<span class="typing"><i></i><i></i><i></i></span>');
+  const b = node('div', 'bubble live', recording ? WAVE : TYPING);
   row.append(b);
   wrap.append(row);
   el.inner.append(wrap);
@@ -271,6 +279,12 @@ function liveBubble(side) {
       b.textContent = text;
       b.append(node('span', 'caret'));
       scrollToBottom(false);
+    },
+    level(v) {
+      b.style.setProperty('--l', v.toFixed(2));
+    },
+    pending() {
+      b.innerHTML = TYPING;
     },
     remove() {
       wrap.remove();
@@ -295,7 +309,10 @@ function pushMessage(mode, m) {
 async function runTranslation(mode, m) {
   m.status = 'pending';
   try {
-    const res = await translate(m.original, m.auto ? 'auto' : engineCode(lang(m.from)), engineCode(lang(m.to)));
+    const res = await translate(m.original, m.auto ? 'auto' : engineCode(lang(m.from)), engineCode(lang(m.to)), {
+      key: settings.sttKey,
+      nameOf: code => findLanguage(code)?.name || code,
+    });
     if (m.auto && res.detected) {
       const detected = findLanguage(res.detected);
       if (detected) {
@@ -380,6 +397,57 @@ function refreshPlaying() {
 }
 
 // ---------------------------------------------------------------------------
+// Capture de la voix
+// ---------------------------------------------------------------------------
+
+/**
+ * Deux moteurs :
+ *  - Whisper (si une clé est enregistrée) : on enregistre l'audio et on le
+ *    fait transcrire. Fiable sur iPhone, où la reconnaissance de Safari
+ *    devient « sourde » après la première dictée (bug d'iOS) ;
+ *  - sinon, la reconnaissance vocale intégrée au navigateur.
+ */
+const useWhisper = () => Boolean(settings.sttKey) && VoiceRecorder.supported;
+const voiceActive = () => listener.active || recorder.active;
+function voiceStop() { listener.stop(); recorder.stop(); }
+function voiceCancel() { listener.cancel(); recorder.cancel(); }
+
+async function captureSpeech(language, live, btn, deafMs) {
+  const silenceMs = settings.silence * 1000;
+  if (useWhisper()) {
+    const res = await recorder.record({
+      silenceMs,
+      onLevel: v => live.level(v),
+      onSpeech: () => heard(btn),
+    });
+    if (!res || !res.speech) return '';
+    setListening(btn, false);
+    live.pending();
+    showStatus('Transcription…');
+    try {
+      return await transcribe(res.blob, language.code, settings.sttKey);
+    } finally {
+      if (!document.querySelector('.listening')) hideStatus();
+    }
+  }
+  return listener.listen({
+    lang: speechLocale(language),
+    silenceMs,
+    deafMs,
+    onText: t => { live.update(t); heard(btn); },
+  });
+}
+
+/** Message affiché quand rien n'a été entendu. */
+function nothingHeard() {
+  if (isIOS && !useWhisper()) {
+    toast('Le micro de Safari s\'est bloqué (bug d\'iOS). Pour un micro fiable, activez « Micro fiable (Whisper) » dans les réglages ⚙︎.');
+  } else {
+    toast('Je n\'ai rien entendu. Touchez le micro et parlez.');
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Micro — mode Traduire
 // ---------------------------------------------------------------------------
 
@@ -395,23 +463,18 @@ function spokenSourceCode() {
 
 async function onMicText() {
   Speaker.unlock();
-  if (listener.active) { listener.stop(); return; }
+  if (voiceActive()) { voiceStop(); return; }
   const deafMs = Speaker.playedRecently() ? 1300 : 2500;
   stopSpeaking();
   const run = ++voiceRun;
 
   const spoken = lang(spokenSourceCode());
-  const live = liveBubble('right');
+  const live = liveBubble('right', useWhisper());
   setListening(el.mic, true, `J'écoute en ${spoken.name.toLowerCase()}…`);
 
   let text = '';
   try {
-    text = await listener.listen({
-      lang: speechLocale(spoken),
-      silenceMs: settings.silence * 1000,
-      deafMs,
-      onText: t => { live.update(t); heard(el.mic); },
-    });
+    text = await captureSpeech(spoken, live, el.mic, deafMs);
   } catch (err) {
     live.remove();
     setListening(el.mic, false);
@@ -421,7 +484,7 @@ async function onMicText() {
   live.remove();
   setListening(el.mic, false);
   if (run !== voiceRun) return;
-  if (!text) { toast('Je n\'ai rien entendu. Touchez le micro et parlez.'); return; }
+  if (!text) { nothingHeard(); return; }
   await translateTyped(text, { from: spoken.code, spoken: true });
 }
 
@@ -432,8 +495,8 @@ async function onMicText() {
 async function onMicConv(side) {
   Speaker.unlock();
   const btn = side === 'a' ? el.convA : el.convB;
-  if (listener.active && btn.classList.contains('listening')) { listener.stop(); return; }
-  listener.cancel();
+  if (voiceActive() && btn.classList.contains('listening')) { voiceStop(); return; }
+  voiceCancel();
   await converse(side, false);
 }
 
@@ -448,17 +511,12 @@ async function converse(side, chained) {
 
   setListening(el.convA, false);
   setListening(el.convB, false);
-  const live = liveBubble(side === 'a' ? 'right' : 'left');
+  const live = liveBubble(side === 'a' ? 'right' : 'left', useWhisper());
   setListening(btn, true, `J'écoute en ${from.name.toLowerCase()}…`);
 
   let text = '';
   try {
-    text = await listener.listen({
-      lang: speechLocale(from),
-      silenceMs: settings.silence * 1000,
-      deafMs,
-      onText: t => { live.update(t); heard(btn); },
-    });
+    text = await captureSpeech(from, live, btn, deafMs);
   } catch (err) {
     live.remove();
     setListening(btn, false);
@@ -470,7 +528,7 @@ async function converse(side, chained) {
   setListening(btn, false);
   if (run !== voiceRun) return;
   if (!text) {
-    if (!chained) toast('Je n\'ai rien entendu. Touchez le micro et parlez.');
+    if (!chained) nothingHeard();
     return;
   }
 
@@ -537,7 +595,7 @@ function renderLangbar() {
 
 function setMode(mode) {
   if (settings.mode === mode) return;
-  listener.cancel();
+  voiceCancel();
   stopSpeaking();
   voiceRun++;
   setListening(el.mic, false);
@@ -737,6 +795,22 @@ function initSettings() {
   rate.addEventListener('input', () => { settings.rate = +rate.value; show(); saveSettings(); });
   silence.addEventListener('input', () => { settings.silence = +silence.value; show(); saveSettings(); });
 
+  const sttKey = $('optSttKey');
+  const sttStatus = $('sttStatus');
+  const showStt = () => {
+    const on = Boolean(settings.sttKey);
+    sttStatus.textContent = on ? 'Activé' : 'Désactivé';
+    sttStatus.classList.toggle('on', on);
+  };
+  sttKey.value = settings.sttKey;
+  showStt();
+  sttKey.addEventListener('input', () => {
+    settings.sttKey = sttKey.value.trim();
+    saveSettings();
+    showStt();
+  });
+  if (!VoiceRecorder.supported) sttKey.disabled = true;
+
   $('clearBtn').addEventListener('click', () => {
     const mode = settings.mode;
     if (!history[mode].length) { closeSheet(settingsSheet.sheet, settingsSheet.backdrop); return; }
@@ -857,7 +931,7 @@ function init() {
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) return;
     voiceRun++;
-    listener.cancel();
+    voiceCancel();
     stopSpeaking();
   });
 

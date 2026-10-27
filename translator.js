@@ -1,4 +1,5 @@
-// Traduction : moteur principal Google (endpoint public), repli MyMemory.
+// Traduction : moteur principal Google (endpoint public), repli MyMemory,
+// puis, si une clé Groq/OpenAI est enregistrée, un modèle de langage en dernier recours.
 // Chaque requête a un délai maximal et est retentée avant de basculer.
 
 const TIMEOUT_MS = 6000;
@@ -12,21 +13,25 @@ export class TranslationError extends Error {}
 
 /**
  * Traduit `text` de `from` (code moteur ou 'auto') vers `to`.
+ * @param {object} [opts]
+ * @param {string} [opts.key]  clé Groq (gsk_…) ou OpenAI (sk-…) pour le dernier recours
+ * @param {(code: string) => string} [opts.nameOf]  nom lisible d'une langue
  * @returns {Promise<{ text: string, detected: string|null }>}
  */
-export async function translate(text, from, to) {
+export async function translate(text, from, to, { key = '', nameOf = c => c } = {}) {
   const clean = text.trim();
   if (!clean) return { text: '', detected: null };
   if (from !== 'auto' && from === to) return { text: clean, detected: from };
 
-  const key = `${from}|${to}|${clean}`;
-  if (cache.has(key)) return cache.get(key);
+  const cacheKey = `${from}|${to}|${clean}`;
+  if (cache.has(cacheKey)) return cache.get(cacheKey);
 
   // Après un échec du moteur principal, le secours passe en premier pendant quelques minutes.
   const googleFirst = Date.now() > googleDownUntil;
   const engines = googleFirst
     ? [() => google(clean, from, to), () => withRetry(() => myMemory(clean, from, to), 2)]
     : [() => myMemory(clean, from, to), () => google(clean, from, to)];
+  if (key) engines.push(() => llm(clean, from, to, key, nameOf));
 
   let result;
   for (const [i, run] of engines.entries()) {
@@ -45,7 +50,7 @@ export async function translate(text, from, to) {
   if (!googleFirst && result.engine === 'google') googleDownUntil = 0;
 
   if (cache.size > 300) cache.delete(cache.keys().next().value);
-  cache.set(key, result);
+  cache.set(cacheKey, result);
   return result;
 }
 
@@ -86,6 +91,40 @@ async function google(text, from, to) {
     detected = detected || data.src || null;
   }
   return { text: parts.join(' ').trim(), detected, engine: 'google' };
+}
+
+const LLM = {
+  groq: { url: 'https://api.groq.com/openai/v1/chat/completions', model: 'llama-3.3-70b-versatile' },
+  openai: { url: 'https://api.openai.com/v1/chat/completions', model: 'gpt-4o-mini' },
+};
+
+async function llm(text, from, to, key, nameOf) {
+  const p = key.startsWith('gsk_') ? LLM.groq : LLM.openai;
+  const source = from === 'auto' ? 'the source language (detect it)' : `${nameOf(from)} (${from})`;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 12000);
+  try {
+    const res = await fetch(p.url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      signal: ctrl.signal,
+      body: JSON.stringify({
+        model: p.model,
+        temperature: 0,
+        messages: [
+          { role: 'system', content: `You are a professional translator. Translate the user's text from ${source} into ${nameOf(to)} (${to}). Reply with the translation only, without quotes, notes or explanations.` },
+          { role: 'user', content: text },
+        ],
+      }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const out = data.choices?.[0]?.message?.content?.trim();
+    if (!out) throw new Error('Réponse vide');
+    return { text: out, detected: from === 'auto' ? null : from, engine: 'llm' };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 const MM_CODES = { iw: 'he', jw: 'jv', tl: 'fil', 'zh-CN': 'zh-CN', 'zh-TW': 'zh-TW', 'mni-Mtei': 'mni' };

@@ -149,6 +149,18 @@
         </label>
       </div>
 
+      <div class="group-title">Micro fiable (Whisper)</div>
+      <div class="group">
+        <div class="row row-col">
+          <span class="row-text">
+            <span>Clé de reconnaissance vocale <span class="pill-status" id="sttStatus"></span></span>
+            <small>Recommandé sur iPhone : la voix est enregistrée puis transcrite par Whisper, sans le blocage du micro de Safari. Clé gratuite Groq (gsk_…) ou clé OpenAI (sk-…). Elle reste sur cet appareil.</small>
+          </span>
+          <input class="text-input" id="optSttKey" type="password" placeholder="Coller la clé ici" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+        </div>
+        <a class="row row-btn" id="sttHelp" href="https://console.groq.com/keys" target="_blank" rel="noopener">Obtenir une clé gratuite (Groq)</a>
+      </div>
+
       <div class="group-title">Historique</div>
       <div class="group">
         <button class="row row-btn danger" id="clearBtn">Effacer la conversation</button>

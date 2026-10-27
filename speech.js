@@ -227,7 +227,6 @@ function assemble(results) {
 // ---------------------------------------------------------------------------
 
 const synth = window.speechSynthesis;
-const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
 
 class SpeakerImpl {
   constructor() {
@@ -247,7 +246,9 @@ class SpeakerImpl {
 
   /**
    * À appeler pendant un geste de l'utilisateur (toucher) : iOS n'autorise
-   * la lecture audio qu'après une première lecture déclenchée par un geste.
+   * la synthèse vocale qu'après une première lecture déclenchée par un geste.
+   * (Pas de lecture via un élément <audio> ici : sur iOS, cela rend la
+   * reconnaissance vocale de Safari sourde — bug WebKit 321436.)
    */
   unlock() {
     if (this.unlocked) return;
@@ -258,10 +259,6 @@ class SpeakerImpl {
         u.volume = 0;
         synth.speak(u);
       }
-    } catch { /* sans incidence */ }
-    try {
-      this.audio.src = SILENT_WAV;
-      this.audio.play().catch(() => {});
     } catch { /* sans incidence */ }
   }
 
@@ -301,7 +298,7 @@ class SpeakerImpl {
   releaseAudio() {
     try {
       if (!this.audio.paused) this.audio.pause();
-      if (this.audio.src && !this.audio.src.startsWith('data:')) {
+      if (this.audio.src) {
         this.audio.removeAttribute('src');
         this.audio.load();
       }

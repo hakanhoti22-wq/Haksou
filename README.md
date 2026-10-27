@@ -11,6 +11,17 @@ Application web de traduction pensée pour l'iPhone (installable sur l'écran d'
 - Fiabilité : délai maximal sur chaque requête, moteur de traduction de secours (Google → MyMemory), relance du micro si le moteur vocal s'interrompt, garde-fous si un événement vocal ne se déclenche pas, historique conservé sur l'appareil.
 - Mode sombre automatique, fonctionne hors ligne pour l'interface.
 
+## Micro fiable sur iPhone (recommandé)
+
+Sur les iOS récents, la reconnaissance vocale intégrée à Safari devient « sourde » après la première dictée : il faut recharger la page pour reparler. C'est un bug d'Apple ([WebKit 321436](https://bugs.webkit.org/show_bug.cgi?id=321436)), que l'app ne peut pas corriger.
+
+La solution : l'app enregistre elle-même la voix, détecte le silence, puis fait transcrire l'audio par **Whisper**.
+
+1. Créer un compte gratuit sur [console.groq.com](https://console.groq.com/keys) et générer une clé (elle commence par `gsk_`).
+2. Dans l'app : ⚙︎ Réglages → **Micro fiable (Whisper)** → coller la clé.
+
+La clé reste sur le téléphone et n'est envoyée qu'à Groq. Elle sert aussi de traduction de secours si les services gratuits ne répondent pas. Une clé OpenAI (`sk-…`) fonctionne aussi.
+
 ## Mise en ligne (GitHub Pages)
 
 Le micro exige une adresse **https** : il faut donc héberger l'app.
@@ -42,7 +53,9 @@ Puis ouvrir `http://localhost:8000`. Aucune dépendance, aucune étape de compil
 | `index.html` | Structure de l'interface |
 | `styles.css` | Design (palette, bulles, feuilles, mode sombre) |
 | `app.js` | Logique de l'app : modes, fil de messages, réglages |
-| `speech.js` | Micro avec arrêt automatique au silence, synthèse vocale |
+| `speech.js` | Reconnaissance vocale de Safari/Chrome, synthèse vocale |
+| `recorder.js` | Enregistrement de la voix avec détection du silence |
+| `stt.js` | Transcription Whisper (Groq ou OpenAI) |
 | `translator.js` | Traduction avec délai maximal, cache et moteur de secours |
 | `languages.js` | Liste des langues et locales vocales |
 | `sw.js`, `manifest.webmanifest`, `icons/` | Installation sur l'écran d'accueil et hors ligne |
