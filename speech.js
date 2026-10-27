@@ -1,6 +1,8 @@
 // Voix : reconnaissance (micro) et synthèse (lecture des traductions).
 
 import { splitText } from './translator.js';
+import { synthesize } from './tts.js';
+import { getAudioContext, ensureRunning, unlockAudio } from './audio.js';
 
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -236,6 +238,8 @@ class SpeakerImpl {
     this.token = 0;
     this.unlocked = false;
     this.lastSound = 0;
+    this.source = null;
+    this.onNeuralError = null;
     this.loadVoices();
     synth?.addEventListener?.('voiceschanged', () => this.loadVoices());
   }
@@ -251,6 +255,7 @@ class SpeakerImpl {
    * reconnaissance vocale de Safari sourde — bug WebKit 321436.)
    */
   unlock() {
+    unlockAudio();
     if (this.unlocked) return;
     this.unlocked = true;
     try {
@@ -291,6 +296,8 @@ class SpeakerImpl {
     if (this.current != null) this.lastSound = Date.now();
     this.current = null;
     try { synth?.cancel(); } catch { /* rien */ }
+    try { this.source?.stop(); } catch { /* déjà arrêté */ }
+    this.source = null;
     this.releaseAudio();
   }
 
@@ -311,16 +318,27 @@ class SpeakerImpl {
   }
 
   /**
-   * Lit `text` dans la langue `locale`. Utilise une voix de l'appareil quand
-   * elle existe, sinon une voix en ligne.
+   * Lit `text` dans la langue `locale`. Utilise d'abord la voix naturelle (IA)
+   * si `neural` est fourni, puis la meilleure voix de l'appareil, sinon une
+   * voix en ligne.
+   * @param {object} [o.neural]  { key, langCode, langName, gender } pour une voix IA
    * @returns {Promise<void>} résolue à la fin de la lecture (ou à l'annulation)
    */
-  async speak(text, { locale, engine, rate = 1 } = {}) {
+  async speak(text, { locale, engine, rate = 1, neural = null } = {}) {
     this.cancel();
     const token = this.token;
     this.current = token;
     const voice = synth ? this.voiceFor(locale) : null;
     try {
+      if (neural) {
+        try {
+          await this.speakNeural(text, neural, rate, token);
+          return;
+        } catch (err) {
+          if (token !== this.token) return;
+          this.onNeuralError?.(err);
+        }
+      }
       if (voice) {
         try {
           await this.speakNative(text, voice, locale, rate, token);
@@ -336,6 +354,44 @@ class SpeakerImpl {
         this.lastSound = Date.now();
         this.releaseAudio();
       }
+    }
+  }
+
+  async speakNeural(text, neural, rate, token) {
+    const buf = await synthesize(text, { ...neural, rate });
+    if (token !== this.token) return;
+
+    if (await ensureRunning()) {
+      const ctx = getAudioContext();
+      const audio = await new Promise((resolve, reject) => {
+        const p = ctx.decodeAudioData(buf, resolve, reject);
+        p?.then?.(resolve, reject);
+      });
+      if (token !== this.token) return;
+      await new Promise((resolve) => {
+        const src = ctx.createBufferSource();
+        src.buffer = audio;
+        src.connect(ctx.destination);
+        const guard = setTimeout(resolve, audio.duration * 1000 + 1500);
+        src.onended = () => { clearTimeout(guard); resolve(); };
+        this.source = src;
+        src.start(0);
+      });
+      return;
+    }
+
+    // Moteur Web Audio indisponible : lecteur classique.
+    const url = URL.createObjectURL(new Blob([buf], { type: 'audio/mpeg' }));
+    try {
+      await new Promise((resolve, reject) => {
+        const a = this.audio;
+        a.onended = () => resolve();
+        a.onerror = () => reject(new Error('lecture'));
+        a.src = url;
+        a.play().catch(reject);
+      });
+    } finally {
+      URL.revokeObjectURL(url);
     }
   }
 

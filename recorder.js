@@ -8,6 +8,8 @@
 // Le micro n'est ouvert que pendant l'écoute : l'iPhone repasse ensuite en
 // mode haut-parleur pour lire la traduction.
 
+import { getAudioContext, unlockAudio } from './audio.js';
+
 export class RecorderError extends Error {
   constructor(code, message) {
     super(message);
@@ -48,11 +50,8 @@ export class VoiceRecorder {
     this.session = s;
 
     // L'AudioContext doit être créé/relancé pendant le geste (iOS).
-    try {
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if (AC && (!this.ctx || this.ctx.state === 'closed')) this.ctx = new AC();
-      this.ctx?.resume?.().catch(() => {});
-    } catch { this.ctx = null; }
+    unlockAudio();
+    this.ctx = getAudioContext();
 
     const promise = (async () => {
       let stream;

@@ -1,8 +1,9 @@
-import { LANGUAGES, AUTO, findLanguage, engineCode, speechLocale, nativeName } from './languages.js';
+import { LANGUAGES, AUTO, findLanguage, engineCode, speechLocale, nativeName, flagOf } from './languages.js';
 import { translate } from './translator.js';
 import { Listener, Speaker } from './speech.js';
 import { VoiceRecorder } from './recorder.js';
 import { transcribe } from './stt.js';
+import { ttsProviderFor, ttsSupports, PROVIDER_NAMES } from './tts.js';
 
 const $ = id => document.getElementById(id);
 
@@ -38,6 +39,8 @@ const settings = {
   recents: [],
   lastDetected: null,
   sttKey: '',
+  ttsKey: '',
+  voiceGender: 'female',
   ...store.get('settings', {}),
 };
 const saveSettings = () => store.set('settings', settings);
@@ -72,6 +75,12 @@ const el = {
   tgtBtn: $('tgtBtn'),
   srcLabel: $('srcLabel'),
   tgtLabel: $('tgtLabel'),
+  srcFlag: $('srcFlag'),
+  tgtFlag: $('tgtFlag'),
+  srcCaption: $('srcCaption'),
+  tgtCaption: $('tgtCaption'),
+  convFlagA: $('convFlagA'),
+  convFlagB: $('convFlagB'),
   swap: $('swapBtn'),
   composerText: $('composerText'),
   composerConv: $('composerConv'),
@@ -95,7 +104,7 @@ let voiceRun = 0; // incrémenté à chaque nouvelle action vocale pour ignorer 
 // ---------------------------------------------------------------------------
 
 const ICON = {
-  speaker: '<svg viewBox="0 0 24 24"><path d="M11 5 6.5 9H3.5v6h3L11 19z"/><path d="M15.5 9.2a4 4 0 0 1 0 5.6M18.4 6.4a8 8 0 0 1 0 11.2"/></svg>',
+  speaker: '<svg class="spk" viewBox="0 0 24 24"><path d="M11 5 6.5 9H3.5v6h3L11 19z"/><path d="M15.5 9.2a4 4 0 0 1 0 5.6M18.4 6.4a8 8 0 0 1 0 11.2"/></svg><span class="eq"><i></i><i></i><i></i><i></i></span>',
   copy: '<svg viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2.5"/><path d="M15.5 8.5V6.5a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"/></svg>',
   check: '<svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>',
   mic: '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>',
@@ -146,15 +155,27 @@ function renderAll() {
   scrollToBottom(false);
 }
 
+const QUICK_PHRASES = ['Bonjour, comment allez-vous ?', 'Où sont les toilettes ?', 'L\'addition, s\'il vous plaît', 'Combien ça coûte ?'];
+
 function emptyState() {
   const conv = settings.mode === 'conv';
   const box = node('div', 'empty');
   box.innerHTML = `
-    <div class="empty-icon">${conv ? ICON.people : ICON.sparkle}</div>
-    <h3>${conv ? 'Conversation face à face' : 'Traduisez en un instant'}</h3>
+    <div class="empty-orb"></div>
+    <h3>${conv ? 'Face à face,<br><em>sans barrière.</em>' : 'Parlez.<br><em>Le monde vous comprend.</em>'}</h3>
     <p>${conv
-      ? 'Chacun touche son micro et parle. La traduction s\'affiche et est lue à voix haute pour l\'autre personne.'
-      : 'Écrivez ou touchez le micro. Plus de 180 langues, détection automatique de la langue.'}</p>`;
+      ? 'Chacun touche son micro et parle dans sa langue. La traduction s\'affiche et se fait entendre.'
+      : 'Écrivez, parlez, ou essayez une phrase :'}</p>`;
+  if (!conv) {
+    const chips = node('div', 'empty-chips');
+    for (const phrase of QUICK_PHRASES) {
+      const c = node('button', 'chip');
+      c.textContent = phrase;
+      c.addEventListener('click', () => { Speaker.unlock(); translateTyped(phrase, { from: 'fr', spoken: true }); });
+      chips.append(c);
+    }
+    box.append(chips);
+  }
   return box;
 }
 
@@ -173,6 +194,10 @@ function updateMessage(m) {
   scrollToBottom(true);
 }
 
+const metaHtml = (...codes) => codes
+  .map(c => `<span class="f">${flagOf(c)}</span>${escapeHtml(langName(c))}`)
+  .join(' <span aria-hidden="true">→</span> ');
+
 function renderMessage(m) {
   const wrap = node('div', 'exchange');
   wrap.dataset.id = m.id;
@@ -180,23 +205,22 @@ function renderMessage(m) {
   if (m.kind === 'text') {
     // Bulle envoyée : le texte d'origine
     const sent = node('div', 'msg right');
-    const fromLabel = m.auto ? `${langName(m.from)} · détecté` : langName(m.from);
-    sent.append(node('div', 'msg-meta', escapeHtml(fromLabel)));
+    sent.append(node('div', 'msg-meta', metaHtml(m.from) + (m.auto ? ' · auto' : '')));
     const b1 = node('div', 'bubble');
     b1.textContent = m.original;
     sent.append(b1);
     wrap.append(sent);
 
     // Bulle reçue : la traduction
-    const recv = node('div', 'msg left');
-    recv.append(node('div', 'msg-meta', escapeHtml(langName(m.to))));
+    const recv = node('div', 'msg left delayed');
+    recv.append(node('div', 'msg-meta', metaHtml(m.to)));
     recv.append(translationBubble(m, false));
     if (m.status === 'ok') recv.append(actions(m));
     wrap.append(recv);
   } else {
     const mine = m.side === 'a';
     const row = node('div', `msg ${mine ? 'right' : 'left other'}`);
-    row.append(node('div', 'msg-meta', `${escapeHtml(langName(m.from))} → ${escapeHtml(langName(m.to))}`));
+    row.append(node('div', 'msg-meta', metaHtml(m.from, m.to)));
     row.append(translationBubble(m, true));
     if (m.status === 'ok') row.append(actions(m));
     wrap.append(row);
@@ -205,7 +229,7 @@ function renderMessage(m) {
 }
 
 function translationBubble(m, withOriginal) {
-  const b = node('div', 'bubble');
+  const b = node('div', 'bubble translation' + (speakingId === m.id ? ' speaking' : ''));
   if (m.status === 'pending') {
     if (withOriginal) {
       b.textContent = m.original;
@@ -216,8 +240,7 @@ function translationBubble(m, withOriginal) {
   } else if (m.status === 'error') {
     b.classList.add('error');
     b.textContent = withOriginal ? m.original : '';
-    const msg = node('span', withOriginal ? 'orig' : '', escapeHtml(m.error || 'Traduction impossible.'));
-    b.append(msg, document.createElement('br'));
+    b.append(node('span', 'err', escapeHtml(m.error || 'Traduction impossible.')));
     const retry = node('button', 'retry', 'Réessayer');
     retry.addEventListener('click', () => retryMessage(m));
     b.append(retry);
@@ -236,7 +259,7 @@ function translationBubble(m, withOriginal) {
 
 function actions(m) {
   const box = node('div', 'actions');
-  const play = node('button', 'act' + (speakingId === m.id ? ' playing' : ''), ICON.speaker);
+  const play = node('button', 'act' + (speakingId === m.id ? ' playing' : ''), ICON.speaker + 'Écouter');
   play.setAttribute('aria-label', 'Écouter');
   play.addEventListener('click', () => {
     Speaker.unlock();
@@ -375,7 +398,12 @@ async function speakMessage(m, delay = 0) {
   if (delay) await sleep(delay); // laisse iOS rebasculer du micro vers le haut-parleur
   if (speakingId !== m.id) return;
   try {
-    await Speaker.speak(m.translation, { locale: speechLocale(target), engine: engineCode(target), rate: settings.rate });
+    await Speaker.speak(m.translation, {
+      locale: speechLocale(target),
+      engine: engineCode(target),
+      rate: settings.rate,
+      neural: neuralVoiceFor(target),
+    });
   } finally {
     if (speakingId === m.id) {
       speakingId = null;
@@ -383,6 +411,31 @@ async function speakMessage(m, delay = 0) {
     }
   }
 }
+
+/** Clé de voix naturelle : celle des réglages, ou la clé OpenAI du micro. */
+function voiceKey() {
+  if (settings.ttsKey) return settings.ttsKey;
+  return ttsProviderFor(settings.sttKey) === 'openai' ? settings.sttKey : '';
+}
+
+const englishNames = (() => { try { return new Intl.DisplayNames(['en'], { type: 'language' }); } catch { return null; } })();
+
+/** Paramètres de la voix IA pour une langue, ou null (voix de l'appareil). */
+function neuralVoiceFor(language) {
+  const key = voiceKey();
+  const provider = ttsProviderFor(key);
+  if (!provider || !ttsSupports(provider, language.code)) return null;
+  let langName = language.name;
+  try { langName = englishNames?.of(language.iso || language.code.split('-')[0]) || langName; } catch { /* nom français */ }
+  return { key, langCode: language.code, langName, gender: settings.voiceGender };
+}
+
+let neuralErrorShown = false;
+Speaker.onNeuralError = (err) => {
+  if (neuralErrorShown) return;
+  neuralErrorShown = true;
+  toast(`${err.message} Voix de l'iPhone utilisée à la place.`);
+};
 
 function stopSpeaking() {
   speakingId = null;
@@ -392,7 +445,9 @@ function stopSpeaking() {
 
 function refreshPlaying() {
   el.inner.querySelectorAll('.exchange').forEach(ex => {
-    ex.querySelector('.act')?.classList.toggle('playing', ex.dataset.id === speakingId);
+    const on = ex.dataset.id === speakingId;
+    ex.querySelector('.act')?.classList.toggle('playing', on);
+    ex.querySelector('.bubble.translation')?.classList.toggle('speaking', on);
   });
 }
 
@@ -412,12 +467,14 @@ const voiceActive = () => listener.active || recorder.active;
 function voiceStop() { listener.stop(); recorder.stop(); }
 function voiceCancel() { listener.cancel(); recorder.cancel(); }
 
+const orbOf = btn => btn.querySelector('.orb') || btn;
+
 async function captureSpeech(language, live, btn, deafMs) {
   const silenceMs = settings.silence * 1000;
   if (useWhisper()) {
     const res = await recorder.record({
       silenceMs,
-      onLevel: v => live.level(v),
+      onLevel: v => { live.level(v); orbOf(btn).style.setProperty('--l', v.toFixed(2)); },
       onSpeech: () => heard(btn),
     });
     if (!res || !res.speech) return '';
@@ -549,6 +606,7 @@ async function converse(side, chained) {
 
 function setListening(btn, on, label) {
   btn.classList.toggle('listening', on);
+  if (!on) orbOf(btn).style.setProperty('--l', 0);
   btn.classList.remove('heard');
   if (on) showStatus(label);
   else if (!document.querySelector('.listening')) hideStatus();
@@ -575,20 +633,29 @@ function renderLangbar() {
   const conv = settings.mode === 'conv';
   if (conv) {
     // Disposition spatiale : interlocuteur à gauche, moi à droite.
+    el.srcCaption.textContent = 'En face';
+    el.tgtCaption.textContent = 'Vous';
     el.srcLabel.textContent = langName(settings.b);
     el.tgtLabel.textContent = langName(settings.a);
+    el.srcFlag.textContent = flagOf(settings.b);
+    el.tgtFlag.textContent = flagOf(settings.a);
     el.convLabelA.textContent = langName(settings.a);
     el.convLabelB.textContent = langName(settings.b);
+    el.convFlagA.textContent = flagOf(settings.a);
+    el.convFlagB.textContent = flagOf(settings.b);
     el.swap.disabled = false;
   } else {
+    el.srcCaption.textContent = settings.src === 'auto' ? '✦ Auto' : 'Depuis';
+    el.tgtCaption.textContent = 'Vers';
     if (settings.src === 'auto') {
-      el.srcLabel.innerHTML = settings.lastDetected
-        ? `<svg class="auto-icon" viewBox="0 0 24 24" aria-label="Détection automatique"><path d="M12 2.5c.5 4.6 2.9 7 7.5 7.5-4.6.5-7 2.9-7.5 7.5-.5-4.6-2.9-7-7.5-7.5 4.6-.5 7-2.9 7.5-7.5Zm6.5 12c.25 2 1.25 3 3.25 3.25-2 .25-3 1.25-3.25 3.25-.25-2-1.25-3-3.25-3.25 2-.25 3-1.25 3.25-3.25Z"/></svg>${escapeHtml(langName(settings.lastDetected))}`
-        : 'Détection auto';
+      el.srcLabel.textContent = settings.lastDetected ? langName(settings.lastDetected) : 'Automatique';
+      el.srcFlag.textContent = settings.lastDetected ? flagOf(settings.lastDetected) : flagOf('auto');
     } else {
       el.srcLabel.textContent = langName(settings.src);
+      el.srcFlag.textContent = flagOf(settings.src);
     }
     el.tgtLabel.textContent = langName(settings.tgt);
+    el.tgtFlag.textContent = flagOf(settings.tgt);
     el.swap.disabled = settings.src === 'auto' && !settings.lastDetected;
   }
 }
@@ -664,6 +731,7 @@ function renderLangList() {
 
   const row = (l) => {
     const btn = node('button', 'row lang-row' + (l.code === current ? ' selected' : ''));
+    btn.append(node('span', 'lang-flag', flagOf(l.code)));
     const native = l.code === 'auto' ? '' : nativeName(l);
     const text = node('span', 'row-text');
     text.append(node('span', 'lang-name', escapeHtml(l.name)));
@@ -810,6 +878,51 @@ function initSettings() {
     showStt();
   });
   if (!VoiceRecorder.supported) sttKey.disabled = true;
+
+  // Voix naturelle
+  const ttsKey = $('optTtsKey');
+  const ttsStatus = $('ttsStatus');
+  const showTts = () => {
+    const provider = ttsProviderFor(voiceKey());
+    ttsStatus.textContent = provider ? PROVIDER_NAMES[provider] : (settings.ttsKey ? 'Clé non reconnue' : 'Voix de l\'iPhone');
+    ttsStatus.classList.toggle('on', Boolean(provider));
+  };
+  ttsKey.value = settings.ttsKey;
+  showTts();
+  ttsKey.addEventListener('input', () => {
+    settings.ttsKey = ttsKey.value.trim();
+    neuralErrorShown = false;
+    saveSettings();
+    showTts();
+  });
+  sttKey.addEventListener('input', showTts);
+
+  const genderButtons = [...document.querySelectorAll('#optGender [role="radio"]')];
+  const showGender = () => genderButtons.forEach(b => b.setAttribute('aria-checked', String(b.dataset.value === settings.voiceGender)));
+  genderButtons.forEach(b => b.addEventListener('click', () => {
+    settings.voiceGender = b.dataset.value;
+    saveSettings();
+    showGender();
+  }));
+  showGender();
+
+  const SAMPLES = {
+    es: '¡Hola! Encantada de conocerte. ¿Te apetece tomar un café conmigo?',
+    en: 'Hi there! Lovely to meet you. Would you like to grab a coffee with me?',
+    fr: 'Bonjour ! Ravie de vous rencontrer. On prend un café ensemble ?',
+    it: 'Ciao! Piacere di conoscerti. Ti va di prendere un caffè insieme?',
+    de: 'Hallo! Schön, dich kennenzulernen. Wollen wir zusammen einen Kaffee trinken?',
+    pt: 'Olá! Prazer em conhecer você. Vamos tomar um café juntos?',
+  };
+  $('testVoiceBtn').addEventListener('click', () => {
+    Speaker.unlock();
+    neuralErrorShown = false;
+    const target = lang(settings.mode === 'conv' ? settings.b : settings.tgt);
+    const base = engineCode(target).split('-')[0];
+    const sample = SAMPLES[base] || SAMPLES.en;
+    const sampleLang = SAMPLES[base] ? target : lang('en');
+    speakMessage({ id: 'sample', to: sampleLang.code, translation: sample });
+  });
 
   $('clearBtn').addEventListener('click', () => {
     const mode = settings.mode;

@@ -236,3 +236,32 @@ export function nativeName(lang) {
   nativeCache.set(lang.code, name);
   return name;
 }
+
+// Drapeau représentatif de chaque langue (pays où elle est la plus parlée).
+const FLAG_COUNTRY = {
+  af: 'ZA', sq: 'AL', de: 'DE', am: 'ET', en: 'GB', 'en-GB': 'GB', ar: 'SA', hy: 'AM', az: 'AZ', eu: 'ES',
+  bn: 'BD', be: 'BY', my: 'MM', bs: 'BA', bg: 'BG', yue: 'HK', ca: 'ES', 'zh-CN': 'CN', 'zh-TW': 'TW',
+  si: 'LK', ko: 'KR', co: 'FR', ht: 'HT', hr: 'HR', da: 'DK', 'fa-AF': 'AF', es: 'ES', 'es-MX': 'MX',
+  et: 'EE', fo: 'FO', fj: 'FJ', tl: 'PH', fi: 'FI', fr: 'FR', 'fr-CA': 'CA', fy: 'NL', gd: 'GB', gl: 'ES',
+  cy: 'GB', ka: 'GE', el: 'GR', gn: 'PY', gu: 'IN', ha: 'NG', haw: 'US', iw: 'IL', hi: 'IN', hu: 'HU',
+  ig: 'NG', id: 'ID', ga: 'IE', is: 'IS', it: 'IT', ja: 'JP', jw: 'ID', kn: 'IN', kk: 'KZ', km: 'KH',
+  rw: 'RW', ky: 'KG', rn: 'BI', ku: 'IQ', ckb: 'IQ', lo: 'LA', lv: 'LV', ln: 'CD', lt: 'LT', lb: 'LU',
+  mk: 'MK', ms: 'MY', ml: 'IN', mg: 'MG', mt: 'MT', mi: 'NZ', mr: 'IN', mn: 'MN', nl: 'NL', ne: 'NP',
+  no: 'NO', or: 'IN', om: 'ET', ug: 'CN', ur: 'PK', uz: 'UZ', ps: 'AF', pa: 'IN', fa: 'IR', pl: 'PL',
+  pt: 'BR', 'pt-PT': 'PT', qu: 'PE', ro: 'RO', ru: 'RU', sm: 'WS', sr: 'RS', st: 'LS', sn: 'ZW', sd: 'PK',
+  sk: 'SK', sl: 'SI', so: 'SO', su: 'ID', sv: 'SE', sw: 'KE', tg: 'TJ', ta: 'IN', tt: 'RU', cs: 'CZ',
+  te: 'IN', th: 'TH', bo: 'CN', ti: 'ER', to: 'TO', tn: 'BW', tr: 'TR', tk: 'TM', uk: 'UA', vi: 'VN',
+  wo: 'SN', xh: 'ZA', yo: 'NG', zu: 'ZA', ny: 'MW', ceb: 'PH', ilo: 'PH', dv: 'MV', dz: 'BT', ty: 'PF',
+  ee: 'GH', ak: 'GH', lg: 'UG', bm: 'ML', ff: 'SN', ts: 'ZA', ve: 'ZA', nso: 'ZA', ss: 'SZ', nr: 'ZA',
+  pap: 'CW', tet: 'TL', sg: 'CF', kg: 'CD', ch: 'GU', oc: 'FR', br: 'FR', scn: 'IT', vec: 'IT',
+  lmo: 'IT', li: 'NL', se: 'NO', szl: 'PL', ltg: 'LV', mai: 'IN', bho: 'IN', doi: 'IN', gom: 'IN', mwr: 'IN',
+  as: 'IN', sa: 'IN', 'mni-Mtei': 'IN', lus: 'IN', new: 'NP', yi: 'IL', la: 'VA', eo: 'EU',
+};
+
+/** Emoji du drapeau d'une langue (🌐 si aucun pays représentatif). */
+export function flagOf(code) {
+  if (code === 'auto') return '✨';
+  const cc = FLAG_COUNTRY[code];
+  if (!cc) return '🌐';
+  return String.fromCodePoint(...[...cc].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
+}

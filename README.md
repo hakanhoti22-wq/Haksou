@@ -22,6 +22,15 @@ La solution : l'app enregistre elle-même la voix, détecte le silence, puis fai
 
 La clé reste sur le téléphone et n'est envoyée qu'à Groq. Elle sert aussi de traduction de secours si les services gratuits ne répondent pas. Une clé OpenAI (`sk-…`) fonctionne aussi.
 
+## Voix naturelle (IA)
+
+Pour une voix humaine, chaleureuse et pas robotique : ⚙︎ Réglages → **Voix naturelle (IA)** → coller une clé.
+
+- **ElevenLabs** (clé `sk_…`) : la voix la plus naturelle. Offre gratuite limitée (environ 10 minutes de voix par mois), puis à partir de 6 $/mois.
+- **OpenAI** (clé `sk-…`) : très naturelle, environ 0,015 $ par minute de voix.
+
+Sans clé, ou si le service ne répond pas, l'app utilise la meilleure voix de l'iPhone. Pour une voix iPhone gratuite bien plus naturelle : Réglages → Accessibilité → Contenu énoncé → Voix → télécharger une voix « Premium ».
+
 ## Mise en ligne (GitHub Pages)
 
 Le micro exige une adresse **https** : il faut donc héberger l'app.
@@ -56,6 +65,8 @@ Puis ouvrir `http://localhost:8000`. Aucune dépendance, aucune étape de compil
 | `speech.js` | Reconnaissance vocale de Safari/Chrome, synthèse vocale |
 | `recorder.js` | Enregistrement de la voix avec détection du silence |
 | `stt.js` | Transcription Whisper (Groq ou OpenAI) |
+| `tts.js` | Voix naturelles (ElevenLabs ou OpenAI) |
+| `audio.js` | Moteur audio partagé (Web Audio) |
 | `translator.js` | Traduction avec délai maximal, cache et moteur de secours |
 | `languages.js` | Liste des langues et locales vocales |
 | `sw.js`, `manifest.webmanifest`, `icons/` | Installation sur l'écran d'accueil et hors ligne |

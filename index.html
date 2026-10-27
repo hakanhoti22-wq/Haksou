@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
   <title>Haksou — Traduction</title>
-  <meta name="description" content="Traduction instantanée écrite et vocale dans plus de 180 langues, avec mode conversation.">
-  <meta name="theme-color" content="#F6EFE3" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#1E1813" media="(prefers-color-scheme: dark)">
+  <meta name="description" content="Traduction instantanée écrite et vocale dans plus de 190 langues, avec mode conversation et voix naturelles.">
+  <meta name="theme-color" content="#F3E9DA" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#120D09" media="(prefers-color-scheme: dark)">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Haksou">
@@ -15,90 +15,112 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <!-- Fond vivant -->
+  <div class="aurora" aria-hidden="true">
+    <span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span>
+    <span class="grain"></span>
+  </div>
+
   <div class="app" id="app">
 
-    <!-- En-tête -->
     <header class="topbar">
       <div class="topbar-row">
         <div class="brand">
-          <span class="brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 32 32"><path d="M6 9.5A4.5 4.5 0 0 1 10.5 5h11A4.5 4.5 0 0 1 26 9.5v6a4.5 4.5 0 0 1-4.5 4.5H15l-5.2 4.3c-.7.6-1.8.1-1.8-.8V20A4.5 4.5 0 0 1 6 15.5z" fill="currentColor"/></svg>
-          </span>
+          <span class="brand-orb" aria-hidden="true"></span>
           <span class="brand-name">Haksou</span>
         </div>
-        <button class="icon-btn" id="settingsBtn" aria-label="Réglages">
-          <svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 19.35a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.64 15a1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.65 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.64a1.7 1.7 0 0 0 1.03-1.56V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15 4.65a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.36 9a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1Z"/></svg>
+        <button class="glass-btn" id="settingsBtn" aria-label="Réglages">
+          <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg>
         </button>
       </div>
 
       <div class="segmented" role="tablist" aria-label="Mode">
         <span class="segmented-thumb" aria-hidden="true"></span>
-        <button role="tab" data-mode="text" aria-selected="true">Traduire</button>
-        <button role="tab" data-mode="conv" aria-selected="false">Conversation</button>
+        <button role="tab" data-mode="text" aria-selected="true">
+          <svg viewBox="0 0 24 24"><path d="M4 6h9M8.5 4v2m2.5 0c-.6 3.6-3 6.6-6 8m2.2-4.5c1 1.7 2.6 3 4.3 3.8"/><path d="m12.5 20 4-9 4 9m-6.8-2.6h5.6"/></svg>
+          Traduire
+        </button>
+        <button role="tab" data-mode="conv" aria-selected="false">
+          <svg viewBox="0 0 24 24"><path d="M4 8.5A3.5 3.5 0 0 1 7.5 5h5A3.5 3.5 0 0 1 16 8.5v2A3.5 3.5 0 0 1 12.5 14H10l-3 2.5V14a3.5 3.5 0 0 1-3-3.5z"/><path d="M19 10.5a2.5 2.5 0 0 1 1 2v2a2.5 2.5 0 0 1-2 2.45V19l-2.5-2h-2a2.5 2.5 0 0 1-2-1"/></svg>
+          Conversation
+        </button>
       </div>
 
-      <div class="langbar">
-        <button class="lang-pill" id="srcBtn" data-side="src">
-          <span class="lang-pill-label" id="srcLabel">Français</span>
-          <svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+      <div class="langcard">
+        <button class="lang-side" id="srcBtn">
+          <span class="lang-flag" id="srcFlag">✨</span>
+          <span class="lang-text">
+            <span class="lang-caption" id="srcCaption">Depuis</span>
+            <span class="lang-label" id="srcLabel">Détection auto</span>
+          </span>
         </button>
         <button class="swap-btn" id="swapBtn" aria-label="Inverser les langues">
           <svg viewBox="0 0 24 24"><path d="M7 7h12m0 0-3.5-3.5M19 7l-3.5 3.5M17 17H5m0 0 3.5 3.5M5 17l3.5-3.5"/></svg>
         </button>
-        <button class="lang-pill" id="tgtBtn" data-side="tgt">
-          <span class="lang-pill-label" id="tgtLabel">Anglais</span>
-          <svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+        <button class="lang-side right" id="tgtBtn">
+          <span class="lang-text">
+            <span class="lang-caption" id="tgtCaption">Vers</span>
+            <span class="lang-label" id="tgtLabel">Anglais</span>
+          </span>
+          <span class="lang-flag" id="tgtFlag">🇬🇧</span>
         </button>
       </div>
     </header>
 
-    <!-- Fil de messages -->
     <main class="thread" id="thread" aria-live="polite">
       <div class="thread-inner" id="threadInner"></div>
     </main>
 
-    <!-- Bandeau d'état -->
-    <div class="status" id="status" hidden>
-      <span class="status-dot"></span><span id="statusText"></span>
-    </div>
+    <div class="dock">
+      <div class="status" id="status" hidden>
+        <span class="status-dot"></span><span id="statusText"></span>
+      </div>
 
-    <!-- Barre de saisie : mode Traduire -->
-    <footer class="composer" id="composerText">
-      <div class="composer-field">
-        <textarea id="input" rows="1" placeholder="Écrire pour traduire…" autocomplete="off" autocorrect="on" spellcheck="true" enterkeyhint="send"></textarea>
-        <button class="field-btn send-btn" id="sendBtn" aria-label="Traduire" hidden>
-          <svg viewBox="0 0 24 24"><path d="M12 19V5m0 0-6 6m6-6 6 6"/></svg>
+      <!-- Saisie : mode Traduire -->
+      <div class="composer" id="composerText">
+        <div class="field">
+          <textarea id="input" rows="1" placeholder="Écrire pour traduire…" autocomplete="off" autocorrect="on" spellcheck="true" enterkeyhint="send"></textarea>
+          <button class="send-btn" id="sendBtn" aria-label="Traduire" hidden>
+            <svg viewBox="0 0 24 24"><path d="M12 19V5m0 0-6 6m6-6 6 6"/></svg>
+          </button>
+        </div>
+        <button class="orb" id="micBtn" aria-label="Parler pour traduire">
+          <span class="orb-halo" aria-hidden="true"></span>
+          <span class="orb-core" aria-hidden="true"></span>
+          <svg class="mic-icon" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
+          <svg class="stop-icon" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2.5"/></svg>
         </button>
       </div>
-      <button class="mic-btn" id="micBtn" aria-label="Parler pour traduire">
-        <span class="mic-ring" aria-hidden="true"></span>
-        <svg class="mic-icon" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
-        <svg class="stop-icon" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2.5"/></svg>
-      </button>
-    </footer>
 
-    <!-- Barre de saisie : mode Conversation -->
-    <footer class="composer conv-composer" id="composerConv" hidden>
-      <button class="conv-btn conv-btn-b" id="convBtnB" data-side="b">
-        <span class="conv-btn-circle">
-          <span class="mic-ring" aria-hidden="true"></span>
-          <svg class="mic-icon" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
-          <svg class="stop-icon" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2.5"/></svg>
-        </span>
-        <span class="conv-btn-label" id="convLabelB">Anglais</span>
-      </button>
-      <button class="conv-btn conv-btn-a" id="convBtnA" data-side="a">
-        <span class="conv-btn-circle">
-          <span class="mic-ring" aria-hidden="true"></span>
-          <svg class="mic-icon" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
-          <svg class="stop-icon" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2.5"/></svg>
-        </span>
-        <span class="conv-btn-label" id="convLabelA">Français</span>
-      </button>
-    </footer>
+      <!-- Saisie : mode Conversation -->
+      <div class="composer conv" id="composerConv" hidden>
+        <button class="conv-btn" id="convBtnB" data-side="b">
+          <span class="orb orb-alt">
+            <span class="orb-halo" aria-hidden="true"></span>
+            <span class="orb-core" aria-hidden="true"></span>
+            <svg class="mic-icon" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
+            <svg class="stop-icon" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2.5"/></svg>
+          </span>
+          <span class="conv-label"><span id="convFlagB">🇬🇧</span> <span id="convLabelB">Anglais</span></span>
+        </button>
+        <div class="conv-divider" aria-hidden="true"></div>
+        <button class="conv-btn" id="convBtnA" data-side="a">
+          <span class="orb">
+            <span class="orb-halo" aria-hidden="true"></span>
+            <span class="orb-core" aria-hidden="true"></span>
+            <svg class="mic-icon" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
+            <svg class="stop-icon" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2.5"/></svg>
+          </span>
+          <span class="conv-label"><span id="convFlagA">🇫🇷</span> <span id="convLabelA">Français</span></span>
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- Feuille : choix de langue -->
@@ -106,12 +128,12 @@
   <section class="sheet" id="langSheet" role="dialog" aria-modal="true" aria-labelledby="langSheetTitle" hidden>
     <div class="sheet-grabber" aria-hidden="true"></div>
     <div class="sheet-head">
-      <h2 id="langSheetTitle">Langue source</h2>
+      <h2 id="langSheetTitle">Langue</h2>
       <button class="text-btn" data-close>OK</button>
     </div>
     <div class="search">
       <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>
-      <input id="langSearch" type="search" placeholder="Rechercher une langue" autocomplete="off" autocorrect="off" spellcheck="false">
+      <input id="langSearch" type="search" placeholder="Rechercher parmi 193 langues" autocomplete="off" autocorrect="off" spellcheck="false">
     </div>
     <div class="sheet-body" id="langList"></div>
   </section>
@@ -125,7 +147,35 @@
       <button class="text-btn" data-close>OK</button>
     </div>
     <div class="sheet-body">
-      <div class="group-title">Voix</div>
+
+      <div class="group-title">Voix naturelle (IA)</div>
+      <div class="group">
+        <div class="row row-col">
+          <span class="row-text">
+            <span>Clé de voix <span class="pill-status" id="ttsStatus"></span></span>
+            <small>Une voix humaine, chaleureuse, pas robotique. Clé ElevenLabs (sk_…, la plus naturelle) ou OpenAI (sk-…). Elle reste sur cet appareil.</small>
+          </span>
+          <input class="text-input" id="optTtsKey" type="password" placeholder="Coller la clé ici" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+        </div>
+        <div class="row">
+          <span class="row-text"><span>Timbre</span></span>
+          <div class="mini-seg" id="optGender" role="radiogroup" aria-label="Timbre de la voix">
+            <button role="radio" data-value="female">Féminin</button>
+            <button role="radio" data-value="male">Masculin</button>
+          </div>
+        </div>
+        <button class="row row-btn accent" id="testVoiceBtn">
+          <svg viewBox="0 0 24 24"><path d="M11 5 6.5 9H3.5v6h3L11 19z"/><path d="M15.5 9.2a4 4 0 0 1 0 5.6M18.4 6.4a8 8 0 0 1 0 11.2"/></svg>
+          Écouter la voix
+        </button>
+        <div class="row links">
+          <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank" rel="noopener">Clé ElevenLabs</a>
+          <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">Clé OpenAI</a>
+        </div>
+      </div>
+      <p class="group-note">Sans clé : pour une voix iPhone bien plus naturelle et gratuite, téléchargez une voix « Premium » dans Réglages → Accessibilité → Contenu énoncé → Voix (par ex. Espagnol → Mónica Premium).</p>
+
+      <div class="group-title">Lecture</div>
       <div class="group">
         <label class="row">
           <span class="row-text"><span>Lecture automatique</span><small>Énoncer la traduction après avoir parlé</small></span>
@@ -133,7 +183,7 @@
         </label>
         <label class="row row-col">
           <span class="row-text"><span>Vitesse de la voix</span><small id="rateValue">Normale</small></span>
-          <input type="range" id="optRate" min="0.6" max="1.3" step="0.05">
+          <input type="range" id="optRate" min="0.7" max="1.2" step="0.05">
         </label>
       </div>
 
@@ -147,18 +197,16 @@
           <span class="row-text"><span>Enchaînement automatique</span><small>En conversation, rouvre le micro de l'autre personne après la lecture</small></span>
           <input type="checkbox" class="switch" id="optAutoChain">
         </label>
-      </div>
-
-      <div class="group-title">Micro fiable (Whisper)</div>
-      <div class="group">
         <div class="row row-col">
           <span class="row-text">
-            <span>Clé de reconnaissance vocale <span class="pill-status" id="sttStatus"></span></span>
-            <small>Recommandé sur iPhone : la voix est enregistrée puis transcrite par Whisper, sans le blocage du micro de Safari. Clé gratuite Groq (gsk_…) ou clé OpenAI (sk-…). Elle reste sur cet appareil.</small>
+            <span>Micro fiable (Whisper) <span class="pill-status" id="sttStatus"></span></span>
+            <small>Recommandé sur iPhone : la voix est enregistrée puis transcrite par Whisper, sans le blocage du micro de Safari. Clé gratuite Groq (gsk_…) ou OpenAI (sk-…).</small>
           </span>
           <input class="text-input" id="optSttKey" type="password" placeholder="Coller la clé ici" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
         </div>
-        <a class="row row-btn" id="sttHelp" href="https://console.groq.com/keys" target="_blank" rel="noopener">Obtenir une clé gratuite (Groq)</a>
+        <div class="row links">
+          <a href="https://console.groq.com/keys" target="_blank" rel="noopener">Obtenir une clé Groq gratuite</a>
+        </div>
       </div>
 
       <div class="group-title">Historique</div>
