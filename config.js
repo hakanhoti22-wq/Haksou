@@ -4,7 +4,7 @@
 // Une fois remplie, l'app s'y connecte toute seule : essai gratuit, abonnements,
 // invitations famille, micro fiable et voix naturelle, sans rien à configurer.
 // Laissez vide pour utiliser l'app avec des clés saisies dans les réglages.
-export const RELAY_URL = '';
+export const RELAY_URL = 'https://haksou.hakan-hoti-22.workers.dev';
 
 // Prix affichés (doivent correspondre aux prix créés dans Stripe).
 export const PRICES = {
