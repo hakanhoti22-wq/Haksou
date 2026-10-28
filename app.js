@@ -5,12 +5,13 @@ import { VoiceRecorder } from './recorder.js';
 import { transcribe, providerFor } from './stt.js';
 import { relayStatus } from './api.js';
 import { Account, adminCall } from './account.js';
+import { coachTurn, LEVELS, SCENARIOS } from './coach.js';
 import { RELAY_URL, PRICES } from './config.js';
 import { ttsProviderFor, ttsSupports, PROVIDER_NAMES } from './tts.js';
 
 const $ = id => document.getElementById(id);
 
-export const APP_VERSION = '16';
+export const APP_VERSION = '17';
 
 // ---------------------------------------------------------------------------
 // Stockage local
@@ -33,6 +34,10 @@ const otherDefault = deviceLang === 'en' ? 'fr' : 'en';
 
 const settings = {
   mode: 'text',
+  coachNative: deviceLang,
+  coachTarget: deviceLang === 'es' ? 'en' : 'es',
+  coachLevel: 'A',
+  coachTopic: 'libre',
   src: 'auto',
   tgt: otherDefault,
   a: deviceLang,       // conversation : moi (à droite)
@@ -57,6 +62,7 @@ const MAX_HISTORY = 150;
 const history = {
   text: store.get('history.text', []),
   conv: store.get('history.conv', []),
+  coach: store.get('history.coach', []),
 };
 const saveHistory = mode => store.set('history.' + mode, history[mode].slice(-MAX_HISTORY));
 
@@ -165,7 +171,23 @@ function renderAll() {
 
 const QUICK_PHRASES = ['Bonjour, comment allez-vous ?', 'Où sont les toilettes ?', 'L\'addition, s\'il vous plaît', 'Combien ça coûte ?'];
 
+function coachEmptyState() {
+  const target = lang(settings.coachTarget);
+  const box = node('div', 'empty');
+  box.innerHTML = `
+    <div class="empty-orb"></div>
+    <h3>Parlez ${escapeHtml(target.name.toLowerCase())},<br><em>sans peur.</em></h3>
+    <p>Votre coach vous parle, vous répondez à la voix ou par écrit. Il corrige gentiment vos erreurs et vous explique en ${escapeHtml(langName(settings.coachNative).toLowerCase())}.</p>`;
+  const start = node('button', 'cta', `Commencer la conversation ${flagOf(target.code)}`);
+  start.style.maxWidth = '320px';
+  start.addEventListener('click', () => { Speaker.unlock(); coachStart(); });
+  box.append(start);
+  box.append(node('p', 'coach-tip', `Astuce : pour une voix naturelle et gratuite, téléchargez une voix « Premium » ${escapeHtml(target.name.toLowerCase())} dans Réglages de l'iPhone → recherchez « Voix ».`));
+  return box;
+}
+
 function emptyState() {
+  if (settings.mode === 'coach') return coachEmptyState();
   const conv = settings.mode === 'conv';
   const box = node('div', 'empty');
   box.innerHTML = `
@@ -207,6 +229,7 @@ const metaHtml = (...codes) => codes
   .join(' <span aria-hidden="true">→</span> ');
 
 function renderMessage(m) {
+  if (m.kind === 'coach') return renderCoachMessage(m);
   const wrap = node('div', 'exchange');
   wrap.dataset.id = m.id;
 
@@ -396,10 +419,165 @@ async function retryMessage(m) {
 }
 
 // ---------------------------------------------------------------------------
+// Coach de langue
+// ---------------------------------------------------------------------------
+
+const englishName = code => {
+  const l = lang(code);
+  try { return englishNames?.of(l.iso || l.code.split('-')[0]) || l.name; } catch { return l.name; }
+};
+
+/** Échanges précédents, au format attendu par l'IA. */
+function coachTurns() {
+  return history.coach
+    .filter(m => m.status === 'ok')
+    .map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.role === 'user' ? m.text : JSON.stringify({ reply: m.text }) }));
+}
+
+/** Demande la réplique suivante au coach et l'affiche. */
+async function coachReply(pending, userMsg) {
+  const cred = sttCred();
+  if (!cred) {
+    pending.status = 'error';
+    pending.error = 'Le coach a besoin de votre accès Haksou (essai ou abonnement) ou d\'une clé Groq dans les réglages.';
+    updateMessage(pending);
+    return;
+  }
+  const run = voiceRun;
+  try {
+    const out = await coachTurn({
+      cred,
+      target: englishName(settings.coachTarget),
+      native: englishName(settings.coachNative),
+      level: settings.coachLevel,
+      scenario: settings.coachTopic,
+      turns: coachTurns(),
+    });
+    if (userMsg) {
+      userMsg.correction = out.correction;
+      userMsg.praise = out.correction ? null : out.praise;
+      updateMessage(userMsg);
+    }
+    Object.assign(pending, { status: 'ok', text: out.reply, translation: out.translation });
+  } catch (err) {
+    if (err.code === 'payment') { onPaymentRequired(); }
+    Object.assign(pending, { status: 'error', error: err.message });
+  }
+  saveHistory('coach');
+  if (settings.mode === 'coach') updateMessage(pending);
+  if (pending.status === 'ok' && settings.autoSpeak && run === voiceRun) speakCoach(pending, false, 200);
+}
+
+function newCoachPending() {
+  const m = { id: newId(), kind: 'coach', role: 'coach', ts: Date.now(), status: 'pending', text: '' };
+  pushMessage('coach', m);
+  return m;
+}
+
+/** Nouvelle conversation : le coach ouvre la discussion. */
+async function coachStart() {
+  if (!ensureAccess()) return;
+  stopSpeaking();
+  history.coach = [];
+  saveHistory('coach');
+  renderAll();
+  await coachReply(newCoachPending(), null);
+}
+
+/** L'élève répond (à l'écrit ou à la voix). */
+async function coachSend(text) {
+  const clean = text.trim();
+  if (!clean) return;
+  const userMsg = { id: newId(), kind: 'coach', role: 'user', ts: Date.now(), status: 'ok', text: clean };
+  pushMessage('coach', userMsg);
+  await coachReply(newCoachPending(), userMsg);
+}
+
+function speakCoach(m, slow = false, delay = 0) {
+  const base = settings.coachLevel === 'A' ? 0.9 : 1;
+  // Voix de l'iPhone (gratuite) ; plus lente pour les débutants ou sur demande.
+  return speakMessage({ id: m.id, to: settings.coachTarget, translation: m.text }, delay, {
+    rate: Math.max(0.55, settings.rate * base * (slow ? 0.72 : 1)),
+    free: true,
+  });
+}
+
+function renderCoachMessage(m) {
+  const wrap = node('div', 'exchange');
+  wrap.dataset.id = m.id;
+  if (m.role === 'user') {
+    const row = node('div', 'msg right');
+    const b = node('div', 'bubble');
+    b.textContent = m.text;
+    row.append(b);
+    if (m.correction) {
+      const fix = node('div', 'fix');
+      fix.append(node('b', '', `✏️ ${escapeHtml(m.correction.corrected)}`));
+      if (m.correction.explanation) fix.append(node('small', '', escapeHtml(m.correction.explanation)));
+      row.append(fix);
+    } else if (m.praise) {
+      row.append(node('div', 'praise', `👏 ${escapeHtml(m.praise)}`));
+    }
+    wrap.append(row);
+    return wrap;
+  }
+  const row = node('div', 'msg left');
+  row.append(node('div', 'msg-meta', `<span class="f">${flagOf(settings.coachTarget)}</span>Coach`));
+  const b = node('div', 'bubble translation' + (speakingId === m.id ? ' speaking' : ''));
+  if (m.status === 'pending') {
+    b.innerHTML = TYPING;
+  } else if (m.status === 'error') {
+    b.classList.add('error');
+    b.append(node('span', 'err', escapeHtml(m.error || 'Le coach n\'a pas pu répondre.')));
+    const retry = node('button', 'retry', 'Réessayer');
+    retry.addEventListener('click', () => {
+      Object.assign(m, { status: 'pending', error: null });
+      updateMessage(m);
+      coachReply(m, [...history.coach].reverse().find(x => x.role === 'user' && x.ts < m.ts) || null);
+    });
+    b.append(retry);
+  } else {
+    b.lang = lang(settings.coachTarget).iso || settings.coachTarget;
+    b.textContent = m.text;
+    if (m.showTr && m.translation) b.append(node('span', 'coach-tr', escapeHtml(m.translation)));
+  }
+  row.append(b);
+  if (m.status === 'ok') {
+    const box = node('div', 'actions');
+    const play = node('button', 'act' + (speakingId === m.id ? ' playing' : ''), ICON.speaker + 'Écouter');
+    play.addEventListener('click', () => { Speaker.unlock(); if (speakingId === m.id) stopSpeaking(); else speakCoach(m); });
+    const slow = node('button', 'act', '🐢 Lentement');
+    slow.addEventListener('click', () => { Speaker.unlock(); speakCoach(m, true); });
+    const tr = node('button', 'act', m.showTr ? 'Masquer' : 'Traduction');
+    tr.addEventListener('click', () => { m.showTr = !m.showTr; saveHistory('coach'); updateMessage(m); });
+    box.append(play, slow, tr);
+    row.append(box);
+  }
+  wrap.append(row);
+  return wrap;
+}
+
+function initCoach() {
+  const level = $('coachLevel');
+  const topic = $('coachTopic');
+  level.innerHTML = Object.entries(LEVELS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
+  topic.innerHTML = Object.entries(SCENARIOS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
+  level.value = settings.coachLevel;
+  topic.value = settings.coachTopic;
+  level.addEventListener('change', () => { settings.coachLevel = level.value; saveSettings(); });
+  topic.addEventListener('change', () => {
+    settings.coachTopic = topic.value;
+    saveSettings();
+    if (history.coach.length && confirm('Commencer une nouvelle conversation sur ce thème ?')) { Speaker.unlock(); coachStart(); }
+  });
+  $('coachRestart').addEventListener('click', () => { Speaker.unlock(); coachStart(); });
+}
+
+// ---------------------------------------------------------------------------
 // Lecture à voix haute
 // ---------------------------------------------------------------------------
 
-async function speakMessage(m, delay = 0) {
+async function speakMessage(m, delay = 0, { rate = settings.rate, free = false } = {}) {
   const target = lang(m.to);
   speakingId = m.id;
   refreshPlaying();
@@ -409,8 +587,8 @@ async function speakMessage(m, delay = 0) {
     await Speaker.speak(m.translation, {
       locale: speechLocale(target),
       engine: engineCode(target),
-      rate: settings.rate,
-      neural: neuralVoiceFor(target),
+      rate,
+      neural: free ? null : neuralVoiceFor(target),
     });
   } finally {
     if (speakingId === m.id) {
@@ -923,7 +1101,7 @@ async function onMicText() {
   stopSpeaking();
   const run = ++voiceRun;
 
-  const spoken = lang(spokenSourceCode());
+  const spoken = lang(settings.mode === 'coach' ? settings.coachTarget : spokenSourceCode());
   const live = liveBubble('right', useWhisper());
   setListening(el.mic, true, `J'écoute en ${spoken.name.toLowerCase()}…`);
 
@@ -941,7 +1119,8 @@ async function onMicText() {
   setListening(el.mic, false);
   if (run !== voiceRun) return;
   if (!text) { nothingHeard(); return; }
-  await translateTyped(text, { from: spoken.code, spoken: true });
+  if (settings.mode === 'coach') await coachSend(text);
+  else await translateTyped(text, { from: spoken.code, spoken: true });
 }
 
 // ---------------------------------------------------------------------------
@@ -1032,6 +1211,16 @@ function hideStatus() { el.status.hidden = true; }
 
 function renderLangbar() {
   const conv = settings.mode === 'conv';
+  if (settings.mode === 'coach') {
+    el.srcCaption.textContent = 'Votre langue';
+    el.tgtCaption.textContent = 'J\'apprends';
+    el.srcLabel.textContent = langName(settings.coachNative);
+    el.tgtLabel.textContent = langName(settings.coachTarget);
+    el.srcFlag.textContent = flagOf(settings.coachNative);
+    el.tgtFlag.textContent = flagOf(settings.coachTarget);
+    el.swap.disabled = false;
+    return;
+  }
   if (conv) {
     // Disposition spatiale : interlocuteur à gauche, moi à droite.
     el.srcCaption.textContent = 'En face';
@@ -1080,11 +1269,22 @@ function applyMode() {
   document.querySelectorAll('.segmented [role="tab"]').forEach(t => t.setAttribute('aria-selected', String(t.dataset.mode === settings.mode)));
   el.composerText.hidden = conv;
   el.composerConv.hidden = !conv;
+  $('coachBar').hidden = settings.mode !== 'coach';
+  el.input.placeholder = settings.mode === 'coach'
+    ? `Répondre en ${langName(settings.coachTarget).toLowerCase()}…`
+    : 'Écrire pour traduire…';
   renderLangbar();
   renderAll();
 }
 
 function swapLanguages() {
+  if (settings.mode === 'coach') {
+    [settings.coachNative, settings.coachTarget] = [settings.coachTarget, settings.coachNative];
+    el.swap.classList.toggle('spin');
+    saveSettings();
+    applyMode();
+    return;
+  }
   if (settings.mode === 'conv') {
     [settings.a, settings.b] = [settings.b, settings.a];
   } else {
@@ -1117,6 +1317,7 @@ function openLangSheet(key) {
   langSheet.key = key;
   langSheet.title.textContent = {
     src: 'Traduire depuis', tgt: 'Traduire vers', a: 'Votre langue', b: 'Langue de l\'interlocuteur',
+    coachNative: 'Votre langue', coachTarget: 'Langue à apprendre',
   }[key];
   langSheet.search.value = '';
   renderLangList();
@@ -1172,7 +1373,7 @@ function renderLangList() {
 
 function pickLanguage(code) {
   const key = langSheet.key;
-  const pairs = { src: 'tgt', tgt: 'src', a: 'b', b: 'a' };
+  const pairs = { src: 'tgt', tgt: 'src', a: 'b', b: 'a', coachNative: 'coachTarget', coachTarget: 'coachNative' };
   const otherKey = pairs[key];
   if (code === settings[otherKey]) {
     settings[otherKey] = settings[key] === 'auto' ? (settings.lastDetected || deviceLang) : settings[key];
@@ -1517,7 +1718,8 @@ function submitInput() {
   el.input.value = '';
   autosize();
   stopSpeaking();
-  translateTyped(text);
+  if (settings.mode === 'coach') coachSend(text);
+  else translateTyped(text);
 }
 
 // ---------------------------------------------------------------------------
@@ -1600,8 +1802,8 @@ async function pasteInto(input) {
 function init() {
   document.querySelectorAll('.segmented [role="tab"]').forEach(t => t.addEventListener('click', () => setMode(t.dataset.mode)));
 
-  el.srcBtn.addEventListener('click', () => openLangSheet(settings.mode === 'conv' ? 'b' : 'src'));
-  el.tgtBtn.addEventListener('click', () => openLangSheet(settings.mode === 'conv' ? 'a' : 'tgt'));
+  el.srcBtn.addEventListener('click', () => openLangSheet({ conv: 'b', coach: 'coachNative' }[settings.mode] || 'src'));
+  el.tgtBtn.addEventListener('click', () => openLangSheet({ conv: 'a', coach: 'coachTarget' }[settings.mode] || 'tgt'));
   el.swap.addEventListener('click', swapLanguages);
 
   el.input.addEventListener('input', autosize);
@@ -1645,6 +1847,7 @@ function init() {
   }
 
   bindSheet(accountSheet.sheet, accountSheet.backdrop);
+  initCoach();
   initSettings();
   applyMode();
   handleIncomingLinks();

@@ -1,5 +1,5 @@
 // Service worker : l'interface fonctionne hors ligne, la traduction passe par le réseau.
-const CACHE = 'haksou-v16';
+const CACHE = 'haksou-v17';
 const SHELL = [
   './',
   'index.html',
@@ -13,6 +13,7 @@ const SHELL = [
   'tts.js',
   'audio.js',
   'api.js',
+  'coach.js',
   'account.js',
   'config.js',
   'privacy.html',
