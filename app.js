@@ -11,7 +11,7 @@ import { ttsProviderFor, ttsSupports, PROVIDER_NAMES } from './tts.js';
 
 const $ = id => document.getElementById(id);
 
-export const APP_VERSION = '17';
+export const APP_VERSION = '18';
 
 // ---------------------------------------------------------------------------
 // Stockage local

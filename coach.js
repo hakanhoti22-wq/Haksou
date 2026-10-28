@@ -72,7 +72,7 @@ export async function coachTurn({ cred, target, native, level, scenario, turns }
   if (!turns.length) {
     messages.push({ role: 'user', content: `(Start the conversation now: greet the learner in ${target} and ask a first simple question that fits the situation. No correction.)` });
   } else {
-    messages.push(...turns.slice(-14));
+    messages.push(...turns.slice(-6)); // derniers échanges seulement : économise la limite gratuite
   }
 
   const call = async (model) => {
