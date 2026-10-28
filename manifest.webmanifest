@@ -1,7 +1,7 @@
 {
   "name": "Haksou — Traduction",
   "short_name": "Haksou",
-  "description": "Traduction écrite et vocale dans plus de 180 langues, avec mode conversation.",
+  "description": "Traduction écrite, vocale et photo dans plus de 190 langues, conversation et coach de langue.",
   "lang": "fr",
   "scope": "./",
   "display": "standalone",
@@ -25,5 +25,14 @@
       "type": "image/png",
       "purpose": "maskable"
     }
-  ]
+  ],
+  "share_target": {
+    "action": "./",
+    "method": "GET",
+    "params": {
+      "title": "titre",
+      "text": "texte",
+      "url": "lien"
+    }
+  }
 }

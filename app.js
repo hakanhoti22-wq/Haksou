@@ -6,12 +6,14 @@ import { transcribe, providerFor } from './stt.js';
 import { relayStatus } from './api.js';
 import { Account, adminCall } from './account.js';
 import { coachTurn, LEVELS, SCENARIOS } from './coach.js';
+import { prepareImage, readImage } from './vision.js';
+import { Practice, Words, GOALS } from './practice.js';
 import { RELAY_URL, PRICES } from './config.js';
 import { ttsProviderFor, ttsSupports, PROVIDER_NAMES } from './tts.js';
 
 const $ = id => document.getElementById(id);
 
-export const APP_VERSION = '19';
+export const APP_VERSION = '20';
 
 // ---------------------------------------------------------------------------
 // Stockage local
@@ -68,7 +70,7 @@ const saveHistory = mode => store.set('history.' + mode, history[mode].slice(-MA
 
 // Les traductions interrompues (fermeture de l'app) sont marquées en erreur.
 for (const list of Object.values(history)) {
-  for (const m of list) if (m.status === 'pending') m.status = 'error';
+  for (const m of list) if (m.status === 'pending' || m.status === 'reading') m.status = 'error';
 }
 
 const lang = code => findLanguage(code) || findLanguage('en');
@@ -123,6 +125,7 @@ const ICON = {
   check: '<svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>',
   mic: '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>',
   sparkle: '<svg viewBox="0 0 24 24"><path d="M4 6h9M8.5 4v2m2.5 0c-.6 3.6-3 6.6-6 8m2.2-4.5c1 1.7 2.6 3 4.3 3.8"/><path d="m12.5 20 4-9 4 9m-6.8-2.6h5.6"/></svg>',
+  star: '<svg viewBox="0 0 24 24"><path d="m12 3.8 2.5 5.1 5.6.8-4 3.9.9 5.6-5-2.6-5 2.6.9-5.6-4-3.9 5.6-.8z"/></svg>',
   people: '<svg viewBox="0 0 24 24"><path d="M4 8.5A3.5 3.5 0 0 1 7.5 5h5A3.5 3.5 0 0 1 16 8.5v2A3.5 3.5 0 0 1 12.5 14H10l-3 2.5V14a3.5 3.5 0 0 1-3-3.5z"/><path d="M19 10.5a2.5 2.5 0 0 1 1 2v2a2.5 2.5 0 0 1-2 2.45V19l-2.5-2h-2a2.5 2.5 0 0 1-2-1"/></svg>',
 };
 
@@ -236,18 +239,28 @@ function renderMessage(m) {
   if (m.kind === 'text') {
     // Bulle envoyée : le texte d'origine
     const sent = node('div', 'msg right');
-    sent.append(node('div', 'msg-meta', metaHtml(m.from) + (m.auto ? ' · auto' : '')));
-    const b1 = node('div', 'bubble');
-    b1.textContent = m.original;
+    const origin = SOURCE_LABELS[m.source] ? ` · ${SOURCE_LABELS[m.source]}` : '';
+    sent.append(node('div', 'msg-meta', (m.original ? metaHtml(m.from) : '') + (m.auto && m.original ? ' · auto' : '') + origin));
+    const b1 = node('div', 'bubble' + (m.thumb ? ' with-photo' : ''));
+    if (m.thumb) {
+      const img = node('img', 'photo');
+      img.src = m.thumb;
+      img.alt = '';
+      b1.append(img);
+    }
+    if (m.original) b1.append(document.createTextNode(m.original));
+    else if (m.status === 'reading') b1.append(node('span', 'reading', `${TYPING} ${m.source === 'voice' ? 'J\'écoute le vocal…' : 'Je lis la photo…'}`));
     sent.append(b1);
     wrap.append(sent);
 
     // Bulle reçue : la traduction
     const recv = node('div', 'msg left delayed');
     recv.append(node('div', 'msg-meta', metaHtml(m.to)));
-    recv.append(translationBubble(m, false));
-    if (m.status === 'ok') recv.append(actions(m));
-    wrap.append(recv);
+    if (m.status !== 'reading') {
+      recv.append(translationBubble(m, false));
+      if (m.status === 'ok') recv.append(actions(m));
+      wrap.append(recv);
+    }
   } else {
     const mine = m.side === 'a';
     const row = node('div', `msg ${mine ? 'right' : 'left other'}`);
@@ -272,9 +285,11 @@ function translationBubble(m, withOriginal) {
     b.classList.add('error');
     b.textContent = withOriginal ? m.original : '';
     b.append(node('span', 'err', escapeHtml(m.error || 'Traduction impossible.')));
-    const retry = node('button', 'retry', 'Réessayer');
-    retry.addEventListener('click', () => retryMessage(m));
-    b.append(retry);
+    if (m.original) {
+      const retry = node('button', 'retry', 'Réessayer');
+      retry.addEventListener('click', () => retryMessage(m));
+      b.append(retry);
+    }
   } else {
     b.lang = lang(m.to).iso || m.to;
     b.textContent = m.translation;
@@ -305,8 +320,31 @@ function actions(m) {
     toast('Traduction copiée');
     setTimeout(() => { copy.innerHTML = ICON.copy; }, 1500);
   });
-  box.append(play, copy);
+  box.append(play, copy, starButton(wordCardFor(m)));
   return box;
+}
+
+const SOURCE_LABELS = { photo: '📷 photo', voice: '🎙️ vocal', share: '📋 message' };
+
+/** Carte « Mes mots » d'une traduction : la face avant est dans la langue étrangère. */
+function wordCardFor(m) {
+  const native = settings.coachNative;
+  return m.to === native
+    ? { front: m.original, back: m.translation, lang: m.from, backLang: m.to }
+    : { front: m.translation, back: m.original, lang: m.to, backLang: m.from };
+}
+
+function starButton(card) {
+  const btn = node('button', 'act star' + (Words.has(card.front, card.lang) ? ' on' : ''), ICON.star);
+  btn.setAttribute('aria-label', 'Ajouter à Mes mots');
+  btn.addEventListener('click', () => {
+    if (card.front.length > 220) { toast('Trop long pour une carte : gardez une phrase courte.'); return; }
+    const added = Words.toggle({ ...card, source: 'star' });
+    btn.classList.toggle('on', added);
+    toast(added ? '⭐ Ajouté à Mes mots' : 'Retiré de Mes mots');
+    refreshProgressUI();
+  });
+  return btn;
 }
 
 function scrollToBottom(smooth) {
@@ -412,7 +450,85 @@ async function translateTyped(text, { from = null, spoken = false } = {}) {
   if (ok && spoken && settings.autoSpeak && run === voiceRun) await speakMessage(m, 250);
 }
 
+/** Traduit un texte reçu (photo, vocal, message collé) vers la langue de l'appareil. */
+async function translateIncoming(m, text, fromHint = null) {
+  const hinted = fromHint && findLanguage(fromHint);
+  Object.assign(m, {
+    original: text,
+    auto: !hinted,
+    from: hinted ? hinted.code : (settings.lastDetected || deviceLang),
+    to: deviceLang,
+    status: 'pending',
+  });
+  // Déjà dans ma langue : on traduit vers ma langue cible habituelle.
+  const elsewhere = () => (settings.tgt !== deviceLang ? settings.tgt : otherDefault);
+  if (m.from === m.to && hinted) m.to = elsewhere();
+  if (settings.mode === 'text') updateMessage(m);
+  const ok = await runTranslation('text', m);
+  if (ok && m.from === m.to) {
+    m.to = elsewhere();
+    await runTranslation('text', m);
+  }
+}
+
+function incomingMessage(source, thumb = null) {
+  const m = {
+    id: newId(), kind: 'text', ts: Date.now(), auto: true, source, thumb,
+    from: deviceLang, to: deviceLang, original: '', status: 'reading',
+  };
+  if (settings.mode !== 'text') setMode('text');
+  pushMessage('text', m);
+  return m;
+}
+
+function failIncoming(m, message) {
+  Object.assign(m, { status: 'error', error: message });
+  saveHistory('text');
+  if (settings.mode === 'text') updateMessage(m);
+}
+
+async function translatePhoto(file) {
+  if (!file || !ensureAccess()) return;
+  const cred = sttCred();
+  if (!cred) { toast('La lecture des photos passe par votre accès Haksou ou une clé Groq (Réglages → Micro).'); return; }
+  let img;
+  try { img = await prepareImage(file); } catch (err) { toast(err.message); return; }
+  const m = incomingMessage('photo', img.thumb);
+  try {
+    const out = await readImage(img.data, cred);
+    if (!out.text) { failIncoming(m, 'Aucun texte lisible sur cette photo. Rapprochez-vous et évitez les reflets.'); return; }
+    await translateIncoming(m, out.text, out.language);
+  } catch (err) {
+    if (err.code === 'payment') onPaymentRequired();
+    failIncoming(m, err.message);
+  }
+}
+
+async function translateVoiceFile(file) {
+  if (!file || !ensureAccess()) return;
+  const cred = sttCred();
+  if (!cred) { toast('Les vocaux passent par votre accès Haksou ou une clé Groq (Réglages → Micro).'); return; }
+  if (file.size > 24 * 1024 * 1024) { toast('Vocal trop long (25 Mo maximum).'); return; }
+  const m = incomingMessage('voice');
+  try {
+    const text = await transcribe(file, 'auto', cred, file.name);
+    if (!text) { failIncoming(m, 'Aucune parole reconnue dans ce vocal.'); return; }
+    await translateIncoming(m, text);
+  } catch (err) {
+    if (err.code === 'payment') onPaymentRequired();
+    failIncoming(m, err.message);
+  }
+}
+
+async function translatePasted(text) {
+  const clean = (text || '').trim();
+  if (!clean) { toast('Rien à coller : copiez d\'abord le message (appui long → Copier).'); return; }
+  if (!ensureAccess()) return;
+  await translateIncoming(incomingMessage('share'), clean.slice(0, 4000));
+}
+
 async function retryMessage(m) {
+  if (!m.original) return;
   const mode = m.kind === 'text' ? 'text' : 'conv';
   updateMessage(Object.assign(m, { status: 'pending' }));
   await runTranslation(mode, m);
@@ -456,7 +572,11 @@ async function coachReply(pending, userMsg) {
     if (userMsg) {
       userMsg.correction = out.correction;
       userMsg.praise = out.correction ? null : out.praise;
+      if (out.correction) {
+        userMsg.saved = Words.add({ front: out.correction.corrected, back: out.correction.explanation, lang: settings.coachTarget, backLang: settings.coachNative, source: 'correction' });
+      }
       updateMessage(userMsg);
+      addPractice(1);
     }
     Object.assign(pending, { status: 'ok', text: out.reply, translation: out.translation });
   } catch (err) {
@@ -514,6 +634,7 @@ function renderCoachMessage(m) {
       const fix = node('div', 'fix');
       fix.append(node('b', '', `✏️ ${escapeHtml(m.correction.corrected)}`));
       if (m.correction.explanation) fix.append(node('small', '', escapeHtml(m.correction.explanation)));
+      if (m.saved) fix.append(node('small', 'fix-saved', '📚 Ajouté à Mes mots'));
       row.append(fix);
     } else if (m.praise) {
       row.append(node('div', 'praise', `👏 ${escapeHtml(m.praise)}`));
@@ -550,7 +671,7 @@ function renderCoachMessage(m) {
     slow.addEventListener('click', () => { Speaker.unlock(); speakCoach(m, true); });
     const tr = node('button', 'act', m.showTr ? 'Masquer' : 'Traduction');
     tr.addEventListener('click', () => { m.showTr = !m.showTr; saveHistory('coach'); updateMessage(m); });
-    box.append(play, slow, tr);
+    box.append(play, slow, tr, starButton({ front: m.text, back: m.translation || '', lang: settings.coachTarget, backLang: settings.coachNative }));
     row.append(box);
   }
   wrap.append(row);
@@ -1270,6 +1391,7 @@ function applyMode() {
   el.composerText.hidden = conv;
   el.composerConv.hidden = !conv;
   $('coachBar').hidden = settings.mode !== 'coach';
+  $('attachBtn').hidden = settings.mode === 'coach';
   el.input.placeholder = settings.mode === 'coach'
     ? `Répondre en ${langName(settings.coachTarget).toLowerCase()}…`
     : 'Écrire pour traduire…';
@@ -1796,6 +1918,340 @@ async function pasteInto(input) {
 }
 
 // ---------------------------------------------------------------------------
+// Importer : photo, capture d'écran, vocal WhatsApp, message collé
+// ---------------------------------------------------------------------------
+
+const importSheet = { sheet: $('importSheet'), backdrop: $('importBackdrop') };
+
+function initImport() {
+  bindSheet(importSheet.sheet, importSheet.backdrop);
+  $('attachBtn').addEventListener('click', () => { Speaker.unlock(); openSheet(importSheet.sheet, importSheet.backdrop); });
+  const pick = (input, handler) => {
+    input.addEventListener('change', () => {
+      const file = input.files?.[0];
+      input.value = '';
+      closeSheet(importSheet.sheet, importSheet.backdrop);
+      handler(file);
+    });
+  };
+  pick($('fileCamera'), translatePhoto);
+  pick($('filePhoto'), translatePhoto);
+  pick($('fileAudio'), translateVoiceFile);
+  $('importCamera').addEventListener('click', () => $('fileCamera').click());
+  $('importPhoto').addEventListener('click', () => $('filePhoto').click());
+  $('importAudio').addEventListener('click', () => $('fileAudio').click());
+  $('importPaste').addEventListener('click', async () => {
+    let text = '';
+    try { text = await navigator.clipboard.readText(); } catch { /* refusé */ }
+    closeSheet(importSheet.sheet, importSheet.backdrop);
+    if (!text.trim()) {
+      el.input.focus();
+      toast('Touchez le champ puis « Coller ».');
+      return;
+    }
+    translatePasted(text);
+  });
+}
+
+/** Texte partagé vers Haksou (?texte=… ou #texte=…, ex. depuis le menu Partager d'Android ou un Raccourci iPhone). */
+function handleSharedText() {
+  const query = new URLSearchParams(location.search);
+  const hash = new URLSearchParams(location.hash.slice(1));
+  const text = [query.get('titre'), query.get('texte') || hash.get('texte'), query.get('lien')].filter(Boolean).join('\n');
+  if (!query.has('texte') && !query.has('titre') && !query.has('lien') && !hash.has('texte')) return;
+  hash.delete('texte');
+  const rest = hash.toString();
+  window.history.replaceState(null, '', location.pathname + (rest ? '#' + rest : ''));
+  if (text.trim()) translatePasted(text);
+}
+
+// ---------------------------------------------------------------------------
+// Série de jours et objectif quotidien
+// ---------------------------------------------------------------------------
+
+const progressSheet = { sheet: $('progressSheet'), backdrop: $('progressBackdrop'), body: $('progressBody') };
+const plural = (n, one, many) => `${n} ${n > 1 ? many : one}`;
+
+function addPractice(points) {
+  if (Practice.add(points)) {
+    const n = Practice.streak();
+    toast(`🔥 Objectif du jour atteint ! Série : ${plural(n, 'jour', 'jours')}`);
+    const btn = $('streakBtn');
+    btn.classList.remove('celebrate');
+    void btn.offsetWidth;
+    btn.classList.add('celebrate');
+  }
+  refreshProgressUI();
+}
+
+function refreshProgressUI() {
+  const btn = $('streakBtn');
+  $('streakCount').textContent = Practice.streak();
+  btn.style.setProperty('--p', Math.min(1, Practice.today() / Practice.goal()).toFixed(3));
+  btn.classList.toggle('done', Practice.done());
+  const due = Words.dueCount();
+  const badge = $('wordsBadge');
+  badge.hidden = !due;
+  badge.textContent = due > 99 ? '99+' : due;
+}
+
+const weekdayFmt = new Intl.DateTimeFormat('fr-FR', { weekday: 'narrow' });
+
+function renderProgress() {
+  const body = progressSheet.body;
+  const streak = Practice.streak();
+  const today = Practice.today();
+  const goal = Practice.goal();
+  const ratio = Math.min(1, today / goal);
+  const best = Math.max(Practice.state.best || 0, streak);
+  body.innerHTML = `
+    <div class="streak-hero${Practice.done() ? ' done' : ''}">
+      <div class="big-flame" aria-hidden="true">🔥</div>
+      <div class="streak-num">${streak}</div>
+      <div class="streak-label">${streak > 1 ? 'jours d\'affilée' : 'jour d\'affilée'}</div>
+      <small>Record : ${plural(best, 'jour', 'jours')}</small>
+    </div>
+    <div class="goal-card">
+      <div class="goal-ring" style="--p:${ratio.toFixed(3)}"><span>${Math.min(today, goal)}<small>/${goal}</small></span></div>
+      <div class="goal-text">
+        <b>${Practice.done() ? 'Objectif du jour atteint ✓' : `Encore ${plural(goal - today, 'point', 'points')} aujourd'hui`}</b>
+        <small>1 point = une réponse au Coach ou un mot révisé.</small>
+      </div>
+    </div>
+    <div class="week">${Practice.week().map(d => `
+      <div class="day${d.done ? ' done' : ''}${d.today ? ' today' : ''}">
+        <span class="dot">${d.done ? '🔥' : d.count ? '•' : ''}</span>
+        <small>${weekdayFmt.format(d.date).toUpperCase()}</small>
+      </div>`).join('')}
+    </div>
+    <div class="group-title">Objectif quotidien</div>
+    <div class="group"><div class="row">
+      <span class="row-text"><span>Points par jour</span></span>
+      <div class="mini-seg" id="goalSeg" role="radiogroup" aria-label="Objectif quotidien">
+        ${GOALS.map(g => `<button role="radio" data-goal="${g}" aria-checked="${g === goal}">${g}</button>`).join('')}
+      </div>
+    </div></div>
+    <div class="group-title">Rappel quotidien</div>
+    <div class="group">
+      <label class="row">
+        <span class="row-text"><span>Heure du rappel</span><small>Ajouté à votre calendrier, gratuit et sans compte</small></span>
+        <input type="time" class="time-input" id="reminderTime" value="${escapeHtml(Practice.state.reminderTime || '19:00')}">
+      </label>
+      <button class="row row-btn accent" id="reminderBtn">🔔 Ajouter le rappel au calendrier</button>
+    </div>
+    <button class="cta" id="practiceCoach">S'entraîner avec le Coach</button>
+    ${Words.dueCount() ? `<button class="link-btn" id="practiceWords">Réviser mes mots (${Words.dueCount()})</button>` : ''}`;
+
+  body.querySelectorAll('[data-goal]').forEach(b => b.addEventListener('click', () => {
+    Practice.setGoal(Number(b.dataset.goal));
+    refreshProgressUI();
+    renderProgress();
+  }));
+  $('reminderTime').addEventListener('change', e => { Practice.state.reminderTime = e.target.value; Practice.persist(); });
+  $('reminderBtn').addEventListener('click', () => downloadReminder($('reminderTime').value || '19:00'));
+  $('practiceCoach').addEventListener('click', () => {
+    closeSheet(progressSheet.sheet, progressSheet.backdrop);
+    setMode('coach');
+  });
+  $('practiceWords')?.addEventListener('click', () => {
+    closeSheet(progressSheet.sheet, progressSheet.backdrop);
+    openWords(true);
+  });
+}
+
+/** Rappel quotidien : un événement récurrent (.ics) que le calendrier de l'iPhone ajoute en un geste. */
+function downloadReminder(time) {
+  const [h, min] = time.split(':').map(Number);
+  const start = new Date();
+  start.setHours(h, min, 0, 0);
+  if (start < new Date()) start.setDate(start.getDate() + 1);
+  const pad = n => String(n).padStart(2, '0');
+  const local = d => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
+  const end = new Date(start.getTime() + 10 * 60 * 1000);
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+  const ics = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Haksou//Rappel//FR', 'CALSCALE:GREGORIAN',
+    'BEGIN:VEVENT',
+    `UID:haksou-rappel-${Date.now()}@haksou`,
+    `DTSTAMP:${stamp}`,
+    `DTSTART:${local(start)}`,
+    `DTEND:${local(end)}`,
+    'RRULE:FREQ=DAILY',
+    'SUMMARY:🔥 Haksou : ma série du jour',
+    `DESCRIPTION:5 minutes avec le Coach pour garder votre série. ${appUrl()}`,
+    `URL:${appUrl()}`,
+    'BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:Haksou : ma série du jour', 'TRIGGER:PT0M', 'END:VALARM',
+    'END:VEVENT', 'END:VCALENDAR',
+  ].join('\r\n');
+  const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'rappel-haksou.ics';
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  toast('Touchez « Ajouter au calendrier » pour activer le rappel.');
+}
+
+function initProgress() {
+  bindSheet(progressSheet.sheet, progressSheet.backdrop);
+  bindSheet(wordsSheet.sheet, wordsSheet.backdrop);
+  $('streakBtn').addEventListener('click', () => { renderProgress(); openSheet(progressSheet.sheet, progressSheet.backdrop); });
+  $('wordsBtn').addEventListener('click', () => openWords(false));
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshProgressUI(); });
+  refreshProgressUI();
+}
+
+// ---------------------------------------------------------------------------
+// Mes mots : liste et révision
+// ---------------------------------------------------------------------------
+
+const wordsSheet = { sheet: $('wordsSheet'), backdrop: $('wordsBackdrop'), body: $('wordsBody'), title: $('wordsTitle') };
+let review = null; // { queue, index, done, shown, misses }
+
+function openWords(startReview) {
+  if (startReview && Words.dueCount()) startReviewSession();
+  else { review = null; renderWords(); }
+  openSheet(wordsSheet.sheet, wordsSheet.backdrop);
+}
+
+function speakWord(text, code, slow = false) {
+  Speaker.unlock();
+  return speakMessage({ id: 'word', to: code, translation: text }, 0, { free: true, rate: settings.rate * (slow ? 0.75 : 0.95) });
+}
+
+function renderWords() {
+  const body = wordsSheet.body;
+  wordsSheet.title.textContent = 'Mes mots';
+  body.replaceChildren();
+  const due = Words.dueCount();
+  const stats = node('div', 'stats-grid');
+  stats.innerHTML = `
+    <div class="stat"><b>${Words.list.length}</b><span>mots</span></div>
+    <div class="stat hl"><b>${due}</b><span>à réviser</span></div>
+    <div class="stat"><b>${Words.learned()}</b><span>appris</span></div>`;
+  body.append(stats);
+
+  if (!Words.list.length) {
+    body.append(node('div', 'words-empty', `
+      <div class="big">📚</div>
+      <p>Touchez <b>☆</b> sous une traduction ou une réplique du Coach pour garder un mot ou une phrase.</p>
+      <p>Les corrections du Coach s'ajoutent toutes seules.</p>
+      <p>Haksou vous les repropose au bon moment : juste avant de les oublier.</p>`));
+    return;
+  }
+
+  const start = node('button', 'cta', due ? `Réviser maintenant (${due})` : 'Tout est révisé ✓ — revenez demain');
+  start.disabled = !due;
+  start.addEventListener('click', startReviewSession);
+  body.append(start);
+
+  body.append(node('div', 'group-title', 'Mes cartes'));
+  const group = node('div', 'group');
+  for (const w of [...Words.list].reverse().slice(0, 300)) {
+    const row = node('div', 'row word-row');
+    const text = node('span', 'row-text');
+    const front = node('span', 'word-front');
+    front.textContent = `${flagOf(w.lang)} ${w.front}`;
+    const back = node('small');
+    back.textContent = w.back;
+    text.append(front, back);
+    const listen = node('button', 'icon-btn', ICON.speaker);
+    listen.setAttribute('aria-label', 'Écouter');
+    listen.addEventListener('click', () => speakWord(w.front, w.lang));
+    const del = node('button', 'icon-btn muted', '✕');
+    del.setAttribute('aria-label', 'Supprimer');
+    del.addEventListener('click', () => {
+      Words.remove(w.id);
+      refreshProgressUI();
+      renderWords();
+    });
+    row.append(node('span', 'level', '●'.repeat(Math.min(w.box, 5)) + '○'.repeat(Math.max(0, 5 - w.box))), text, listen, del);
+    row.firstChild.setAttribute('aria-label', `Niveau ${w.box} sur 5`);
+    group.append(row);
+  }
+  body.append(group);
+}
+
+function startReviewSession() {
+  const queue = Words.due().slice(0, 20).map(w => w.id);
+  review = { queue, index: 0, done: 0, shown: false, misses: {} };
+  renderReview();
+}
+
+function renderReview() {
+  const body = wordsSheet.body;
+  body.replaceChildren();
+  if (!review || review.index >= review.queue.length) {
+    wordsSheet.title.textContent = 'Bravo !';
+    const n = review?.done || 0;
+    body.append(node('div', 'words-empty', `
+      <div class="big">🎉</div>
+      <p><b>${plural(n, 'mot révisé', 'mots révisés')}.</b></p>
+      <p>Ils reviendront au bon moment pour s'ancrer dans votre mémoire.</p>`));
+    const back = node('button', 'cta', 'Voir mes mots');
+    back.addEventListener('click', () => { review = null; renderWords(); });
+    body.append(back);
+    return;
+  }
+  const w = Words.list.find(x => x.id === review.queue[review.index]);
+  if (!w) { review.index++; renderReview(); return; }
+  wordsSheet.title.textContent = `${review.index + 1} / ${review.queue.length}`;
+
+  const bar = node('div', 'review-bar');
+  bar.style.setProperty('--p', (review.index / review.queue.length).toFixed(3));
+  body.append(bar);
+
+  const card = node('div', 'review-card' + (review.shown ? ' flipped' : ''));
+  const front = node('div', 'review-front');
+  front.lang = lang(w.lang).iso || w.lang;
+  front.textContent = w.front;
+  card.append(node('div', 'review-lang', `${flagOf(w.lang)} ${escapeHtml(langName(w.lang))}`), front);
+  const listen = node('div', 'review-listen');
+  const play = node('button', 'act', ICON.speaker + 'Écouter');
+  play.addEventListener('click', () => speakWord(w.front, w.lang));
+  const slow = node('button', 'act', '🐢 Lentement');
+  slow.addEventListener('click', () => speakWord(w.front, w.lang, true));
+  listen.append(play, slow);
+  card.append(listen);
+  if (review.shown) {
+    const back = node('div', 'review-back');
+    back.textContent = w.back || '—';
+    card.append(back);
+  }
+  body.append(card);
+
+  if (!review.shown) {
+    const show = node('button', 'cta', 'Afficher la réponse');
+    show.addEventListener('click', () => { review.shown = true; renderReview(); });
+    body.append(show);
+    body.append(node('p', 'fine', 'Dites-le à voix haute, puis vérifiez.'));
+    if (review.autoplay !== w.id) { review.autoplay = w.id; speakWord(w.front, w.lang); }
+  } else {
+    const grades = node('div', 'grades');
+    const again = node('button', 'grade again', 'À revoir');
+    const knew = node('button', 'grade knew', 'Je savais ✓');
+    const next = ok => {
+      Words.grade(w.id, ok);
+      if (!ok && (review.misses[w.id] = (review.misses[w.id] || 0) + 1) <= 2) review.queue.push(w.id);
+      if (!review.counted?.[w.id]) {
+        review.counted = { ...review.counted, [w.id]: true };
+        review.done++;
+        addPractice(1);
+      }
+      review.index++;
+      review.shown = false;
+      renderReview();
+    };
+    again.addEventListener('click', () => next(false));
+    knew.addEventListener('click', () => next(true));
+    grades.append(again, knew);
+    body.append(grades);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Démarrage
 // ---------------------------------------------------------------------------
 
@@ -1848,9 +2304,11 @@ function init() {
 
   bindSheet(accountSheet.sheet, accountSheet.backdrop);
   initCoach();
+  initImport();
+  initProgress();
   initSettings();
   applyMode();
-  handleIncomingLinks();
+  handleIncomingLinks().finally(handleSharedText);
 
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     // Une nouvelle version prend le relais : on recharge une fois pour l'afficher.

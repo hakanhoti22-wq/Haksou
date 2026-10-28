@@ -34,7 +34,13 @@ function whisperLanguage(code) {
   return WHISPER_LANGS.has(c) ? c : null;
 }
 
-function extensionFor(type) {
+function extensionFor(type, name = '') {
+  // Fichiers importés (ex. vocal WhatsApp .opus) : Whisper reconnaît l'Ogg sous l'extension .ogg.
+  const ext = (name.match(/\.([a-z0-9]+)$/i)?.[1] || '').toLowerCase();
+  if (ext === 'opus' || ext === 'oga') return 'ogg';
+  if (['mp3', 'm4a', 'mp4', 'ogg', 'wav', 'webm', 'flac', 'mpeg', 'mpga'].includes(ext)) return ext;
+  if (ext === 'aac' || ext === 'caf') return 'm4a';
+  if (type.includes('mpeg')) return 'mp3';
   if (type.includes('mp4') || type.includes('m4a') || type.includes('aac')) return 'm4a';
   if (type.includes('ogg')) return 'ogg';
   if (type.includes('wav')) return 'wav';
@@ -45,22 +51,23 @@ function extensionFor(type) {
  * @param {Blob} blob   audio enregistré
  * @param {string} langCode  code de la langue parlée (moteur de traduction)
  * @param {import('./api.js').Cred} cred  clé ou relais (fournisseur groq ou openai)
+ * @param {string} [fileName]  nom du fichier importé (pour reconnaître son format)
  * @returns {Promise<string>} texte reconnu ('' si rien)
  */
-export async function transcribe(blob, langCode, cred) {
+export async function transcribe(blob, langCode, cred, fileName = '') {
   const provider = PROVIDERS[cred.provider];
   const language = whisperLanguage(langCode);
 
   const send = async (withLanguage) => {
     const form = new FormData();
-    form.append('file', blob, `parole.${extensionFor(blob.type || '')}`);
+    form.append('file', blob, `parole.${extensionFor(blob.type || '', fileName || blob.name || '')}`);
     form.append('model', provider.model);
     form.append('response_format', 'json');
     form.append('temperature', '0');
     if (withLanguage && language) form.append('language', language);
 
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+    const timer = setTimeout(() => ctrl.abort(), Math.max(TIMEOUT_MS, blob.size / 20)); // longs vocaux : plus de temps
     let res;
     try {
       res = await apiFetch(cred, provider.path, {

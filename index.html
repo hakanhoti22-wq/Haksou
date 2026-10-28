@@ -35,9 +35,20 @@
           <span class="brand-orb" aria-hidden="true"></span>
           <span class="brand-name">Haksou</span>
         </div>
-        <button class="glass-btn" id="settingsBtn" aria-label="Réglages">
-          <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg>
-        </button>
+        <div class="top-actions">
+          <button class="streak-btn" id="streakBtn" aria-label="Ma série et mon objectif du jour">
+            <span class="streak-ring" aria-hidden="true"></span>
+            <span class="flame" aria-hidden="true">🔥</span>
+            <b id="streakCount">0</b>
+          </button>
+          <button class="glass-btn" id="wordsBtn" aria-label="Mes mots">
+            <svg viewBox="0 0 24 24"><path d="M12 6.4C9.3 4.5 6.3 4.3 3 5.4v13.2c3.3-1.1 6.3-.9 9 1 2.7-1.9 5.7-2.1 9-1V5.4c-3.3-1.1-6.3-.9-9 1zM12 6.4v13.2"/></svg>
+            <span class="dot-badge" id="wordsBadge" hidden></span>
+          </button>
+          <button class="glass-btn" id="settingsBtn" aria-label="Réglages">
+            <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg>
+          </button>
+        </div>
       </div>
 
       <div class="segmented" role="tablist" aria-label="Mode">
@@ -96,6 +107,9 @@
 
       <!-- Saisie : mode Traduire -->
       <div class="composer" id="composerText">
+        <button class="attach-btn" id="attachBtn" aria-label="Photo, capture ou message vocal">
+          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
         <div class="field">
           <textarea id="input" rows="1" placeholder="Écrire pour traduire…" autocomplete="off" autocorrect="on" spellcheck="true" enterkeyhint="send"></textarea>
           <button class="send-btn" id="sendBtn" aria-label="Traduire" hidden>
@@ -319,6 +333,68 @@
       <button class="text-btn" data-close>Fermer</button>
     </div>
     <div class="sheet-body" id="accountBody"></div>
+  </section>
+
+  <!-- Feuille : importer (photo, capture, vocal WhatsApp) -->
+  <div class="sheet-backdrop" id="importBackdrop" hidden></div>
+  <section class="sheet import-sheet" id="importSheet" role="dialog" aria-modal="true" aria-labelledby="importTitle" hidden>
+    <div class="sheet-grabber" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <h2 id="importTitle">Traduire…</h2>
+      <button class="text-btn" data-close>Fermer</button>
+    </div>
+    <div class="sheet-body">
+      <div class="group">
+        <button class="row import-row" id="importCamera">
+          <span class="import-ico" aria-hidden="true">📷</span>
+          <span class="row-text"><span>Prendre une photo</span><small>Menu, panneau, étiquette, document</small></span>
+        </button>
+        <button class="row import-row" id="importPhoto">
+          <span class="import-ico" aria-hidden="true">🖼️</span>
+          <span class="row-text"><span>Photo ou capture d'écran</span><small>Une conversation WhatsApp, un message, une image</small></span>
+        </button>
+        <button class="row import-row" id="importAudio">
+          <span class="import-ico" aria-hidden="true">🎙️</span>
+          <span class="row-text"><span>Message vocal</span><small>Un vocal WhatsApp, Telegram… enregistré dans Fichiers</small></span>
+        </button>
+        <button class="row import-row" id="importPaste">
+          <span class="import-ico" aria-hidden="true">📋</span>
+          <span class="row-text"><span>Coller un message</span><small>Le texte copié dans WhatsApp ou ailleurs</small></span>
+        </button>
+      </div>
+      <div class="group-title">Vocal WhatsApp, en 3 gestes</div>
+      <ol class="howto">
+        <li>Dans WhatsApp, <b>maintenez le doigt</b> sur le message vocal → <b>Transférer</b>.</li>
+        <li>Touchez le bouton <b>Partager</b> <span class="kbd">⇪</span> en bas à droite → <b>Enregistrer dans Fichiers</b>.</li>
+        <li>Revenez ici → <b>Message vocal</b>, et choisissez-le.</li>
+      </ol>
+      <p class="group-note">Pour une conversation écrite, faites simplement une capture d'écran puis « Photo ou capture d'écran ».</p>
+      <input type="file" id="fileCamera" accept="image/*" capture="environment" hidden>
+      <input type="file" id="filePhoto" accept="image/*" hidden>
+      <input type="file" id="fileAudio" accept="audio/*,.opus,.ogg,.oga,.m4a,.mp3,.wav,.aac,.caf,.mp4,.webm" hidden>
+    </div>
+  </section>
+
+  <!-- Feuille : ma série et mon objectif -->
+  <div class="sheet-backdrop" id="progressBackdrop" hidden></div>
+  <section class="sheet" id="progressSheet" role="dialog" aria-modal="true" aria-labelledby="progressTitle" hidden>
+    <div class="sheet-grabber" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <h2 id="progressTitle">Ma série</h2>
+      <button class="text-btn" data-close>OK</button>
+    </div>
+    <div class="sheet-body" id="progressBody"></div>
+  </section>
+
+  <!-- Feuille : Mes mots -->
+  <div class="sheet-backdrop" id="wordsBackdrop" hidden></div>
+  <section class="sheet" id="wordsSheet" role="dialog" aria-modal="true" aria-labelledby="wordsTitle" hidden>
+    <div class="sheet-grabber" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <h2 id="wordsTitle">Mes mots</h2>
+      <button class="text-btn" data-close>OK</button>
+    </div>
+    <div class="sheet-body" id="wordsBody"></div>
   </section>
 
   <div class="toast" id="toast" role="status" hidden></div>
