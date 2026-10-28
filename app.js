@@ -13,7 +13,7 @@ import { ttsProviderFor, ttsSupports, PROVIDER_NAMES } from './tts.js';
 
 const $ = id => document.getElementById(id);
 
-export const APP_VERSION = '20';
+export const APP_VERSION = '21';
 
 // ---------------------------------------------------------------------------
 // Stockage local
@@ -185,7 +185,7 @@ function coachEmptyState() {
   start.style.maxWidth = '320px';
   start.addEventListener('click', () => { Speaker.unlock(); coachStart(); });
   box.append(start);
-  box.append(node('p', 'coach-tip', `Astuce : pour une voix naturelle et gratuite, téléchargez une voix « Premium » ${escapeHtml(target.name.toLowerCase())} dans Réglages de l'iPhone → recherchez « Voix ».`));
+  if (!neuralVoiceFor(target)) box.append(node('p', 'coach-tip', `Astuce : pour une voix naturelle et gratuite, téléchargez une voix « Premium » ${escapeHtml(target.name.toLowerCase())} dans Réglages de l'iPhone → recherchez « Voix ».`));
   return box;
 }
 
@@ -615,10 +615,9 @@ async function coachSend(text) {
 
 function speakCoach(m, slow = false, delay = 0) {
   const base = settings.coachLevel === 'A' ? 0.9 : 1;
-  // Voix de l'iPhone (gratuite) ; plus lente pour les débutants ou sur demande.
+  // Même voix naturelle que la traduction (repli : voix de l'iPhone) ; plus lente pour les débutants ou sur demande.
   return speakMessage({ id: m.id, to: settings.coachTarget, translation: m.text }, delay, {
     rate: Math.max(0.55, settings.rate * base * (slow ? 0.72 : 1)),
-    free: true,
   });
 }
 
