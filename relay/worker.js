@@ -9,7 +9,9 @@
 //   GROQ_KEY           clé Groq gsk_…        → micro fiable + traduction de secours
 //   ELEVENLABS_KEY     clé ElevenLabs sk_…   → voix naturelle
 //   OPENAI_KEY         clé OpenAI sk-…       → voix naturelle (ou micro si pas de Groq)
-//   TTS_PROVIDER       « elevenlabs » ou « openai » si les deux clés sont présentes
+//   AZURE_SPEECH_KEY   clé Microsoft Azure Speech (offre gratuite F0) → voix naturelle gratuite
+//   AZURE_SPEECH_REGION région du service Azure, ex. « westeurope » (avec la clé ci-dessus)
+//   TTS_PROVIDER       « azure », « elevenlabs » ou « openai » pour forcer la voix principale
 //   STRIPE_SECRET_KEY  clé secrète Stripe sk_live_… (ou sk_test_… pour essayer)
 //   PRICE_MONTHLY      identifiant du prix mensuel Stripe (price_…)
 //   PRICE_YEARLY       identifiant du prix annuel Stripe (price_…)
@@ -36,6 +38,17 @@ const UPSTREAMS = {
     secret: 'OPENAI_KEY',
     auth: key => ({ Authorization: `Bearer ${key}` }),
     paths: [/^\/v1\/audio\/transcriptions$/, /^\/v1\/audio\/speech$/, /^\/v1\/chat\/completions$/],
+  },
+  azure: {
+    // Voix neuronales Microsoft (offre gratuite F0 : 500 000 caractères par mois, jamais facturée).
+    base: env => `https://${String(env.AZURE_SPEECH_REGION || '').trim().toLowerCase()}.tts.speech.microsoft.com`,
+    secret: 'AZURE_SPEECH_KEY',
+    auth: key => ({
+      'Ocp-Apim-Subscription-Key': key,
+      'X-Microsoft-OutputFormat': 'audio-24khz-48kbitrate-mono-mp3',
+      'User-Agent': 'Haksou',
+    }),
+    paths: [/^\/cognitiveservices\/v1$/],
   },
   elevenlabs: {
     base: 'https://api.elevenlabs.io',
@@ -100,7 +113,8 @@ export default {
 
       const key = env[up.secret];
       if (!key) return reply({ error: `${up.secret} manquant dans les variables du relais.` }, 501);
-      return await forward(up, key, path, url, request, cors);
+      if (provider === 'azure' && !env.AZURE_SPEECH_REGION) return reply({ error: 'AZURE_SPEECH_REGION manquant dans les variables du relais.' }, 501);
+      return await forward(up, key, path, url, request, cors, env);
     } catch (err) {
       return reply({ error: err.message || 'Erreur du relais.' }, 500);
     }
@@ -111,13 +125,14 @@ export default {
 // Services d'IA
 // ---------------------------------------------------------------------------
 
-async function forward(up, key, path, url, request, cors) {
+async function forward(up, key, path, url, request, cors, env) {
   const headers = new Headers(up.auth(key));
   const type = request.headers.get('Content-Type');
   if (type) headers.set('Content-Type', type);
   const accept = request.headers.get('Accept');
   if (accept) headers.set('Accept', accept);
-  const upstream = await fetch(up.base + path + url.search, { method: 'POST', headers, body: request.body });
+  const base = typeof up.base === 'function' ? up.base(env) : up.base;
+  const upstream = await fetch(base + path + url.search, { method: 'POST', headers, body: request.body });
   const out = new Headers(cors);
   const outType = upstream.headers.get('Content-Type');
   if (outType) out.set('Content-Type', outType);
@@ -126,13 +141,18 @@ async function forward(up, key, path, url, request, cors) {
 
 function capabilities(env) {
   const stt = env.GROQ_KEY ? 'groq' : env.OPENAI_KEY ? 'openai' : null;
-  let tts;
-  if (env.TTS_PROVIDER === 'elevenlabs' && env.ELEVENLABS_KEY) tts = 'elevenlabs';
-  else if (env.TTS_PROVIDER === 'openai' && env.OPENAI_KEY) tts = 'openai';
-  else tts = env.ELEVENLABS_KEY ? 'elevenlabs' : env.OPENAI_KEY ? 'openai' : null;
+  // Voix disponibles, la gratuite (Azure) d'abord ; la suivante sert de secours si la première est épuisée.
+  const voices = [
+    env.AZURE_SPEECH_KEY && env.AZURE_SPEECH_REGION && 'azure',
+    env.ELEVENLABS_KEY && 'elevenlabs',
+    env.OPENAI_KEY && 'openai',
+  ].filter(Boolean);
+  const forced = voices.indexOf(String(env.TTS_PROVIDER || '').trim());
+  if (forced > 0) voices.unshift(...voices.splice(forced, 1));
   return {
     stt,
-    tts,
+    tts: voices[0] || null,
+    ttsBackup: voices[1] || null,
     billing: billingReady(env),
     family: Boolean(env.HAKSOU),
     trialDays: trialDays(env),

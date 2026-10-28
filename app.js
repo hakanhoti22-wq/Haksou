@@ -13,7 +13,7 @@ import { ttsProviderFor, ttsSupports, PROVIDER_NAMES } from './tts.js';
 
 const $ = id => document.getElementById(id);
 
-export const APP_VERSION = '21';
+export const APP_VERSION = '22';
 
 // ---------------------------------------------------------------------------
 // Stockage local
@@ -760,6 +760,7 @@ async function connectRelay({ quiet = false } = {}) {
     settings.relayInfo = {
       stt: info.stt || null,
       tts: info.tts || null,
+      ttsBackup: info.ttsBackup || null,
       billing: Boolean(info.billing),
       family: Boolean(info.family),
       trialDays: info.trialDays ?? 7,
@@ -1118,11 +1119,14 @@ const englishNames = (() => { try { return new Intl.DisplayNames(['en'], { type:
 
 /** Paramètres de la voix IA pour une langue, ou null (voix de l'appareil). */
 function neuralVoiceFor(language) {
-  const cred = ttsCred();
+  let cred = ttsCred();
+  // Voix de secours du relais (ex. ElevenLabs si la voix gratuite Azure est épuisée ou ne parle pas cette langue).
+  let backup = relay() && settings.relayInfo?.ttsBackup ? { provider: settings.relayInfo.ttsBackup, relay: relay() } : null;
+  if (cred && backup && !ttsSupports(cred.provider, language.code)) [cred, backup] = [backup, null];
   if (!cred || !ttsSupports(cred.provider, language.code)) return null;
   let langName = language.name;
   try { langName = englishNames?.of(language.iso || language.code.split('-')[0]) || langName; } catch { /* nom français */ }
-  return { cred, langCode: language.code, langName, gender: settings.voiceGender };
+  return { cred, backup, langCode: language.code, langName, gender: settings.voiceGender };
 }
 
 let neuralErrorShown = false;
@@ -2117,7 +2121,9 @@ function openWords(startReview) {
 
 function speakWord(text, code, slow = false) {
   Speaker.unlock();
-  return speakMessage({ id: 'word', to: code, translation: text }, 0, { free: true, rate: settings.rate * (slow ? 0.75 : 0.95) });
+  // Voix naturelle gratuite (Azure) si le relais l'offre ; sinon la voix de l'iPhone, pour ne pas consommer de crédits.
+  const free = settings.relayInfo?.tts !== 'azure';
+  return speakMessage({ id: 'word', to: code, translation: text }, 0, { free, rate: settings.rate * (slow ? 0.75 : 0.95) });
 }
 
 function renderWords() {
