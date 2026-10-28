@@ -1,6 +1,6 @@
 // Coach de langue : un partenaire de conversation IA qui répond dans la langue
 // apprise, corrige gentiment les erreurs et explique dans la langue de l'élève.
-// IA gratuite : Llama 3.3 sur Groq (offre gratuite), via le relais ou une clé.
+// IA gratuite : GPT-OSS sur Groq (offre gratuite), via le relais ou une clé.
 
 import { apiFetch } from './api.js';
 
@@ -22,8 +22,13 @@ export const SCENARIOS = {
 };
 
 const MODELS = {
-  groq: { path: '/openai/v1/chat/completions', model: 'llama-3.3-70b-versatile', fallback: 'llama-3.1-8b-instant' },
-  openai: { path: '/v1/chat/completions', model: 'gpt-4o-mini' },
+  // Groq a retiré Llama de l'offre gratuite (août 2026) : GPT-OSS le remplace.
+  // Modèle à raisonnement : effort minimal, et la réflexion compte dans la limite de longueur.
+  groq: {
+    path: '/openai/v1/chat/completions', model: 'openai/gpt-oss-120b', fallback: 'openai/gpt-oss-20b',
+    extra: { reasoning_effort: 'low', include_reasoning: false, max_completion_tokens: 1500 },
+  },
+  openai: { path: '/v1/chat/completions', model: 'gpt-4o-mini', extra: { max_tokens: 400 } },
 };
 
 export class CoachError extends Error {
@@ -75,7 +80,7 @@ export async function coachTurn({ cred, target, native, level, scenario, turns }
     messages.push(...turns.slice(-6)); // derniers échanges seulement : économise la limite gratuite
   }
 
-  const call = async (model) => {
+  const call = async (model, json = true) => {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 20000);
     try {
@@ -83,7 +88,10 @@ export async function coachTurn({ cred, target, native, level, scenario, turns }
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: ctrl.signal,
-        body: JSON.stringify({ model, messages, temperature: 0.7, max_tokens: 400, response_format: { type: 'json_object' } }),
+        body: JSON.stringify({
+          model, messages, temperature: 0.7, ...conf.extra,
+          ...(json && { response_format: { type: 'json_object' } }),
+        }),
       });
     } catch {
       throw new CoachError('network', navigator.onLine ? 'Le coach ne répond pas. Réessayez.' : 'Pas de connexion internet.');
@@ -93,8 +101,10 @@ export async function coachTurn({ cred, target, native, level, scenario, turns }
   };
 
   let res = await call(conf.model);
-  // Limite gratuite atteinte sur le grand modèle : on passe au modèle léger.
-  if (res.status === 429 && conf.fallback) res = await call(conf.fallback);
+  // JSON strict refusé par le modèle : on réessaie en texte libre (parseJson s'en charge).
+  if (res.status === 400) res = await call(conf.model, false);
+  // Limite gratuite atteinte ou modèle retiré : on passe au modèle léger.
+  if ((res.status === 429 || res.status === 404) && conf.fallback) res = await call(conf.fallback);
   if (res.status === 402) throw new CoachError('payment', 'Abonnement requis.');
   if (res.status === 401 || res.status === 403) throw new CoachError('key', 'Accès au coach refusé (compte ou clé non reconnu).');
   if (res.status === 429) throw new CoachError('quota', 'Le coach est très demandé. Réessayez dans une minute.');

@@ -97,7 +97,8 @@ async function google(text, from, to) {
 }
 
 const LLM = {
-  groq: { path: '/openai/v1/chat/completions', model: 'llama-3.3-70b-versatile' },
+  // GPT-OSS remplace Llama, retiré de l'offre gratuite de Groq (août 2026).
+  groq: { path: '/openai/v1/chat/completions', model: 'openai/gpt-oss-120b', extra: { reasoning_effort: 'low', include_reasoning: false } },
   openai: { path: '/v1/chat/completions', model: 'gpt-4o-mini' },
 };
 
@@ -114,6 +115,7 @@ async function llm(text, from, to, cred, nameOf) {
       body: JSON.stringify({
         model: p.model,
         temperature: 0,
+        ...p.extra,
         messages: [
           { role: 'system', content: `You are a professional translator. Translate the user's text from ${source} into ${nameOf(to)} (${to}). Reply with the translation only, without quotes, notes or explanations.` },
           { role: 'user', content: text },
