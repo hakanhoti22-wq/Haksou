@@ -1,0 +1,541 @@
+<title>Ninja des Toits</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Nunito:wght@600;800&display=swap">
+<style>
+  /* Plein écran : le canvas remplit tout, l'interface flotte par-dessus. Univers unique (coucher de soleil sur les toits). */
+  :root {
+    --night: #1d1730;
+    --dusk: #3b2a6b;
+    --ember: #f08a5d;
+    --gold: #ffcf7a;
+    --band: #e8483b;
+    --ink: #fff7ec;
+    --glass: rgba(29, 23, 48, 0.72);
+    --display: "Bungee", "Impact", system-ui, sans-serif;
+    --body: "Nunito", system-ui, -apple-system, sans-serif;
+    color-scheme: dark;
+  }
+  html, body { height: 100%; }
+  body {
+    background: var(--night);
+    color: var(--ink);
+    font-family: var(--body);
+    overflow: hidden;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #app { position: relative; width: 100%; height: 100%; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  .hud {
+    position: absolute; top: 0; left: 0; right: 0;
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+    padding-top: 12px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    pointer-events: none;
+  }
+  .stats { display: flex; gap: 10px; flex-wrap: wrap; }
+  .chip {
+    background: var(--glass); border-radius: 999px; padding: 6px 14px;
+    font-family: var(--display); font-size: 16px; letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+  }
+  .chip small { font-family: var(--body); font-weight: 800; font-size: 11px; opacity: 0.7; letter-spacing: 0.08em; text-transform: uppercase; margin-right: 6px; }
+  .tools { display: flex; gap: 8px; pointer-events: auto; }
+  .icon-btn {
+    width: 40px; height: 40px; border-radius: 50%; border: 0;
+    background: var(--glass); color: var(--ink); font-size: 18px; cursor: pointer;
+    font-family: var(--body); font-weight: 800;
+  }
+  .icon-btn:focus-visible, .big-btn:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+
+  .slide-btn {
+    position: absolute;
+    left: max(16px, env(safe-area-inset-left, 0px));
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    width: 92px; height: 92px; border-radius: 50%;
+    border: 3px solid rgba(255, 247, 236, 0.5);
+    background: var(--glass); color: var(--ink);
+    font-family: var(--display); font-size: 13px; line-height: 1.2;
+    display: grid; place-items: center; text-align: center;
+  }
+  .slide-btn.on { background: var(--band); border-color: var(--ink); }
+  .hint {
+    position: absolute; right: max(16px, env(safe-area-inset-right, 0px));
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    font-weight: 800; font-size: 13px; opacity: 0.75; pointer-events: none; text-align: right;
+  }
+
+  .overlay {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    background: rgba(29, 23, 48, 0.45);
+  }
+  .panel {
+    background: var(--glass); border-radius: 20px; padding: 24px 28px;
+    max-width: 360px; width: 100%; text-align: center;
+    display: flex; flex-direction: column; gap: 14px; align-items: center;
+    backdrop-filter: blur(6px);
+  }
+  .panel h1, .panel h2 {
+    margin: 0; font-family: var(--display); font-weight: 400; line-height: 1.05;
+    text-wrap: balance; color: var(--gold);
+  }
+  .panel h1 { font-size: 34px; }
+  .panel h1 span { color: var(--band); }
+  .panel h2 { font-size: 28px; }
+  .panel p { margin: 0; font-size: 15px; line-height: 1.45; }
+  .rules { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; text-align: left; }
+  .rules b { color: var(--gold); }
+  .result { display: flex; gap: 12px; justify-content: center; }
+  .result div { background: rgba(255,255,255,0.08); border-radius: 12px; padding: 8px 14px; }
+  .result small { display: block; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.7; }
+  .result strong { font-family: var(--display); font-weight: 400; font-size: 24px; font-variant-numeric: tabular-nums; }
+  .new-best { color: var(--gold); font-weight: 800; }
+  .big-btn {
+    border: 0; border-radius: 999px; padding: 14px 32px; cursor: pointer;
+    background: var(--band); color: var(--ink);
+    font-family: var(--display); font-size: 18px; letter-spacing: 0.04em;
+    box-shadow: 0 4px 0 #9e2a20;
+  }
+  .big-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #9e2a20; }
+  @media (prefers-reduced-motion: reduce) { .big-btn:active { transform: none; } }
+</style>
+
+<div id="app">
+  <canvas id="game"></canvas>
+
+  <div class="hud">
+    <div class="stats">
+      <div class="chip"><small>Score</small><span id="score">0</span></div>
+      <div class="chip"><small>Poissons</small><span id="fish">0</span></div>
+    </div>
+    <div class="tools">
+      <button class="icon-btn" id="mute" aria-label="Couper le son">♪</button>
+      <button class="icon-btn" id="pause" aria-label="Pause">II</button>
+    </div>
+  </div>
+
+  <button class="slide-btn" id="slideBtn" aria-label="Glisser">↓<br>Glisser</button>
+  <div class="hint" id="hint">Touche l'écran pour sauter<br>2× = double saut</div>
+
+  <div class="overlay" id="startScreen">
+    <div class="panel">
+      <h1>Ninja des <span>Toits</span></h1>
+      <p>Le chat ninja court sur les toits de la ville. Va le plus loin possible et attrape les poissons&nbsp;!</p>
+      <ul class="rules">
+        <li><b>Sauter</b> : touche l'écran, Espace ou ↑</li>
+        <li><b>Double saut</b> : touche encore en l'air</li>
+        <li><b>Glisser</b> : bouton ↓ ou flèche ↓ (pour passer sous les oiseaux)</li>
+        <li><b>Attention</b> aux cheminées et aux trous entre les toits</li>
+      </ul>
+      <button class="big-btn" id="playBtn">Jouer</button>
+      <p id="bestStart"></p>
+    </div>
+  </div>
+
+  <div class="overlay" id="overScreen" hidden>
+    <div class="panel">
+      <h2 id="overTitle">Aïe&nbsp;!</h2>
+      <div class="result">
+        <div><small>Score</small><strong id="finalScore">0</strong></div>
+        <div><small>Record</small><strong id="finalBest">0</strong></div>
+      </div>
+      <p class="new-best" id="newBest" hidden>Nouveau record&nbsp;!</p>
+      <button class="big-btn" id="againBtn">Rejouer</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="pauseScreen" hidden>
+    <div class="panel">
+      <h2>Pause</h2>
+      <button class="big-btn" id="resumeBtn">Continuer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const $ = id => document.getElementById(id);
+
+  // Monde logique : 360 unités de haut, largeur selon l'écran.
+  const VIEW_H = 360, GROUND = 292;
+  const GRAVITY = 2300, JUMP_V = -780, AIR_JUMP_V = -660;
+  let scale = 1, W = 640, dpr = 1;
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const r = canvas.getBoundingClientRect();
+    canvas.width = Math.round(r.width * dpr);
+    canvas.height = Math.round(r.height * dpr);
+    scale = canvas.height / VIEW_H;
+    W = canvas.width / scale;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // ---------- Stockage du record ----------
+  function loadBest() { try { return +localStorage.getItem('ninja-best') || 0; } catch { return 0; } }
+  function saveBest(v) { try { localStorage.setItem('ninja-best', String(v)); } catch {} }
+  let best = loadBest();
+  if (best) $('bestStart').textContent = 'Ton record : ' + best;
+
+  // ---------- Son ----------
+  let audio = null, muted = false;
+  function beep(freq, dur, type = 'square', vol = 0.06, slide = 0) {
+    if (muted) return;
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      const o = audio.createOscillator(), g = audio.createGain(), t = audio.currentTime;
+      o.type = type; o.frequency.setValueAtTime(freq, t);
+      if (slide) o.frequency.exponentialRampToValueAtTime(slide, t + dur);
+      g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g).connect(audio.destination); o.start(t); o.stop(t + dur);
+    } catch {}
+  }
+  const sfx = {
+    jump: () => beep(420, 0.15, 'square', 0.05, 760),
+    air: () => beep(600, 0.15, 'square', 0.05, 1100),
+    fish: () => { beep(988, 0.08, 'triangle', 0.07); setTimeout(() => beep(1318, 0.12, 'triangle', 0.07), 60); },
+    hit: () => beep(220, 0.45, 'sawtooth', 0.08, 60),
+  };
+
+  // ---------- Décor (bâtiments générés une fois) ----------
+  function makeSkyline(n, minW, maxW, minH, maxH) {
+    const arr = []; let x = 0;
+    for (let i = 0; i < n; i++) {
+      const w = minW + Math.random() * (maxW - minW);
+      arr.push({ x, w, h: minH + Math.random() * (maxH - minH), seed: Math.random() });
+      x += w + 4 + Math.random() * 10;
+    }
+    return { items: arr, width: x };
+  }
+  const far = makeSkyline(30, 30, 70, 60, 150);
+  const mid = makeSkyline(24, 50, 110, 40, 120);
+
+  // ---------- État du jeu ----------
+  let state = 'menu'; // menu | play | pause | over
+  let p, obstacles, fishes, particles, speed, dist, fishCount, elapsed, nextSpawn, scroll, slideHeld, shake;
+
+  function reset() {
+    p = { x: 90, by: GROUND, vy: 0, grounded: true, jumps: 0, falling: false, coyote: 0, run: 0, dead: false };
+    obstacles = []; fishes = []; particles = [];
+    speed = 320; dist = 0; fishCount = 0; elapsed = 0; nextSpawn = 500; scroll = 0; shake = 0;
+  }
+  reset();
+
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const playerH = () => (slideHeld && p.grounded ? 24 : 42);
+
+  function spawn() {
+    const x = W + 40;
+    const r = Math.random();
+    const canBird = elapsed > 8, canGap = elapsed > 15, hard = elapsed > 35;
+    if (canGap && r < 0.22) {
+      const w = rand(70, hard ? 130 : 105);
+      obstacles.push({ type: 'gap', x, w });
+      fishArc(x - 20, w + 40, GROUND - 90);
+    } else if (canBird && r < 0.45) {
+      obstacles.push({ type: 'bird', x, w: 38, h: 22, top: GROUND - 58, flap: Math.random() * 6 });
+      fishLine(x - 10, 4, GROUND - 14);
+    } else {
+      const tall = hard && Math.random() < 0.4;
+      obstacles.push({ type: 'chimney', x, w: 32, h: tall ? 66 : rand(36, 50) });
+      if (hard && Math.random() < 0.35) obstacles.push({ type: 'chimney', x: x + 140, w: 32, h: rand(36, 48) });
+      fishArc(x - 30, 92, GROUND - (tall ? 150 : 120));
+    }
+    if (Math.random() < 0.35) fishLine(x + 220, 5, GROUND - 22);
+  }
+  function fishLine(x, n, y) { for (let i = 0; i < n; i++) fishes.push({ x: x + i * 30, y, got: false }); }
+  function fishArc(x, w, peak) {
+    for (let i = 0; i < 5; i++) {
+      const t = i / 4;
+      fishes.push({ x: x + t * w, y: GROUND - 30 - (GROUND - 30 - peak) * Math.sin(Math.PI * t), got: false });
+    }
+  }
+
+  function overGap() {
+    const l = p.x + 10, r = p.x + 30;
+    return obstacles.some(o => o.type === 'gap' && l > o.x && r < o.x + o.w);
+  }
+
+  function jump() {
+    if (state !== 'play') return;
+    if (p.grounded || p.coyote > 0) {
+      p.vy = JUMP_V; p.jumps = 1; p.grounded = false; p.coyote = 0; sfx.jump(); dust(6);
+    } else if (p.jumps < 2 && !p.falling) {
+      p.vy = AIR_JUMP_V; p.jumps = 2; sfx.air();
+      for (let i = 0; i < 8; i++) particles.push({ x: p.x + 20, y: p.by, vx: rand(-80, 80), vy: rand(20, 120), life: 0.4, c: '#fff7ec', s: 3 });
+    }
+  }
+  function dust(n) {
+    for (let i = 0; i < n; i++) particles.push({ x: p.x + rand(5, 30), y: GROUND, vx: rand(-120, -20), vy: rand(-80, -10), life: 0.35, c: '#c9a0a0', s: 3 });
+  }
+
+  function die() {
+    if (p.dead) return;
+    p.dead = true; sfx.hit(); shake = 0.3;
+    const score = currentScore();
+    const isBest = score > best;
+    if (isBest) { best = score; saveBest(best); }
+    setTimeout(() => {
+      state = 'over';
+      $('finalScore').textContent = score;
+      $('finalBest').textContent = best;
+      $('newBest').hidden = !isBest;
+      $('overTitle').textContent = isBest ? 'Bravo !' : 'Aïe !';
+      $('overScreen').hidden = false;
+      $('againBtn').focus();
+    }, 650);
+  }
+  const currentScore = () => Math.floor(dist / 12) + fishCount * 5;
+
+  // ---------- Mise à jour ----------
+  function update(dt) {
+    elapsed += dt;
+    if (!p.dead) speed = Math.min(800, 320 + elapsed * 9);
+    const move = p.dead ? 0 : speed * dt;
+    dist += move; scroll += move;
+
+    nextSpawn -= move;
+    if (nextSpawn <= 0) { spawn(); nextSpawn = rand(330, 560) * (0.85 + speed / 1400); }
+
+    for (const o of obstacles) { o.x -= move; if (o.type === 'bird') o.flap += dt * 14; }
+    obstacles = obstacles.filter(o => o.x + o.w > -60);
+    for (const f of fishes) f.x -= move;
+    fishes = fishes.filter(f => f.x > -30 && !f.got);
+
+    // Joueur
+    const fastFall = slideHeld && !p.grounded ? 2.4 : 1;
+    p.vy += GRAVITY * fastFall * dt;
+    p.by += p.vy * dt;
+    const supported = !overGap();
+    if (!p.falling && supported && p.by >= GROUND && p.vy >= 0) {
+      if (!p.grounded) dust(4);
+      p.by = GROUND; p.vy = 0; p.grounded = true; p.jumps = 0; p.coyote = 0.09;
+    } else {
+      if (p.grounded) { p.jumps = 1; }
+      p.grounded = false;
+      p.coyote = Math.max(0, p.coyote - dt);
+    }
+    if (!supported && p.by > GROUND + 6) p.falling = true;
+    if (p.by > VIEW_H + 80 && !p.dead) die();
+    p.run += dt * speed / 40;
+
+    // Collisions
+    if (!p.dead) {
+      const h = playerH();
+      const box = { l: p.x + 7, r: p.x + 33, t: p.by - h + 4, b: p.by - 2 };
+      for (const o of obstacles) {
+        let ob = null;
+        if (o.type === 'chimney') ob = { l: o.x + 3, r: o.x + o.w - 3, t: GROUND - o.h + 3, b: GROUND };
+        if (o.type === 'bird') ob = { l: o.x + 4, r: o.x + o.w - 4, t: o.top + 3, b: o.top + o.h };
+        if (ob && box.l < ob.r && box.r > ob.l && box.t < ob.b && box.b > ob.t) { die(); break; }
+      }
+      // Bord d'un toit après une chute
+      if (p.falling && p.by > GROUND + 4 && supported) die();
+      for (const f of fishes) {
+        const cx = p.x + 20, cy = p.by - h / 2;
+        if (Math.abs(f.x - cx) < 24 && Math.abs(f.y - cy) < h / 2 + 12) {
+          f.got = true; fishCount++; sfx.fish();
+          for (let i = 0; i < 6; i++) particles.push({ x: f.x, y: f.y, vx: rand(-90, 90), vy: rand(-140, -30), life: 0.45, c: '#ffcf7a', s: 3 });
+        }
+      }
+    }
+
+    for (const q of particles) { q.x += q.vx * dt - move * 0.3; q.y += q.vy * dt; q.vy += 300 * dt; q.life -= dt; }
+    particles = particles.filter(q => q.life > 0);
+    if (p.grounded && !p.dead && Math.random() < dt * 8) dust(1);
+    shake = Math.max(0, shake - dt);
+
+    $('score').textContent = currentScore();
+    $('fish').textContent = fishCount;
+  }
+
+  // ---------- Dessin ----------
+  function drawSky() {
+    const g = ctx.createLinearGradient(0, 0, 0, GROUND);
+    g.addColorStop(0, '#2a1f55'); g.addColorStop(0.5, '#6b3a78'); g.addColorStop(0.82, '#f08a5d'); g.addColorStop(1, '#ffcf7a');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, VIEW_H);
+    ctx.fillStyle = 'rgba(255, 220, 150, 0.9)';
+    ctx.beginPath(); ctx.arc(W * 0.72, GROUND - 70, 46, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    for (let i = 0; i < 24; i++) { const sx = (i * 137.5) % W, sy = (i * 53) % 110; ctx.fillRect(sx, sy, 1.5, 1.5); }
+  }
+  function drawSkyline(sk, factor, base, color, windows) {
+    const off = (scroll * factor) % sk.width;
+    ctx.fillStyle = color;
+    for (let rep = 0; rep * sk.width - off < W + 120; rep++) {
+      for (const b of sk.items) {
+        const x = b.x + rep * sk.width - off;
+        if (x > W || x + b.w < 0) continue;
+        ctx.fillStyle = color;
+        ctx.fillRect(x, base - b.h, b.w, b.h + 200);
+        if (windows) {
+          for (let wy = base - b.h + 10; wy < base - 8; wy += 16)
+            for (let wx = x + 7; wx < x + b.w - 10; wx += 14) {
+              const lit = ((wx - x) * 7 + wy * 3 + b.seed * 100) % 5 < 1.3;
+              if (lit) { ctx.fillStyle = 'rgba(255, 207, 122, 0.75)'; ctx.fillRect(wx, wy, 6, 8); }
+            }
+        }
+      }
+    }
+  }
+  function drawRoof() {
+    const gaps = obstacles.filter(o => o.type === 'gap').sort((a, b) => a.x - b.x);
+    let x = 0;
+    const seg = (a, b) => {
+      if (b <= a) return;
+      ctx.fillStyle = '#1d1730'; ctx.fillRect(a, GROUND, b - a, VIEW_H - GROUND);
+      ctx.fillStyle = '#7a4a5a'; ctx.fillRect(a, GROUND, b - a, 7);
+      ctx.fillStyle = '#9c5f6c';
+      const off = scroll % 24;
+      for (let tx = a - ((a + off) % 24); tx < b; tx += 24) ctx.fillRect(Math.max(a, tx), GROUND, Math.min(10, b - Math.max(a, tx)), 3);
+    };
+    for (const g of gaps) { seg(x, g.x); x = g.x + g.w; }
+    seg(x, W);
+  }
+  function drawChimney(o) {
+    const top = GROUND - o.h;
+    ctx.fillStyle = '#8c3b35'; ctx.fillRect(o.x, top, o.w, o.h);
+    ctx.fillStyle = '#6e2c28';
+    for (let y = top + 8; y < GROUND; y += 10) ctx.fillRect(o.x, y, o.w, 2);
+    ctx.fillStyle = '#3a2a3a'; ctx.fillRect(o.x - 4, top - 6, o.w + 8, 8);
+  }
+  function drawBird(o) {
+    const cx = o.x + o.w / 2, cy = o.top + o.h / 2, wing = Math.sin(o.flap) * 9;
+    ctx.fillStyle = '#2b2440';
+    ctx.beginPath(); ctx.ellipse(cx, cy, 15, 8, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(cx - 4, cy - 2); ctx.lineTo(cx + 6, cy - 2); ctx.lineTo(cx + 1, cy - 12 - wing); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#ffcf7a'; ctx.beginPath(); ctx.moveTo(cx - 15, cy); ctx.lineTo(cx - 23, cy + 2); ctx.lineTo(cx - 15, cy + 4); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.fillRect(cx - 10, cy - 4, 3, 3);
+  }
+  function drawFish(f, t) {
+    const bob = Math.sin(t * 5 + f.x * 0.05) * 2;
+    ctx.save(); ctx.translate(f.x, f.y + bob);
+    ctx.fillStyle = '#ffcf7a';
+    ctx.beginPath(); ctx.ellipse(0, 0, 9, 5.5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-7, 0); ctx.lineTo(-14, -5); ctx.lineTo(-14, 5); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#1d1730'; ctx.fillRect(4, -2, 2, 2);
+    ctx.restore();
+  }
+  function drawCat(t) {
+    const h = playerH(), sliding = h < 30;
+    const x = p.x, b = p.by;
+    ctx.save();
+    if (p.dead) { ctx.translate(x + 20, b - h / 2); ctx.rotate(t * 10); ctx.translate(-(x + 20), -(b - h / 2)); }
+    const body = '#2b2a33';
+    // Queue
+    ctx.strokeStyle = body; ctx.lineWidth = 5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x + 4, b - h * 0.55);
+    ctx.quadraticCurveTo(x - 10, b - h * 0.8 + Math.sin(p.run) * 6, x - 6, b - h - 4 + Math.sin(p.run * 0.7) * 4); ctx.stroke();
+    // Pattes
+    if (!sliding) {
+      const s = p.grounded ? Math.sin(p.run) * 6 : 3;
+      ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.moveTo(x + 12, b - 10); ctx.lineTo(x + 12 + s, b - 1); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x + 28, b - 10); ctx.lineTo(x + 28 - s, b - 1); ctx.stroke();
+    }
+    // Corps
+    ctx.fillStyle = body;
+    const bodyH = sliding ? 16 : 22;
+    roundRect(x + 4, b - (sliding ? 18 : 30), 30, bodyH, 9); ctx.fill();
+    // Tête
+    const hx = x + (sliding ? 36 : 30), hy = b - (sliding ? 14 : 34);
+    ctx.beginPath(); ctx.arc(hx, hy, 11, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(hx - 9, hy - 5); ctx.lineTo(hx - 7, hy - 18); ctx.lineTo(hx - 1, hy - 9); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(hx + 1, hy - 9); ctx.lineTo(hx + 7, hy - 18); ctx.lineTo(hx + 9, hy - 5); ctx.fill();
+    // Bandeau ninja
+    ctx.fillStyle = '#e8483b'; ctx.fillRect(hx - 11, hy - 5, 22, 5);
+    ctx.strokeStyle = '#e8483b'; ctx.lineWidth = 3;
+    const wave = Math.sin(t * 18) * 4;
+    ctx.beginPath(); ctx.moveTo(hx - 10, hy - 3); ctx.lineTo(hx - 24, hy - 6 + wave); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(hx - 10, hy - 2); ctx.lineTo(hx - 22, hy + 3 - wave); ctx.stroke();
+    // Yeux
+    ctx.fillStyle = p.dead ? '#fff7ec' : '#ffcf7a';
+    if (p.dead) { ctx.font = 'bold 8px sans-serif'; ctx.fillText('x', hx + 1, hy + 4); ctx.fillText('x', hx + 6, hy + 4); }
+    else { ctx.fillRect(hx + 2, hy + 1, 3, 3); ctx.fillRect(hx + 7, hy + 1, 3, 3); }
+    ctx.restore();
+  }
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+
+  function draw(t) {
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    if (shake > 0) ctx.translate(rand(-4, 4) * shake * 3, rand(-4, 4) * shake * 3);
+    drawSky();
+    drawSkyline(far, 0.15, GROUND - 20, '#4a3570', false);
+    drawSkyline(mid, 0.4, GROUND + 10, '#2e2350', true);
+    drawRoof();
+    for (const o of obstacles) { if (o.type === 'chimney') drawChimney(o); if (o.type === 'bird') drawBird(o); }
+    for (const f of fishes) drawFish(f, t);
+    drawCat(t);
+    for (const q of particles) { ctx.globalAlpha = Math.max(0, q.life * 2.5); ctx.fillStyle = q.c; ctx.fillRect(q.x, q.y, q.s, q.s); }
+    ctx.globalAlpha = 1;
+  }
+
+  // ---------- Boucle ----------
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.033, (now - last) / 1000); last = now;
+    if (state === 'play') update(dt);
+    else if (state === 'menu') { scroll += 60 * dt; p.run += dt * 6; }
+    draw(now / 1000);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // ---------- Contrôles ----------
+  function start() {
+    reset(); state = 'play';
+    $('startScreen').hidden = true; $('overScreen').hidden = true; $('pauseScreen').hidden = true;
+    setTimeout(() => { $('hint').hidden = true; }, 5000);
+  }
+  function setPause(on) {
+    if (on && state === 'play') { state = 'pause'; $('pauseScreen').hidden = false; }
+    else if (!on && state === 'pause') { state = 'play'; last = performance.now(); $('pauseScreen').hidden = true; }
+  }
+
+  $('playBtn').addEventListener('click', start);
+  $('againBtn').addEventListener('click', start);
+  $('resumeBtn').addEventListener('click', () => setPause(false));
+  $('pause').addEventListener('click', e => { e.stopPropagation(); setPause(state === 'play'); });
+  $('mute').addEventListener('click', e => {
+    e.stopPropagation(); muted = !muted;
+    $('mute').textContent = muted ? '×' : '♪';
+    $('mute').setAttribute('aria-label', muted ? 'Activer le son' : 'Couper le son');
+  });
+
+  canvas.addEventListener('pointerdown', e => { e.preventDefault(); jump(); });
+  const sb = $('slideBtn');
+  const slideOn = e => { e.preventDefault(); slideHeld = true; sb.classList.add('on'); };
+  const slideOff = () => { slideHeld = false; sb.classList.remove('on'); };
+  sb.addEventListener('pointerdown', slideOn);
+  sb.addEventListener('pointerup', slideOff);
+  sb.addEventListener('pointercancel', slideOff);
+  sb.addEventListener('pointerleave', slideOff);
+
+  window.addEventListener('keydown', e => {
+    if (['Space', 'ArrowUp', 'KeyW'].includes(e.code)) {
+      e.preventDefault();
+      if (state === 'menu' || state === 'over') { if (!e.repeat && state === 'menu') start(); return; }
+      if (!e.repeat) jump();
+    } else if (['ArrowDown', 'KeyS'].includes(e.code)) {
+      e.preventDefault(); slideHeld = true; sb.classList.add('on');
+    } else if (e.code === 'KeyP' || e.code === 'Escape') {
+      setPause(state === 'play');
+    }
+  });
+  window.addEventListener('keyup', e => { if (['ArrowDown', 'KeyS'].includes(e.code)) slideOff(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) setPause(true); });
+})();
+</script>
