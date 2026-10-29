@@ -13,7 +13,7 @@ import { ttsProviderFor, ttsSupports, PROVIDER_NAMES } from './tts.js';
 
 const $ = id => document.getElementById(id);
 
-export const APP_VERSION = '22';
+export const APP_VERSION = '23';
 
 // ---------------------------------------------------------------------------
 // Stockage local
@@ -848,7 +848,7 @@ async function handleIncomingLinks() {
     if (account.token) {
       try {
         await account.confirm(paid);
-        toast('Merci ! Votre abonnement Haksou est actif. 🎉');
+        toast(account.info?.lifetime ? 'Merci ! Haksou est à vous, pour toujours. 🎉' : 'Merci ! Votre abonnement Haksou est actif. 🎉');
       } catch (err) {
         toast(err.message);
       }
@@ -861,7 +861,27 @@ async function handleIncomingLinks() {
   if (billingOn() && !account.token) openAccountSheet('welcome');
 }
 
-const STATUS_LABELS = { trial: 'Essai', monthly: 'Mensuel', yearly: 'Annuel', family: 'Famille', expired: 'Expiré' };
+const STATUS_LABELS = { trial: 'Essai', monthly: 'Mensuel', quarterly: 'Trimestriel', yearly: 'Annuel', lifetime: 'À vie', family: 'Famille', expired: 'Expiré' };
+const PLAN_ORDER = ['yearly', 'lifetime', 'quarterly', 'monthly'];
+const PLAN_INFO = {
+  quarterly: { name: 'Trimestriel', sub: 'Sans engagement' },
+  yearly: { name: 'Annuel', sub: 'Le meilleur rapport' },
+  lifetime: { name: 'À vie', sub: 'Payez une fois, c\'est à vous pour toujours' },
+  monthly: { name: 'Mensuel', sub: 'Sans engagement' },
+};
+/** « 3,50 CHF tous les 3 mois, 11 CHF par an ou 23 CHF une seule fois » */
+function priceSummary(info) {
+  const parts = ['monthly', 'quarterly', 'yearly', 'lifetime']
+    .filter(p => offeredPlans(info).includes(p))
+    .map(p => `${PRICES[p].label} ${PRICES[p].period}`);
+  return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} ou ${parts[parts.length - 1]}` : parts.join('');
+}
+
+/** Formules proposées par le relais (les anciens relais ne connaissent que mensuel et annuel). */
+const offeredPlans = info => {
+  const list = PLAN_ORDER.filter(p => info.plans?.[p]);
+  return list.length ? list : ['yearly', 'monthly'];
+};
 
 /** Tableau de bord du propriétaire : chiffres clés et liste des comptes. */
 async function renderStats() {
@@ -877,24 +897,28 @@ async function renderStats() {
   }
   const c = data.counts;
   const day = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' });
-  const paying = c.monthly + c.yearly;
-  const revenue = (c.monthly * 0.95 + c.yearly * 9.95 / 12).toFixed(2).replace('.', ',');
+  const n = k => c[k] || 0;
+  const paying = n('monthly') + n('quarterly') + n('yearly') + n('lifetime');
+  const chf = v => v.toFixed(2).replace('.', ',');
+  const perMonth = ['monthly', 'quarterly', 'yearly'].reduce((sum, k) => sum + n(k) * PRICES[k].amount / PRICES[k].months, 0);
+  const revenue = chf(perMonth);
   body.innerHTML = `
     <div class="stats-grid">
       <div class="stat hl"><b>${c.total}</b><span>Utilisateurs</span></div>
       <div class="stat"><b>${c.newThisWeek}</b><span>Nouveaux (7 j)</span></div>
-      <div class="stat hl"><b>${paying}</b><span>Abonnés</span></div>
+      <div class="stat hl"><b>${paying}</b><span>Clients</span></div>
       <div class="stat"><b>${c.trial}</b><span>En essai</span></div>
-      <div class="stat"><b>${c.monthly} / ${c.yearly}</b><span>Mensuel / Annuel</span></div>
+      <div class="stat"><b>${n('quarterly') + n('monthly')} / ${n('yearly')} / ${n('lifetime')}</b><span>3 mois / An / À vie</span></div>
       <div class="stat"><b>${c.family}</b><span>Famille</span></div>
     </div>
-    <p class="fine" style="margin:0 0 12px">≈ ${revenue} CHF de revenus par mois (avant frais Stripe) · ${c.expired} essai(s) expiré(s)</p>
+    <p class="fine" style="margin:0 0 12px">≈ ${revenue} CHF par mois d'abonnements${n('lifetime') ? ` + ${chf(n('lifetime') * PRICES.lifetime.amount)} CHF d'achats à vie` : ''} (avant frais Stripe) · ${c.expired} essai(s) expiré(s)</p>
     <input class="text-input stats-search" id="statsSearch" type="search" placeholder="Rechercher un e-mail" autocomplete="off" autocapitalize="off">
     <div class="group" id="statsList"></div>`;
   const list = $('statsList');
   const detail = u => {
     if (u.status === 'trial' && u.trialEndsAt) return `Essai jusqu'au ${day.format(new Date(u.trialEndsAt))}`;
-    if ((u.status === 'monthly' || u.status === 'yearly') && u.periodEnd) return `${u.cancelAtPeriodEnd ? 'Se termine' : 'Renouvellement'} le ${day.format(new Date(u.periodEnd))}`;
+    if (u.status === 'lifetime') return 'Accès à vie';
+    if (['monthly', 'quarterly', 'yearly'].includes(u.status) && u.periodEnd) return `${u.cancelAtPeriodEnd ? 'Se termine' : 'Renouvellement'} le ${day.format(new Date(u.periodEnd))}`;
     if (u.status === 'family') return u.name ? `Invité : ${u.name}` : 'Invité';
     return u.created ? `Inscrit le ${day.format(new Date(u.created))}` : '';
   };
@@ -999,7 +1023,7 @@ function renderAccount(view) {
       <div class="acct-hero">
         <div class="empty-orb"></div>
         <h3>Essayez Haksou<br><em>${days} jours gratuits</em></h3>
-        <p>Sans carte bancaire. Ensuite ${PRICES.monthly.label} ${PRICES.monthly.period} ou ${PRICES.yearly.label} ${PRICES.yearly.period}.</p>
+        <p>Sans carte bancaire. Ensuite ${priceSummary(info)}.</p>
       </div>
       <ul class="acct-perks">
         <li>Micro fiable qui s'arrête tout seul</li>
@@ -1067,26 +1091,26 @@ function renderAccount(view) {
 
   // Abonnement
   accountSheet.title.textContent = 'Abonnement';
-  const plans = ['yearly', 'monthly'].filter(p => info.plans?.[p] !== false);
+  const plans = offeredPlans(info);
   if (!plans.includes(selectedPlan)) selectedPlan = plans[0];
   const expired = account.info && !account.info.active;
   body.innerHTML = `
     <div class="acct-hero">
       <div class="empty-orb"></div>
       <h3>${expired ? 'Votre essai est terminé.<br><em>Continuez avec Haksou.</em>' : 'Haksou,<br><em>sans limite.</em>'}</h3>
-      <p>Micro fiable, voix naturelle et 193 langues. Résiliable à tout moment.</p>
+      <p>Micro fiable, voix naturelle, coach de langue et 193 langues. Abonnements résiliables à tout moment.</p>
     </div>
     <div class="plans" role="radiogroup" aria-label="Formule">
       ${plans.map(p => `
         <button class="plan" role="radio" data-plan="${p}" aria-checked="${p === selectedPlan}">
           ${PRICES[p].badge ? `<span class="plan-badge">${PRICES[p].badge}</span>` : ''}
-          <span><span class="plan-name">${p === 'yearly' ? 'Annuel' : 'Mensuel'}</span><br><span class="plan-sub">${p === 'yearly' ? 'Le meilleur prix' : 'Sans engagement'}</span></span>
+          <span><span class="plan-name">${PLAN_INFO[p].name}</span><br><span class="plan-sub">${PLAN_INFO[p].sub}</span></span>
           <span class="plan-price">${PRICES[p].label}<br><small>${PRICES[p].period}</small></span>
         </button>`).join('')}
     </div>
     <button class="cta" id="acctPay">Continuer</button>
     <button class="link-btn" id="acctToRestore">Restaurer un abonnement</button>
-    <p class="fine">Paiement sécurisé par Stripe (carte, Apple Pay, Google Pay). Gérer ou résilier : Réglages → Mon abonnement.</p>`;
+    <p class="fine">Paiement sécurisé par Stripe (carte, Apple Pay, Google Pay). Abonnement : gérer ou résilier dans Réglages → Mon abonnement. « À vie » : un seul paiement, sans renouvellement.</p>`;
   body.querySelectorAll('.plan').forEach(btn => btn.addEventListener('click', () => {
     selectedPlan = btn.dataset.plan;
     body.querySelectorAll('.plan').forEach(b => b.setAttribute('aria-checked', String(b === btn)));
@@ -1734,13 +1758,13 @@ function initSettings() {
     const i = account.info;
     const pill = $('subStatus');
     const kind = !account.token ? 'none' : i?.kind || 'none';
-    pill.textContent = { none: 'Aucun compte', trial: 'Essai gratuit', sub: i?.plan === 'yearly' ? 'Annuel' : 'Mensuel', family: 'Famille', revoked: 'Accès retiré', expired: 'Expiré' }[kind];
+    pill.textContent = { none: 'Aucun compte', trial: 'Essai gratuit', sub: PLAN_INFO[i?.plan]?.name || 'Abonné', family: 'Famille', revoked: 'Accès retiré', expired: 'Expiré' }[kind];
     pill.classList.toggle('on', Boolean(i?.active));
     const daysLeft = i?.trialEndsAt ? Math.max(0, Math.ceil((i.trialEndsAt - Date.now()) / 864e5)) : 0;
     $('subDetail').textContent = {
       none: 'Commencez l\'essai gratuit pour utiliser Haksou.',
       trial: `${daysLeft} jour${daysLeft > 1 ? 's' : ''} d'essai restant${daysLeft > 1 ? 's' : ''}.`,
-      sub: i?.periodEnd ? `${i.cancelAtPeriodEnd ? 'Se termine' : 'Renouvellement'} le ${dateFmt.format(new Date(i.periodEnd))}.` : 'Abonnement actif.',
+      sub: i?.lifetime ? 'Accès à vie. Merci ! 🎉' : i?.periodEnd ? `${i.cancelAtPeriodEnd ? 'Se termine' : 'Renouvellement'} le ${dateFmt.format(new Date(i.periodEnd))}.` : 'Abonnement actif.',
       family: `Accès familial gratuit${i?.name ? ` (${i.name})` : ''}. Merci qui ? 😉`,
       revoked: 'L\'accès familial a été retiré. Vous pouvez vous abonner.',
       expired: 'Abonnez-vous pour continuer à utiliser Haksou.',
@@ -1754,7 +1778,8 @@ function initSettings() {
   $('subscribeBtn').addEventListener('click', () => openAccountSheet(account.token ? 'paywall' : 'welcome'));
   $('statsBtn').addEventListener('click', () => openAccountSheet('stats'));
   $('deleteAccountBtn').addEventListener('click', async () => {
-    if (!confirm('Supprimer définitivement votre compte Haksou et vos données (e-mail, essai, statut) ? Cette action est irréversible.')) return;
+    const lifetimeWarning = account.info?.lifetime ? '\n\nAttention : votre achat « à vie » sera perdu.' : '';
+    if (!confirm(`Supprimer définitivement votre compte Haksou et vos données (e-mail, essai, statut) ? Cette action est irréversible.${lifetimeWarning}`)) return;
     try {
       await account.call('/account/delete', {});
       account.forget();

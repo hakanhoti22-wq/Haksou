@@ -1,7 +1,7 @@
 # Haksou — activer l'essai gratuit et les abonnements
 
 Résultat : toute personne qui ouvre l'app a **7 jours gratuits**, puis choisit
-**0,95 CHF / mois** ou **9,95 CHF / an**. Ta famille, invitée par toi, a l'app **gratuite** sans rien configurer.
+**3,50 CHF tous les 3 mois**, **11 CHF / an** ou **23 CHF à vie** (paiement unique). Ta famille, invitée par toi, a l'app **gratuite** sans rien configurer.
 Tes clés (Groq, ElevenLabs) restent cachées sur ton relais Cloudflare.
 
 > Commence en **mode test** de Stripe (faux paiements), vérifie que tout marche, puis passe en mode réel.
@@ -14,12 +14,14 @@ Tes clés (Groq, ElevenLabs) restent cachées sur ton relais Cloudflare.
 2. En haut, vérifie que l'interrupteur **Test mode** (ou « Sandbox ») est **activé**.
 3. **Product catalog** → **+ Add product** :
    - **Name** : `Haksou`
-   - **Pricing** : *Recurring* · **0.95** · **CHF** · **Monthly** → **Add product**
-4. Dans la fiche du produit Haksou → **+ Add another price** :
-   - *Recurring* · **9.95** · **CHF** · **Yearly** → **Save**
+   - **Pricing** : *Recurring* · **3.50** · **CHF** · **Every 3 months** (*Custom* : 3 months) → **Add product**
+4. Dans la fiche du produit Haksou → **+ Add another price**, deux fois :
+   - *Recurring* · **11** · **CHF** · **Yearly** → **Save**
+   - *One-off* (paiement unique) · **23** · **CHF** → **Save** ← la formule « à vie »
 5. Copie l'**identifiant de chaque prix** (il commence par `price_…`, bouton ⋯ → *Copy price ID*) :
-   - mensuel → pour `PRICE_MONTHLY`
+   - 3 mois → pour `PRICE_QUARTERLY`
    - annuel → pour `PRICE_YEARLY`
+   - à vie → pour `PRICE_LIFETIME`
 6. **Developers** → **API keys** → **Secret key** → *Reveal* → copie (`sk_test_…`) → pour `STRIPE_SECRET_KEY`.
 7. **Settings** → **Billing** → **Customer portal** → **Activate** (autorise « Cancel subscriptions »).
    C'est la page où les abonnés gèrent ou résilient.
@@ -38,8 +40,9 @@ Tes clés (Groq, ElevenLabs) restent cachées sur ton relais Cloudflare.
 | Nom | Valeur |
 | --- | --- |
 | `STRIPE_SECRET_KEY` | `sk_test_…` (étape 1.6) |
-| `PRICE_MONTHLY` | `price_…` du prix mensuel |
+| `PRICE_QUARTERLY` | `price_…` du prix 3 mois |
 | `PRICE_YEARLY` | `price_…` du prix annuel |
+| `PRICE_LIFETIME` | `price_…` du prix à vie (paiement unique) |
 | `ALLOWED_ORIGIN` | `https://hakanhoti22-wq.github.io` |
 
    (Garde `ACCESS_CODE`, `GROQ_KEY`, `ELEVENLABS_KEY` déjà présents.) → **Deploy**.

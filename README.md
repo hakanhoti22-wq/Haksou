@@ -26,7 +26,7 @@ La clé reste sur le téléphone et n'est envoyée qu'à Groq. Elle sert aussi d
 
 Le dossier [`relay/`](relay/) contient un petit serveur gratuit (Cloudflare Worker) qui garde vos clés cachées. Vos proches ouvrent votre **lien famille** et le micro fiable + la voix naturelle fonctionnent sans clé.
 Mise en place pas à pas : [`relay/LISEZMOI.md`](relay/LISEZMOI.md).
-Essai gratuit de 7 jours, abonnements (0,95 CHF/mois, 9,95 CHF/an) et invitations famille : [`relay/ABONNEMENTS.md`](relay/ABONNEMENTS.md).
+Essai gratuit de 7 jours, formules (3,50 CHF / 3 mois, 11 CHF / an, 23 CHF à vie) et invitations famille : [`relay/ABONNEMENTS.md`](relay/ABONNEMENTS.md).
 
 ## Voix naturelle (IA)
 

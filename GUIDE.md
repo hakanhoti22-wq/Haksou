@@ -91,7 +91,7 @@ La page doit afficher : **« Relais Haksou opérationnel. »** → copie l'adres
 
 Guide complet : **relay/ABONNEMENTS.md** (Stripe, base de données Cloudflare, tests, passage en vrais paiements).
 
-- Public : **7 jours gratuits**, puis **0,95 CHF / mois** ou **9,95 CHF / an**.
+- Public : **7 jours gratuits**, puis **3,50 CHF / 3 mois**, **11 CHF / an** ou **23 CHF à vie**.
 - Famille : **⚙︎ → Propriétaire → Inviter un proche (gratuit)** → envoyer le lien → rien à configurer chez eux.
 - Retirer un proche : **⚙︎ → Propriétaire → Retirer**.
 

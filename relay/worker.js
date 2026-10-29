@@ -13,8 +13,10 @@
 //   AZURE_SPEECH_REGION région du service Azure, ex. « westeurope » (avec la clé ci-dessus)
 //   TTS_PROVIDER       « azure », « elevenlabs » ou « openai » pour forcer la voix principale
 //   STRIPE_SECRET_KEY  clé secrète Stripe sk_live_… (ou sk_test_… pour essayer)
-//   PRICE_MONTHLY      identifiant du prix mensuel Stripe (price_…)
-//   PRICE_YEARLY       identifiant du prix annuel Stripe (price_…)
+//   PRICE_QUARTERLY    identifiant du prix « tous les 3 mois » Stripe (price_…, récurrent)
+//   PRICE_YEARLY       identifiant du prix annuel Stripe (price_…, récurrent)
+//   PRICE_LIFETIME     identifiant du prix « à vie » Stripe (price_…, paiement unique)
+//   PRICE_MONTHLY      (ancien) prix mensuel ; proposé seulement sans PRICE_QUARTERLY
 //   TRIAL_DAYS         durée de l'essai gratuit (défaut : 7)
 //   DAILY_LIMIT        requêtes par personne et par jour (défaut : 300)
 //   STRIPE_API_VERSION version de l'API Stripe (défaut : 2025-03-31.basil)
@@ -59,6 +61,8 @@ const UPSTREAMS = {
 };
 
 const DAY = 24 * 60 * 60 * 1000;
+// Formules et variable Stripe correspondante.
+const PLAN_PRICES = { monthly: 'PRICE_MONTHLY', quarterly: 'PRICE_QUARTERLY', yearly: 'PRICE_YEARLY', lifetime: 'PRICE_LIFETIME' };
 const ACTIVE_SUB = new Set(['active', 'trialing', 'past_due']);
 const MAX_INVITE_DEVICES = 4;
 
@@ -156,11 +160,16 @@ function capabilities(env) {
     billing: billingReady(env),
     family: Boolean(env.HAKSOU),
     trialDays: trialDays(env),
-    plans: { monthly: Boolean(env.PRICE_MONTHLY), yearly: Boolean(env.PRICE_YEARLY) },
+    plans: {
+      quarterly: Boolean(env.PRICE_QUARTERLY),
+      yearly: Boolean(env.PRICE_YEARLY),
+      lifetime: Boolean(env.PRICE_LIFETIME),
+      monthly: Boolean(env.PRICE_MONTHLY && !env.PRICE_QUARTERLY),
+    },
   };
 }
 
-const billingReady = env => Boolean(env.HAKSOU && env.STRIPE_SECRET_KEY && (env.PRICE_MONTHLY || env.PRICE_YEARLY));
+const billingReady = env => Boolean(env.HAKSOU && env.STRIPE_SECRET_KEY && Object.values(PLAN_PRICES).some(k => env[k]));
 const trialDays = env => Math.max(0, parseInt(env.TRIAL_DAYS || '7', 10) || 0);
 
 // ---------------------------------------------------------------------------
@@ -168,7 +177,8 @@ const trialDays = env => Math.max(0, parseInt(env.TRIAL_DAYS || '7', 10) || 0);
 // ---------------------------------------------------------------------------
 // KV :
 //   user:<token>     → { token, kind, email, name, created, trialEndsAt, invite,
-//                        customer, subscription, subStatus, periodEnd, plan, checkedAt }
+//                        customer, subscription, subStatus, periodEnd, plan, checkedAt,
+//                        lifetime, lifetimeSession }
 //   email:<email>    → token
 //   invite:<code>    → { code, name, created, devices: [token…], revoked }
 //   usage:<token>:<jour> → nombre de requêtes
@@ -185,7 +195,7 @@ async function accountRoutes(path, request, env, token, reply) {
       const existing = await getUser(env, existingToken);
       if (existing) {
         // Un compte payant ne se récupère qu'avec son code de récupération.
-        if (existing.subscription) return reply({ error: 'Cet e-mail a déjà un abonnement. Utilisez « Restaurer » avec votre code de récupération.' }, 409);
+        if (existing.subscription || existing.lifetime) return reply({ error: 'Cet e-mail a déjà un abonnement. Utilisez « Restaurer » avec votre code de récupération.' }, 409);
         const access = await computeAccess(env, existing);
         return reply({ token: existingToken, account: publicAccount(existing, access) });
       }
@@ -230,11 +240,15 @@ async function accountRoutes(path, request, env, token, reply) {
 
   // Ouvrir la page de paiement Stripe
   if (path === '/billing/checkout' && request.method === 'POST') {
-    const price = body.plan === 'yearly' ? env.PRICE_YEARLY : env.PRICE_MONTHLY;
+    const plan = PLAN_PRICES[body.plan] ? body.plan : 'yearly';
+    const price = env[PLAN_PRICES[plan]];
     if (!price) return reply({ error: 'Formule indisponible.' }, 400);
+    if (user.lifetime) return reply({ error: 'Vous avez déjà l\'accès à vie. 🎉' }, 409);
+    const lifetime = plan === 'lifetime';
     const returnUrl = safeReturnUrl(body.returnUrl, request, env);
     const params = {
-      mode: 'subscription',
+      // « À vie » : un paiement unique ; les autres formules : un abonnement.
+      mode: lifetime ? 'payment' : 'subscription',
       'line_items[0][price]': price,
       'line_items[0][quantity]': '1',
       client_reference_id: user.token,
@@ -243,10 +257,15 @@ async function accountRoutes(path, request, env, token, reply) {
       allow_promotion_codes: 'true',
       locale: 'auto',
       'metadata[token]': user.token,
-      'subscription_data[metadata][token]': user.token,
+      'metadata[plan]': plan,
     };
+    if (lifetime) params['payment_intent_data[metadata][token]'] = user.token;
+    else params['subscription_data[metadata][token]'] = user.token;
     if (user.customer) params.customer = user.customer;
-    else if (user.email) params.customer_email = user.email;
+    else {
+      if (user.email) params.customer_email = user.email;
+      if (lifetime) params.customer_creation = 'always';
+    }
     const session = await stripe(env, 'POST', '/checkout/sessions', params);
     return reply({ url: session.url });
   }
@@ -257,6 +276,21 @@ async function accountRoutes(path, request, env, token, reply) {
     if (!/^cs_[A-Za-z0-9_]+$/.test(id)) return reply({ error: 'Session de paiement invalide.' }, 400);
     const session = await stripe(env, 'GET', `/checkout/sessions/${id}?expand[]=subscription`);
     if (session.client_reference_id !== user.token) return reply({ error: 'Ce paiement ne correspond pas à ce compte.' }, 403);
+    if (session.mode === 'payment') {
+      // Achat « à vie »
+      if (session.status !== 'complete' || session.payment_status !== 'paid') return reply({ error: 'Paiement non finalisé.' }, 402);
+      if (session.customer) user.customer = session.customer;
+      Object.assign(user, { kind: 'sub', lifetime: true, lifetimeSession: session.id, plan: 'lifetime' });
+      // Un abonnement en cours devient inutile : il s'arrêtera à la fin de la période déjà payée.
+      if (user.subscription && ACTIVE_SUB.has(user.subStatus) && !user.cancelAtPeriodEnd) {
+        try {
+          await stripe(env, 'POST', `/subscriptions/${user.subscription}`, { cancel_at_period_end: 'true' });
+          user.cancelAtPeriodEnd = true;
+        } catch { /* le propriétaire pourra le résilier dans Stripe */ }
+      }
+      await putUser(env, user);
+      return reply({ token: user.token, account: publicAccount(user, await computeAccess(env, user)) });
+    }
     if (session.status !== 'complete' || !session.subscription) return reply({ error: 'Paiement non finalisé.' }, 402);
     user.customer = session.customer;
     applySubscription(user, session.subscription, env);
@@ -267,8 +301,8 @@ async function accountRoutes(path, request, env, token, reply) {
 
   // Supprimer son compte et ses données (droit à l'effacement)
   if (path === '/account/delete' && request.method === 'POST') {
-    const access = await computeAccess(env, user, { force: true });
-    if (access.kind === 'sub' && !user.cancelAtPeriodEnd) {
+    await computeAccess(env, user, { force: true });
+    if (user.subscription && ACTIVE_SUB.has(user.subStatus) && !user.cancelAtPeriodEnd) {
       return reply({ error: 'Résiliez d\'abord votre abonnement (Gérer ou résilier), puis supprimez le compte.' }, 409);
     }
     await deleteUser(env, user);
@@ -296,6 +330,7 @@ async function computeAccess(env, user, { force = false } = {}) {
     const active = Boolean(invite && !invite.revoked);
     return { active, kind: active ? 'family' : 'revoked' };
   }
+  if (user.lifetime) return { active: true, kind: 'sub' };
   if (user.subscription && env.STRIPE_SECRET_KEY) {
     const stale = force ? now - (user.checkedAt || 0) > 60 * 1000 : now - (user.checkedAt || 0) > 6 * 60 * 60 * 1000;
     if (stale || (user.periodEnd && user.periodEnd < now)) {
@@ -321,8 +356,17 @@ function applySubscription(user, sub, env) {
   user.subStatus = sub.status;
   user.periodEnd = end ? end * 1000 : null;
   user.cancelAtPeriodEnd = Boolean(sub.cancel_at_period_end);
-  user.plan = priceId && priceId === env.PRICE_YEARLY ? 'yearly' : 'monthly';
+  if (!user.lifetime) user.plan = planOfPrice(env, priceId, sub);
   user.checkedAt = Date.now();
+}
+
+/** Formule d'un abonnement, d'après son prix (ou sa périodicité pour un ancien prix). */
+function planOfPrice(env, priceId, sub) {
+  for (const [plan, key] of Object.entries(PLAN_PRICES)) if (priceId && env[key] === priceId) return plan;
+  const rec = sub.items?.data?.[0]?.price?.recurring;
+  if (rec?.interval === 'year') return 'yearly';
+  if (rec?.interval === 'month' && rec.interval_count === 3) return 'quarterly';
+  return 'monthly';
 }
 
 function publicAccount(user, access) {
@@ -335,7 +379,8 @@ function publicAccount(user, access) {
     plan: user.plan || null,
     periodEnd: user.periodEnd || null,
     cancelAtPeriodEnd: Boolean(user.cancelAtPeriodEnd),
-    canManage: Boolean(user.customer),
+    lifetime: Boolean(user.lifetime),
+    canManage: Boolean(user.customer && user.subscription),
     recovery: user.token,
   };
 }
@@ -355,7 +400,7 @@ async function adminRoutes(path, request, env, reply) {
       const inv = await env.HAKSOU.get(k, 'json');
       if (inv) invites.set(inv.code, inv);
     }
-    const counts = { total: 0, trial: 0, monthly: 0, yearly: 0, family: 0, expired: 0, newThisWeek: 0 };
+    const counts = { total: 0, trial: 0, monthly: 0, quarterly: 0, yearly: 0, lifetime: 0, family: 0, expired: 0, newThisWeek: 0 };
     const users = [];
     for (const k of await listAll(env, 'user:')) {
       const u = await env.HAKSOU.get(k, 'json');
@@ -433,8 +478,9 @@ function quickStatus(u, invites, now) {
     const inv = invites.get(u.invite);
     return inv && !inv.revoked ? 'family' : 'expired';
   }
+  if (u.lifetime) return 'lifetime';
   if (u.subscription && ACTIVE_SUB.has(u.subStatus) && (!u.periodEnd || u.periodEnd + 3 * DAY > now)) {
-    return u.plan === 'yearly' ? 'yearly' : 'monthly';
+    return ['quarterly', 'yearly'].includes(u.plan) ? u.plan : 'monthly';
   }
   if (u.trialEndsAt && u.trialEndsAt > now) return 'trial';
   return 'expired';
