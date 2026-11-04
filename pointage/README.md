@@ -14,6 +14,8 @@ Timbre automatiquement l'arrivée et le départ au **Marly Innovation Center** (
 
 ## Installation (≈ 10 min)
 
+📱 **Guide détaillé pour iPhone : [IPHONE.md](IPHONE.md)**
+
 ### 1. Google Sheet
 1. Crée une Google Sheet vide.
 2. **Extensions → Apps Script**, efface le contenu et colle `apps-script.gs`.
