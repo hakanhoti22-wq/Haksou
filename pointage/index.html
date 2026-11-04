@@ -149,41 +149,39 @@ ol{padding-left:20px;margin:6px 0}li{margin:5px 0}
 
   <h2>Pointage automatique (iPhone)</h2>
   <div class="card">
-    <div class="mut">Les adresses à coller dans les automatisations :</div>
-    <label>① URL arrivée</label><code id="uIn">–</code><button class="sm" data-copy="uIn">Copier</button>
-    <label>② URL sortie</label><code id="uLeave">–</code><button class="sm" data-copy="uLeave">Copier</button>
-    <label>③ URL trajet pro</label><code id="uPro">–</code><button class="sm" data-copy="uPro">Copier</button>
-    <label>④ URL détimbrer</label><code id="uOut">–</code><button class="sm" data-copy="uOut">Copier</button>
-
-    <h2>Automatisation « Arrivée »</h2>
-    <ol class="mut">
-      <li>App <b>Raccourcis</b> → <b>Automatisation</b> → <b>+</b> → <b>Arrivée</b>.</li>
-      <li><b>Lieu</b> → colle les coordonnées ci-dessus dans la recherche, puis règle le rayon.</li>
-      <li><b>Exécuter immédiatement</b> → Suivant → <b>Nouveau raccourci vide</b>.</li>
-      <li>Action <b>Obtenir le contenu de l’URL</b> → colle l’<b>URL ①</b>.</li>
-    </ol>
-
-    <h2>Automatisation « Départ »</h2>
-    <ol class="mut">
-      <li><b>+</b> → <b>Départ</b> → même lieu et même rayon → <b>Exécuter immédiatement</b> → raccourci vide.</li>
-      <li>Construis ces actions :</li>
-    </ol>
-    <div class="step">
-      <b>Obtenir le contenu de l’URL</b> → URL ②
-      <div style="margin-top:6px"><b>Si</b> <i>Contenu de l’URL</i> <b>est</b> <code style="display:inline;padding:2px 6px">QUESTION</code></div>
-      <div class="ind">
-        <b>Choisir dans le menu</b> · invite : « Trajet professionnel ? »<br>options : <b>Oui</b> / <b>Non</b>
-        <div class="ind">Oui → <b>Obtenir le contenu de l’URL</b> → URL ③</div>
-        <div class="ind">Non → <b>Obtenir le contenu de l’URL</b> → URL ④</div>
-        <div>Fin du menu</div>
-      </div>
-      <div>Fin de la condition</div>
+    <div class="step" style="border-color:#22c55e66">
+      <b>Méthode simple : 2 automatisations, 1 seule action chacune.</b>
+      <ol style="margin-top:8px">
+        <li>App <b>Raccourcis</b> → onglet <b>Automatisation</b> (en bas) → <b>+</b> → <b>Arrivée</b>.</li>
+        <li><b>Lieu</b> → <b>Choisir</b> → écris <b>Marly Innovation Center</b> (ou colle les coordonnées de la carte) → rayon <b id="circR2">–</b> m → <b>OK</b>.</li>
+        <li>Coche <b>Exécuter immédiatement</b> → <b>Suivant</b> → <b>Nouveau raccourci vide</b>.</li>
+        <li><b>Ajouter une action</b> → cherche <b>URL</b> → touche <b>Obtenir le contenu de l’URL</b>.</li>
+        <li>Touche le mot bleu <b>URL</b> → colle l’<b>URL ①</b> ci-dessous → <b>OK</b>.</li>
+      </ol>
+      <label>① URL arrivée</label><code id="uIn">–</code><button class="sm" data-copy="uIn">Copier ①</button>
+      <div style="margin-top:12px">Refais exactement pareil en choisissant <b>Départ</b> au lieu d’Arrivée, avec l’<b>URL ②</b> :</div>
+      <label>② URL sortie</label><code id="uLeave">–</code><button class="sm" data-copy="uLeave">Copier ②</button>
+      <div style="margin-top:12px">Enfin : Réglages iPhone → Confidentialité et sécurité → Service de localisation → <b>Raccourcis</b> → <b>Toujours</b> + <b>Position exacte</b>.</div>
     </div>
-    <ol class="mut" start="3">
-      <li>Réglages iOS → Confidentialité → Service de localisation → <b>Raccourcis : Toujours</b> + <b>Position exacte</b>.</li>
-      <li>Réglages iOS → Notifications → <b>Raccourcis</b> : autoriser.</li>
-    </ol>
-    <div class="mut" style="margin-top:8px">L’iPhone affiche la question en notification : touche-la pour répondre. Si tu ne réponds pas, le timbrage continue et l’app te repose la question ici. Si tu reviens sur le site le même jour, la sortie est comptée comme professionnelle.</div>
+    <div class="mut" style="margin-top:10px">
+      <b>Quand tu sors entre 06:30 et 18:00</b>, la sortie est notée « à confirmer » et l’app te pose la question « Trajet professionnel ? » à la prochaine ouverture.
+      Si tu ne réponds pas : si tu reviens sur le site le même jour, la sortie compte comme pro. Sinon, tu es détimbré à l’heure de ta sortie.
+    </div>
+    <details style="margin-top:12px">
+      <summary class="mut">Option avancée : recevoir la question en notification sur l’iPhone</summary>
+      <div class="step">
+        Dans l’automatisation <b>Départ</b>, après l’action URL ② :
+        <div style="margin-top:6px"><b>Si</b> <i>Contenu de l’URL</i> <b>est</b> <code style="display:inline;padding:2px 6px">QUESTION</code></div>
+        <div class="ind">
+          <b>Choisir dans le menu</b> « Trajet professionnel ? » : <b>Oui</b> / <b>Non</b>
+          <div class="ind">Oui → <b>Obtenir le contenu de l’URL</b> → URL ③</div>
+          <div class="ind">Non → <b>Obtenir le contenu de l’URL</b> → URL ④</div>
+        </div>
+        <div>Fin de la condition</div>
+      </div>
+      <label>③ URL trajet pro</label><code id="uPro">–</code><button class="sm" data-copy="uPro">Copier ③</button>
+      <label>④ URL détimbrer</label><code id="uOut">–</code><button class="sm" data-copy="uOut">Copier ④</button>
+    </details>
   </div>
 </section>
 
@@ -273,6 +271,8 @@ function sessions() { // temps de travail : arrivée → départ (les sorties pr
     const t = new Date(e.t);
     if ((e.a === 'in' || e.a === 'back') && !open) open = t;
     else if (e.a === 'out' && open) { out.push({ s: open, e: t }); open = null; }
+    // sortie jamais confirmée et pas revenu le même jour → compte comme départ à l'heure de sortie
+    else if (e.a === 'leave' && open && dayKey(t) !== dayKey(new Date())) { out.push({ s: open, e: t }); open = null; }
   }
   if (open) out.push({ s: open, e: null });
   return out;
@@ -437,7 +437,7 @@ function drawShape(pts) {
 function updCircle() {
   const c = enclosing(cfg.poly);
   circL.setLatLng([c.lat, c.lon]); circL.setRadius(c.r);
-  $('#circTxt').textContent = c.lat + ', ' + c.lon; $('#circR').textContent = c.r;
+  $('#circTxt').textContent = c.lat + ', ' + c.lon; $('#circR').textContent = $('#circR2').textContent = c.r;
 }
 function setDrawing(on) {
   drawing = on;
