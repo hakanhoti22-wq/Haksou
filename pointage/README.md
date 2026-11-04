@@ -66,3 +66,10 @@ Réglages iOS : **Raccourcis → Position : Toujours + Position exacte**, et **N
 - iOS peut déclencher l'automatisation avec 1 à 5 minutes de décalage. Tu peux corriger un pointage dans l'historique (✕) ou dans la Google Sheet.
 - Sans réseau au moment du passage, le raccourci échoue. Tu peux alors timbrer à la main dans l'app, qui garde le pointage et l'envoie plus tard.
 - Après une modification de `apps-script.gs` : Déployer → Gérer les déploiements → Modifier → **Nouvelle version**.
+
+## Partager avec un collègue
+Chacun a **sa propre Google Sheet** : tes heures restent privées et chacun a son propre mot de passe.
+1. Dans l'app : **Réglages → 📤 Partager l'app**. Envoie le lien par WhatsApp, SMS ou e-mail.
+2. Ton collègue ouvre le lien dans **Safari** et accepte l'import : la zone dessinée et la plage horaire sont déjà réglées.
+3. Il ajoute l'app à son écran d'accueil (**Partager → Sur l'écran d'accueil**).
+4. Il suit les étapes **1, 3 et 4** de ce guide (sa Google Sheet, sa connexion, ses automatisations Raccourcis).
