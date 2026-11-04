@@ -141,6 +141,12 @@ ol{padding-left:20px;margin:6px 0}li{margin:5px 0}
     </div>
   </div>
 
+  <h2>Partager avec un collègue</h2>
+  <div class="card">
+    <div class="mut">Envoie un lien qui ouvre l’app avec <b>ta zone dessinée</b> et <b>ta plage horaire</b> déjà réglées. Ton URL, ton token et tes heures ne sont <b>pas</b> partagés : ton collègue crée sa propre Google Sheet (voir le guide).</div>
+    <div style="margin-top:12px"><button id="bShare">📤 Partager l’app</button></div>
+  </div>
+
   <h2>Pointage automatique (iPhone)</h2>
   <div class="card">
     <div class="mut">Les adresses à coller dans les automatisations :</div>
@@ -324,6 +330,7 @@ async function refresh(silent) {
   if (!cfg.url) return render();
   try {
     await flush();
+    if (cfg.hoursDirty) { await api({ action: 'config', start: cfg.start, end: cfg.end }); cfg.hoursDirty = false; saveCfg(); }
     const j = await api({ action: 'list', days: 120 });
     events = j.events; LS.set('pm_events', events);
     if (j.hours) { cfg.start = j.hours.start; cfg.end = j.hours.end; saveCfg(); fillHours(); }
@@ -399,7 +406,7 @@ $('#bHours').onclick = async () => {
   const s = $('#hStart').value, e = $('#hEnd').value;
   if (!s || !e || s >= e) return toast('Plage horaire invalide');
   cfg.start = s; cfg.end = e; saveCfg(); render();
-  try { await api({ action: 'config', start: s, end: e }); toast('Plage enregistrée ✅'); } catch (err) { toast('Enregistré sur le téléphone, mais pas dans la Sheet : ' + err.message); }
+  try { await api({ action: 'config', start: s, end: e }); cfg.hoursDirty = false; saveCfg(); toast('Plage enregistrée ✅'); } catch (err) { toast('Enregistré sur le téléphone, mais pas dans la Sheet : ' + err.message); }
 };
 
 /* ---------- carte : dessin de la zone ---------- */
@@ -452,6 +459,31 @@ $('#bDone').onclick = () => {
 };
 $('#bHere').onclick = () => navigator.geolocation.getCurrentPosition(p => map && map.setView([p.coords.latitude, p.coords.longitude], 18), e => toast(e.message), { enableHighAccuracy: true });
 
+/* ---------- partage ---------- */
+const b64e = o => btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const b64d = s => JSON.parse(decodeURIComponent(escape(atob(s.replace(/-/g, '+').replace(/_/g, '/')))));
+$('#bShare').onclick = async () => {
+  const link = location.origin + location.pathname + '#z=' + b64e({ p: cfg.poly, s: cfg.start, e: cfg.end });
+  const text = 'App de pointage MIC Marly (zone et horaires déjà réglés). Guide d’installation : https://github.com/hakanhoti22-wq/Haksou/blob/main/pointage/README.md';
+  try {
+    if (navigator.share) await navigator.share({ title: 'Pointage MIC', text, url: link });
+    else { await navigator.clipboard.writeText(text + '\n' + link); toast('Lien copié !'); }
+  } catch (e) { if (e.name !== 'AbortError') toast('Partage impossible'); }
+};
+function importShared() {
+  const m = location.hash.match(/^#z=([\w-]+)/); if (!m) return;
+  history.replaceState(null, '', location.pathname);
+  try {
+    const z = b64d(m[1]);
+    const okP = Array.isArray(z.p) && z.p.length >= 3 && z.p.every(q => Array.isArray(q) && q.length === 2 && q.every(Number.isFinite));
+    const okH = /^\d\d:\d\d$/.test(z.s) && /^\d\d:\d\d$/.test(z.e) && z.s < z.e;
+    if (!okP || !okH) throw 0;
+    if (!confirm(`Importer la zone du site et la plage horaire ${z.s} – ${z.e} partagées par ton collègue ?`)) return;
+    cfg.poly = z.p; cfg.start = z.s; cfg.end = z.e; cfg.hoursDirty = true; saveCfg(); fillHours();
+    toast('Zone et horaires importés ✅ Configure ta Google Sheet dans Réglages.');
+  } catch { toast('Lien de partage invalide'); }
+}
+
 /* ---------- onglets ---------- */
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
   document.querySelectorAll('nav button').forEach(x => x.classList.toggle('cur', x === b));
@@ -460,7 +492,7 @@ document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
   if (b.dataset.tab === 'hist') refresh(true);
 });
 
-render(); refresh(true);
+importShared(); render(); refresh(true);
 setInterval(render, 30000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(true); });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
