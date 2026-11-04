@@ -21,10 +21,10 @@ Timbre automatiquement l'arrivée et le départ au **Marly Innovation Center** (
 4. **Déployer → Nouveau déploiement** → type **Application Web** → *Exécuter en tant que : Moi* → *Accès : Tout le monde* → **Déployer**, puis autorise l'accès.
 5. Copie l'URL qui finit par `/exec`.
 
-### 2. Héberger la web app
-Avec GitHub Pages : dépôt → **Settings → Pages** → *Deploy from a branch* → `main` / `root`.
-L'app est ensuite disponible sur `https://<utilisateur>.github.io/<dépôt>/pointage/`.
-Sur l'iPhone, ouvre-la dans Safari → **Partager → Sur l'écran d'accueil**.
+### 2. Ouvrir la web app
+L'app est déjà en ligne sur https://hakanhoti22-wq.github.io/Haksou/pointage/ (à côté de l'app de traduction, sans la toucher).
+⚠️ Ne change pas les réglages GitHub Pages : ils servent l'app de traduction.
+Sur l'iPhone, ouvre l'adresse dans Safari → **Partager → Sur l'écran d'accueil**.
 
 ### 3. Configurer l'app
 Onglet **Réglages** : colle l'URL `/exec` et le token → **Enregistrer et tester**. Vérifie le cercle sur la carte.
