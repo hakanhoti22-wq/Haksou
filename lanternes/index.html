@@ -574,33 +574,237 @@
   }
   buildWorld(ZONES[0]);
 
-  /* ================= Son ================= */
-  let actx = null, lastHitSnd = 0;
+  /* ================= Son =================
+     Tout est synthétisé en direct (Web Audio) : bruits filtrés, grognements à formants,
+     écho de la cour (réverbération), son placé à gauche/droite et atténué selon la distance. */
+  let A = null;
   function audio() {
-    if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; } }
-    if (actx.state === 'suspended') actx.resume();
-    return actx;
+    if (!A) {
+      let c;
+      try { c = new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; }
+      const master = c.createGain(); master.gain.value = 0.85;
+      const comp = c.createDynamicsCompressor();
+      comp.threshold.value = -16; comp.knee.value = 10; comp.ratio.value = 5; comp.attack.value = 0.003; comp.release.value = 0.25;
+      master.connect(comp).connect(c.destination);
+      // réverbération : réponse impulsionnelle générée (pierre de la cour)
+      const len = Math.floor(c.sampleRate * 2.4), ir = c.createBuffer(2, len, c.sampleRate);
+      for (let ch = 0; ch < 2; ch++) { const d = ir.getChannelData(ch); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2); }
+      const verb = c.createConvolver(); verb.buffer = ir;
+      const vg = c.createGain(); vg.gain.value = 0.55; verb.connect(vg).connect(master);
+      // bruits blanc et brun (2 s, joués en boucle à un point au hasard)
+      const n = c.sampleRate * 2, white = c.createBuffer(1, n, c.sampleRate), brown = c.createBuffer(1, n, c.sampleRate);
+      const w = white.getChannelData(0), br = brown.getChannelData(0); let last = 0;
+      for (let i = 0; i < n; i++) { w[i] = Math.random() * 2 - 1; last = (last + 0.02 * w[i]) / 1.02; br[i] = last * 3.5; }
+      A = { c, master, verb, white, brown, voices: 0, last: {}, wind: null };
+    }
+    if (A.c.state === 'suspended') A.c.resume();
+    return A;
   }
-  function beep(freq, dur, type = 'square', vol = 0.05, slide = 0) {
-    if (save.mute) return; const a = audio(); if (!a) return;
-    const t = a.currentTime, o = a.createOscillator(), g = a.createGain();
-    o.type = type; o.frequency.setValueAtTime(freq, t);
-    if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), t + dur);
-    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur);
+  // Réserve une voix (anti-cacophonie) ; renvoie null si coupé, trop proche du précédent ou trop de sons
+  function voice(key, gap = 0) {
+    if (save.mute) return null;
+    const a = audio(); if (!a) return null;
+    const now = a.c.currentTime;
+    if (gap && a.last[key] && now - a.last[key] < gap) return null;
+    if (a.voices > 30) return null;
+    a.last[key] = now;
+    return a;
   }
+  // Sortie d'un son : volume, position stéréo selon x/y (par rapport au ninja), envoi vers l'écho
+  function bus(a, { x, y, vol = 1, wet = 0.12, dur = 1 } = {}) {
+    const g = a.c.createGain(); let v = vol, pan = 0;
+    if (x !== undefined && player) {
+      const dx = x - player.x, dy = y - player.y, d = Math.hypot(dx, dy);
+      v *= 1 / (1 + d / 320); pan = clamp(dx / 420, -0.85, 0.85);
+    }
+    g.gain.value = v;
+    if (a.c.createStereoPanner) { const p = a.c.createStereoPanner(); p.pan.value = pan; g.connect(p).connect(a.master); } else g.connect(a.master);
+    if (wet) { const s = a.c.createGain(); s.gain.value = wet; g.connect(s).connect(a.verb); }
+    a.voices++; setTimeout(() => { if (A) A.voices--; }, dur * 1000 + 150);
+    return g;
+  }
+  function env(g, t, vol, atk, dur) {
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol), t + atk);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  }
+  function noise(a, out, t, dur, { type = 'bandpass', f = 1000, f2 = 0, q = 1, vol = 1, atk = 0.004, brown = false } = {}) {
+    const s = a.c.createBufferSource(); s.buffer = brown ? a.brown : a.white; s.loop = true;
+    const fl = a.c.createBiquadFilter(); fl.type = type; fl.Q.value = q;
+    fl.frequency.setValueAtTime(f, t); if (f2) fl.frequency.exponentialRampToValueAtTime(f2, t + dur);
+    const g = a.c.createGain(); env(g, t, vol, atk, dur);
+    s.connect(fl).connect(g).connect(out); s.start(t, Math.random() * 1.5); s.stop(t + dur + 0.05);
+  }
+  function tone(a, out, t, dur, { type = 'sine', f = 440, f2 = 0, vol = 1, atk = 0.004 } = {}) {
+    const o = a.c.createOscillator(); o.type = type;
+    o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+    const g = a.c.createGain(); env(g, t, vol, atk, dur);
+    o.connect(g).connect(out); o.start(t); o.stop(t + dur + 0.05);
+  }
+  // Voix rauque : dent de scie + vibrato rugueux, filtrée par deux formants (comme une gorge)
+  function growl(a, out, t, dur, { base = 100, end = 0.8, formants = [500, 1100], rough = 0.4, vol = 1, breath = 0.3 } = {}) {
+    const o = a.c.createOscillator(); o.type = 'sawtooth';
+    o.frequency.setValueAtTime(base, t); o.frequency.linearRampToValueAtTime(base * end, t + dur);
+    const l = a.c.createOscillator(); l.frequency.value = rand(16, 32);
+    const lg = a.c.createGain(); lg.gain.value = base * rough * 0.35; l.connect(lg).connect(o.frequency);
+    const g = a.c.createGain();
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + Math.min(0.12, dur * 0.25));
+    g.gain.setValueAtTime(vol, t + dur * 0.6); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    formants.forEach((f, i) => { const bp = a.c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = 5; const fg = a.c.createGain(); fg.gain.value = i ? 0.6 : 1; o.connect(bp).connect(fg).connect(g); });
+    g.connect(out);
+    o.start(t); l.start(t); o.stop(t + dur + 0.05); l.stop(t + dur + 0.05);
+    if (breath) noise(a, out, t, dur, { f: formants[0], q: 2, vol: vol * breath, atk: 0.05 });
+  }
+  const T = a => a.c.currentTime + 0.005;
+
   const sfx = {
-    hit() { const n = performance.now(); if (n - lastHitSnd < 60) return; lastHitSnd = n; beep(rand(180, 240), 0.06, 'square', 0.025, -80); },
-    gem() { beep(rand(880, 1040), 0.05, 'triangle', 0.03); },
-    coin() { beep(rand(1400, 1600), 0.05, 'square', 0.015); },
-    hurt() { beep(160, 0.18, 'sawtooth', 0.06, -90); },
-    level() { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => beep(f, 0.12, 'triangle', 0.06), i * 70)); },
-    bolt() { beep(90, 0.25, 'sawtooth', 0.05, -40); },
-    slash() { beep(600, 0.08, 'triangle', 0.03, -400); },
-    boss() { beep(70, 0.6, 'sawtooth', 0.08, 30); },
-    buy() { [660, 880, 1320].forEach((f, i) => setTimeout(() => beep(f, 0.09, 'triangle', 0.05), i * 60)); },
-    no() { beep(140, 0.15, 'square', 0.04); },
+    // --- armes du ninja ---
+    slash() { // fouetté d'air de la lame + léger chant de l'acier
+      const a = voice('slash', 0.05); if (!a) return; const t = T(a), o = bus(a, { vol: 0.7, wet: 0.1, dur: 0.4 });
+      noise(a, o, t, 0.2, { f: 700, f2: 3800, q: 1.4, vol: 0.9, atk: 0.03 });
+      noise(a, o, t + 0.06, 0.16, { f: 3800, f2: 1200, q: 1.2, vol: 0.5 });
+      tone(a, o, t + 0.02, 0.3, { f: rand(3100, 3400), vol: 0.04 }); tone(a, o, t + 0.02, 0.25, { f: rand(4700, 5000), vol: 0.025 });
+    },
+    throw() { // sifflement du shuriken
+      const a = voice('throw', 0.07); if (!a) return; const t = T(a), o = bus(a, { vol: 0.35, wet: 0.05, dur: 0.2 });
+      noise(a, o, t, 0.13, { type: 'highpass', f: 2500, f2: 6500, q: 0.8, vol: 0.8, atk: 0.01 });
+    },
+    hit(x, y) { // impact sourd dans la chair
+      const a = voice('hit', 0.045); if (!a) return; const t = T(a), o = bus(a, { x, y, vol: 0.55, wet: 0.05, dur: 0.2 });
+      tone(a, o, t, 0.12, { f: rand(130, 160), f2: 50, vol: 0.9 });
+      noise(a, o, t, 0.07, { type: 'lowpass', f: 1100, f2: 300, vol: 0.7 });
+    },
+    kill(type, x, y) {
+      const a = voice('kill', 0.04); if (!a) return; const t = T(a);
+      if (type === 'squelette') { // os qui s'effondrent
+        const o = bus(a, { x, y, vol: 0.5, wet: 0.15, dur: 0.4 });
+        for (let i = 0; i < 7; i++) noise(a, o, t + rand(0, 0.28), 0.03, { f: rand(2200, 3600), q: 9, vol: 1 });
+      } else if (type === 'spectre') { // cri qui s'évanouit
+        const o = bus(a, { x, y, vol: 0.25, wet: 0.5, dur: 0.8 });
+        tone(a, o, t, 0.6, { f: 900, f2: 260, vol: 0.5, atk: 0.02 }); noise(a, o, t, 0.5, { f: 1500, f2: 400, q: 3, vol: 0.4 });
+      } else { // écrasement humide
+        const o = bus(a, { x, y, vol: 0.5, wet: 0.08, dur: 0.35 });
+        noise(a, o, t, 0.25, { f: 420, f2: 140, q: 2.5, vol: 1, atk: 0.006 });
+        noise(a, o, t, 0.05, { type: 'highpass', f: 1800, vol: 0.4 });
+      }
+    },
+    explode(x, y) { // le Gonflé éclate
+      const a = voice('boom', 0.08); if (!a) return; const t = T(a), o = bus(a, { x, y, vol: 0.95, wet: 0.3, dur: 1 });
+      tone(a, o, t, 0.6, { f: 95, f2: 32, vol: 1 });
+      noise(a, o, t, 0.8, { type: 'lowpass', f: 700, f2: 90, vol: 1, brown: true });
+      noise(a, o, t + 0.02, 0.35, { f: 900, f2: 300, q: 1.5, vol: 0.6 });
+    },
+    fire(x, y) { // lanterne qui s'embrase, puis crépitements
+      const a = voice('fire', 0.15); if (!a) return; const t = T(a), o = bus(a, { x, y, vol: 0.5, wet: 0.12, dur: 0.8 });
+      noise(a, o, t, 0.35, { f: 300, f2: 1400, q: 0.8, vol: 0.7, atk: 0.05 });
+      for (let i = 0; i < 9; i++) noise(a, o, t + 0.1 + rand(0, 0.55), 0.02, { type: 'highpass', f: rand(2000, 5000), vol: rand(0.3, 0.8) });
+    },
+    bolt(x, y) { // claquement de foudre puis tonnerre qui roule
+      const a = voice('bolt', 0.25); if (!a) return; const t = T(a), o = bus(a, { vol: 0.9, wet: 0.55, dur: 2.2 });
+      noise(a, o, t, 0.09, { type: 'highpass', f: 1400, vol: 1 });
+      noise(a, o, t + 0.01, 0.3, { f: 3000, f2: 800, q: 0.7, vol: 0.6 });
+      noise(a, o, t + 0.08, 1.9, { type: 'lowpass', f: 260, f2: 60, vol: 1, atk: 0.15, brown: true });
+    },
+    // --- ramassage ---
+    coin() { // tintement de pièce de métal
+      const a = voice('coin', 0.035); if (!a) return; const t = T(a), o = bus(a, { vol: 0.16, wet: 0.08, dur: 0.25 });
+      const f = rand(2400, 2800); tone(a, o, t, 0.14, { f, vol: 1 }); tone(a, o, t, 0.1, { f: f * 1.47, vol: 0.6 }); tone(a, o, t + 0.05, 0.12, { f: f * 1.08, vol: 0.5 });
+    },
+    gem() { // âme cristalline
+      const a = voice('gem', 0.03); if (!a) return; const t = T(a), o = bus(a, { vol: 0.08, wet: 0.35, dur: 0.4 });
+      const f = rand(1500, 1900); tone(a, o, t, 0.22, { f, vol: 1 }); tone(a, o, t, 0.16, { f: f * 2.01, vol: 0.4 });
+    },
+    heal() {
+      const a = voice('heal', 0.1); if (!a) return; const t = T(a), o = bus(a, { vol: 0.15, wet: 0.4, dur: 0.7 });
+      tone(a, o, t, 0.35, { f: 660, vol: 1, atk: 0.02 }); tone(a, o, t + 0.12, 0.45, { f: 990, vol: 0.8, atk: 0.02 });
+    },
+    // --- ninja ---
+    hurt() { // coup reçu + grognement du ninja
+      const a = voice('hurt', 0.12); if (!a) return; const t = T(a), o = bus(a, { vol: 0.6, wet: 0.08, dur: 0.35 });
+      tone(a, o, t, 0.18, { f: 120, f2: 45, vol: 1 });
+      noise(a, o, t, 0.06, { type: 'lowpass', f: 1500, vol: 0.6 });
+      growl(a, o, t + 0.02, 0.2, { base: rand(150, 175), end: 0.75, formants: [650, 1150], rough: 0.15, vol: 0.35, breath: 0.5 });
+    },
+    level() { // cloche de temple
+      const a = voice('level', 0.2); if (!a) return; const t = T(a), o = bus(a, { vol: 0.22, wet: 0.6, dur: 2 });
+      [523, 659, 784, 1047].forEach((f, i) => { tone(a, o, t + i * 0.07, 1.4, { f, vol: 0.8 }); tone(a, o, t + i * 0.07, 0.6, { f: f * 2.76, vol: 0.18 }); });
+    },
+    revive() {
+      const a = voice('revive', 0.5); if (!a) return; const t = T(a), o = bus(a, { vol: 0.5, wet: 0.6, dur: 2 });
+      noise(a, o, t, 0.8, { f: 300, f2: 3000, q: 1, vol: 0.6, atk: 0.2 }); tone(a, o, t + 0.3, 1.5, { f: 392, vol: 0.5 }); tone(a, o, t + 0.3, 1.5, { f: 587, vol: 0.4 });
+    },
+    // --- gardiens ---
+    boss() { // rugissement + grondement de terre + gong grave
+      const a = voice('boss', 1); if (!a) return; const t = T(a), o = bus(a, { vol: 0.9, wet: 0.5, dur: 3 });
+      growl(a, o, t, 2.0, { base: 58, end: 0.7, formants: [260, 620], rough: 0.7, vol: 0.9, breath: 0.4 });
+      noise(a, o, t, 2.6, { type: 'lowpass', f: 160, f2: 50, vol: 0.9, atk: 0.3, brown: true });
+      tone(a, o, t, 2.8, { f: 65, vol: 0.4, atk: 0.01 }); tone(a, o, t, 2.2, { f: 65 * 2.4, vol: 0.12 });
+    },
+    ring(x, y) { // décharge maléfique
+      const a = voice('ring', 0.3); if (!a) return; const t = T(a), o = bus(a, { x, y, vol: 0.6, wet: 0.45, dur: 0.8 });
+      noise(a, o, t, 0.5, { f: 400, f2: 2200, q: 2, vol: 0.8, atk: 0.04 }); tone(a, o, t, 0.5, { type: 'triangle', f: 320, f2: 120, vol: 0.4 });
+    },
+    charge(x, y) { // le gardien prend son élan
+      const a = voice('charge', 0.5); if (!a) return; const t = T(a), o = bus(a, { x, y, vol: 0.8, wet: 0.3, dur: 0.8 });
+      growl(a, o, t, 0.6, { base: 75, end: 1.3, formants: [300, 700], rough: 0.8, vol: 0.9 });
+    },
+    arrow(x, y) { // corde d'arc + flèche qui part
+      const a = voice('arrow', 0.12); if (!a) return; const t = T(a), o = bus(a, { x, y, vol: 0.45, wet: 0.12, dur: 0.4 });
+      tone(a, o, t, 0.22, { type: 'triangle', f: 190, f2: 160, vol: 0.9, atk: 0.002 });
+      noise(a, o, t, 0.02, { type: 'highpass', f: 3000, vol: 0.5 });
+      noise(a, o, t + 0.03, 0.15, { type: 'highpass', f: 2200, f2: 4000, vol: 0.35 });
+    },
+    // --- cris des morts-vivants (ambiance) ---
+    cry(e) {
+      const a = voice('cry-' + e.type, 0.7); if (!a) return; const t = T(a), x = e.x, y = e.y;
+      if (e.type === 'zombie') { const o = bus(a, { x, y, vol: 0.5, wet: 0.25, dur: 1.6 }); growl(a, o, t, rand(0.8, 1.4), { base: rand(85, 120), end: rand(0.65, 0.85), formants: [rand(400, 600), rand(900, 1250)], rough: 0.5, vol: 0.8 }); }
+      else if (e.type === 'chien') { const o = bus(a, { x, y, vol: 0.45, wet: 0.2, dur: 0.6 }); for (let i = 0; i < 2; i++) growl(a, o, t + i * 0.2, 0.13, { base: rand(320, 380), end: 0.6, formants: [800, 1600], rough: 0.8, vol: 0.9, breath: 0.6 }); }
+      else if (e.type === 'rat') { const o = bus(a, { x, y, vol: 0.12, wet: 0.1, dur: 0.4 }); for (let i = 0; i < 3; i++) tone(a, o, t + i * 0.09, 0.06, { f: rand(3200, 3800), f2: rand(4200, 4800), vol: 1 }); }
+      else if (e.type === 'gonfle') { const o = bus(a, { x, y, vol: 0.5, wet: 0.2, dur: 1 }); for (let i = 0; i < 5; i++) noise(a, o, t + i * 0.13, 0.12, { type: 'lowpass', f: rand(250, 450), q: 6, vol: 1, brown: true }); tone(a, o, t, 0.7, { f: 70, f2: 55, vol: 0.4 }); }
+      else if (e.type === 'squelette') { const o = bus(a, { x, y, vol: 0.35, wet: 0.15, dur: 0.5 }); for (let i = 0; i < 6; i++) noise(a, o, t + i * rand(0.03, 0.06), 0.025, { f: rand(2600, 3400), q: 10, vol: 1 }); }
+      else if (e.type === 'spectre') {
+        const o = bus(a, { x, y, vol: 0.2, wet: 0.6, dur: 1.8 });
+        const osc = a.c.createOscillator(); osc.frequency.setValueAtTime(rand(650, 800), t); osc.frequency.linearRampToValueAtTime(rand(420, 520), t + 1.3);
+        const lfo = a.c.createOscillator(); lfo.frequency.value = 6; const lg = a.c.createGain(); lg.gain.value = 30; lfo.connect(lg).connect(osc.frequency);
+        const g = a.c.createGain(); env(g, t, 0.7, 0.3, 1.4); osc.connect(g).connect(o); osc.start(t); lfo.start(t); osc.stop(t + 1.5); lfo.stop(t + 1.5);
+        noise(a, o, t, 1.3, { f: 1300, q: 4, vol: 0.3, atk: 0.3 });
+      }
+      else if (e.type === 'abomination') { const o = bus(a, { x, y, vol: 0.7, wet: 0.3, dur: 1.5 }); growl(a, o, t, 1.2, { base: rand(55, 65), end: 0.7, formants: [300, 720], rough: 0.7, vol: 1 }); }
+      else if (e.type === 'boss') { const o = bus(a, { x, y, vol: 0.7, wet: 0.4, dur: 1.5 }); growl(a, o, t, 1.1, { base: 62, end: 0.75, formants: [280, 650], rough: 0.7, vol: 1 }); }
+    },
+    // --- camp ---
+    buy() { // pluie de pièces
+      const a = voice('buy', 0.15); if (!a) return; const t = T(a), o = bus(a, { vol: 0.14, wet: 0.2, dur: 0.6 });
+      for (let i = 0; i < 7; i++) { const f = rand(2300, 3000), tt = t + i * rand(0.04, 0.07); tone(a, o, tt, 0.12, { f, vol: 1 }); tone(a, o, tt, 0.08, { f: f * 1.47, vol: 0.5 }); }
+    },
+    no() {
+      const a = voice('no', 0.15); if (!a) return; const t = T(a), o = bus(a, { vol: 0.4, wet: 0.05, dur: 0.25 });
+      tone(a, o, t, 0.15, { f: 130, f2: 90, vol: 1 }); noise(a, o, t, 0.08, { type: 'lowpass', f: 600, vol: 0.5 });
+    },
   };
+  // Vent de la nuit pendant les combats
+  function windStart() {
+    if (save.mute) return; const a = audio(); if (!a || a.wind) return;
+    const s = a.c.createBufferSource(); s.buffer = a.brown; s.loop = true;
+    const f = a.c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 420; f.Q.value = 2;
+    const lfo = a.c.createOscillator(); lfo.frequency.value = 0.08; const lg = a.c.createGain(); lg.gain.value = 260; lfo.connect(lg).connect(f.frequency);
+    const g = a.c.createGain(); g.gain.setValueAtTime(0.0001, a.c.currentTime); g.gain.exponentialRampToValueAtTime(zone.part === 'snow' ? 0.22 : 0.12, a.c.currentTime + 2);
+    s.connect(f).connect(g).connect(a.master); s.start(); lfo.start();
+    a.wind = { s, lfo, g };
+  }
+  function windStop() {
+    if (!A || !A.wind) return; const { s, lfo, g } = A.wind, t = A.c.currentTime;
+    g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(Math.max(0.0001, g.gain.value), t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
+    s.stop(t + 0.45); lfo.stop(t + 0.45); A.wind = null;
+  }
+  // Un mort-vivant proche pousse un cri de temps en temps
+  let nextCry = 2;
+  function ambientCries(dt) {
+    nextCry -= dt; if (nextCry > 0) return;
+    nextCry = rand(0.9, 2.4) / Math.min(2, 1 + enemies.length / 120);
+    const near = enemies.filter(e => Math.abs(e.x - player.x) < 520 && Math.abs(e.y - player.y) < 420);
+    if (near.length) sfx.cry(near[(Math.random() * near.length) | 0]);
+  }
 
   /* ================= État de la partie ================= */
   let state = 'hub';
@@ -638,7 +842,8 @@
     $('stgTxt').textContent = endless ? 'Nuit sans fin' : `Nuit ${stage}`;
     $('clockSub').textContent = endless ? 'survécu' : 'avant le gardien';
     renderLoadout(); updateHud(true);
-    state = 'play'; last = performance.now();
+    state = 'play'; last = performance.now(); nextCry = 2;
+    windStop(); windStart();
     banner(endless ? 'Nuit sans fin' : `${zone.name} · Nuit ${stage}`);
   }
 
@@ -724,16 +929,17 @@
     const kb = e.type === 'boss' ? 0.1 : e.elite ? 0.4 : 1;
     e.kx += kx * kb; e.ky += ky * kb;
     if (texts.length < 70) texts.push({ x: e.x + rand(-6, 6), y: e.y - e.r, t: fmtN(Math.max(1, dmg)), life: 0.7, crit, color });
-    sfx.hit();
+    sfx.hit(e.x, e.y);
     if (e.hp <= 0) kill(e);
   }
   function kill(e) {
     e.dead = true; kills++;
     const col = e.type === 'boss' ? e.c2 : ENEMY[e.type].col;
     burst(e.x, e.y, col, e.type === 'boss' ? 50 : e.elite ? 18 : 7);
+    if (e.type === 'boss') { sfx.boss(); } else if (e.type !== 'gonfle') sfx.kill(e.type, e.x, e.y);
     dropGem(e.x, e.y, e.xp);
     if (e.type === 'gonfle') { // éclate en nuage toxique : ne reste pas collé !
-      burst(e.x, e.y, '#c9d94a', 26); burst(e.x, e.y, '#7a4f86', 10);
+      burst(e.x, e.y, '#c9d94a', 26); burst(e.x, e.y, '#7a4f86', 10); sfx.explode(e.x, e.y);
       pools.push({ x: e.x, y: e.y, r: 70, dmg: 0, life: 0.5, max: 0.5, tick: 99, toxic: true });
       if (Math.hypot(player.x - e.x, player.y - e.y) < 70 + player.r) hurtPlayer(e.dmg * 1.2);
     }
@@ -770,7 +976,7 @@
     if (player.hp <= 0) {
       if (run.revive > 0) {
         player.hp = player.maxHp * run.revive; run.revive = 0; player.inv = 2.5;
-        banner('Le phénix te relève !'); burst(player.x, player.y, '#ffb347', 40);
+        banner('Le phénix te relève !'); sfx.revive(); burst(player.x, player.y, '#ffb347', 40);
         near(player.x, player.y, 220, e => { if (e.type !== 'boss' && Math.hypot(e.x - player.x, e.y - player.y) < 220) { e.hp = 0; kill(e); } });
       } else { player.hp = 0; endRun(false); }
     }
@@ -793,7 +999,7 @@
           const a = base + (i - (s.n - 1) / 2) * 0.18;
           shots.push({ x: P.x, y: P.y, vx: Math.cos(a) * 440, vy: Math.sin(a) * 440, dmg: s.dmg, pierce: s.pierce, life: 1.2, rot: 0, hit: new Set() });
         }
-        beep(1200, 0.03, 'triangle', 0.015, 300);
+        sfx.throw();
       } else if (id === 'katana') {
         // vise le monstre le plus proche à portée, sinon la direction de course
         let tgt = null, best = (s.r + 70) ** 2;
@@ -816,7 +1022,7 @@
           if (cand.length) { const e = cand[(Math.random() * cand.length) | 0]; tx = e.x; ty = e.y; }
           pools.push({ x: tx, y: ty, r: s.r, dmg: s.dmg, life: s.dur, max: s.dur, tick: 0 });
         }
-        beep(220, 0.15, 'triangle', 0.03, -100);
+        sfx.fire(pools[pools.length - 1].x, pools[pools.length - 1].y);
       } else if (id === 'bolt') {
         const cand = enemies.filter(e => Math.abs(e.x - P.x) < viewW / 2 && Math.abs(e.y - P.y) < viewH / 2);
         if (boss && !boss.dead && !cand.includes(boss) && Math.hypot(boss.x - P.x, boss.y - P.y) < 600) cand.push(boss);
@@ -852,11 +1058,11 @@
     if (e.atk <= 0 && e.tele <= 0 && e.dashT <= 0) {
       e.atk = rand(2.4, 3.6) / (e.grand ? 1.35 : 1);
       const m = e.moves[(Math.random() * e.moves.length) | 0];
-      if (m === 'dash') { e.tele = 0.65; e.dashA = Math.atan2(dy, dx); }
+      if (m === 'dash') { e.tele = 0.65; e.dashA = Math.atan2(dy, dx); sfx.charge(e.x, e.y); }
       else if (m === 'ring') {
         const n = e.grand ? 22 : 14, off = Math.random() * TAU;
         for (let i = 0; i < n; i++) { const a = off + i * TAU / n; foes.push({ x: e.x, y: e.y, vx: Math.cos(a) * 170, vy: Math.sin(a) * 170, life: 4, dmg: e.dmg * 0.6, kind: 'orb', col: e.c2 }); }
-        beep(300, 0.2, 'triangle', 0.04, -150);
+        sfx.ring(e.x, e.y);
       } else if (m === 'summon') {
         const types = Object.keys(zone.mix);
         for (let i = 0; i < (e.grand ? 8 : 5); i++) {
@@ -923,7 +1129,7 @@
       else if (e.type === 'squelette') {
         if (d < 230) { vx = -vx * 0.7 + (-dy / d) * e.speed * 0.6; vy = -vy * 0.7 + (dx / d) * e.speed * 0.6; }
         e.shoot -= dt;
-        if (e.shoot <= 0 && d < 460) { e.shoot = rand(2.2, 3.2); foes.push({ x: e.x, y: e.y, vx: dx / d * 230, vy: dy / d * 230, life: 3, dmg: e.dmg, kind: 'arrow' }); }
+        if (e.shoot <= 0 && d < 460) { e.shoot = rand(2.2, 3.2); sfx.arrow(e.x, e.y); foes.push({ x: e.x, y: e.y, vx: dx / d * 230, vy: dy / d * 230, life: 3, dmg: e.dmg, kind: 'arrow' }); }
       } else if (e.type === 'chien') { e.ph += dt * 6; vx += Math.cos(e.ph) * 30; vy += Math.sin(e.ph) * 30; }
       else if (e.type === 'zombie') { e.ph += dt; vx += Math.cos(e.ph * 1.3) * 14; vy += Math.sin(e.ph * 1.7) * 14; }
       else if (e.type === 'spectre') {
@@ -952,6 +1158,7 @@
     }
 
     updateWeapons(dt);
+    ambientCries(dt);
 
     for (const sh of shots) {
       sh.x += sh.vx * dt; sh.y += sh.vy * dt; sh.life -= dt; sh.rot += dt * 20;
@@ -989,7 +1196,7 @@
       if (g.mag) { g.sp = (g.sp || 120) + 900 * dt; g.x += dx / d * g.sp * dt; g.y += dy / d * g.sp * dt; }
       if (d < P.r + 6) {
         g.got = true;
-        if (g.heal) { const h = P.maxHp * g.heal; P.hp = Math.min(P.maxHp, P.hp + h); texts.push({ x: P.x, y: P.y - 20, t: '+' + fmtN(h), life: 0.9, color: '#9be08a' }); beep(660, 0.15, 'triangle', 0.05, 300); }
+        if (g.heal) { const h = P.maxHp * g.heal; P.hp = Math.min(P.maxHp, P.hp + h); texts.push({ x: P.x, y: P.y - 20, t: '+' + fmtN(h), life: 0.9, color: '#9be08a' }); sfx.heal(); }
         else if (g.coin) { run.gold += g.v * run.st.gold; sfx.coin(); }
         else { gainXp(g.v * run.st.xp); sfx.gem(); }
       }
@@ -1546,6 +1753,7 @@
   /* ================= Fin de partie et récompenses ================= */
   function endRun(win) {
     if (state === 'over' || state === 'hub') return;
+    windStop();
     state = 'over'; hurtFlash = 0;
     joy.active = false; $('joy').hidden = true;
     ['levelScreen', 'pauseScreen'].forEach(id => $(id).hidden = true);
@@ -1610,6 +1818,7 @@
   try { const t = sessionStorage.getItem('lanternes-tab'); if (TABS.some(x => x.id === t)) tab = t; } catch {}
 
   function openHub() {
+    windStop();
     state = 'hub';
     ['endScreen', 'pauseScreen', 'levelScreen'].forEach(id => $(id).hidden = true);
     $('hudWrap').hidden = true; $('boss').hidden = true;
@@ -1824,7 +2033,7 @@
   /* ================= Pause ================= */
   function pause() {
     if (state !== 'play') return;
-    state = 'pause'; keys.clear(); joy.active = false; $('joy').hidden = true;
+    state = 'pause'; windStop(); keys.clear(); joy.active = false; $('joy').hidden = true;
     $('pauseStats').innerHTML = statsHtml() + `<div><small>Ryō</small><strong><span class="coin"></span>${fmtN(run.gold)}</strong></div>`;
     $('muteBtn').textContent = save.mute ? 'Son : coupé' : 'Son : activé';
     $('pauseScreen').hidden = false;
@@ -1832,12 +2041,12 @@
   }
   function resume() {
     if (state !== 'pause') return;
-    $('pauseScreen').hidden = true; state = 'play'; last = performance.now();
+    $('pauseScreen').hidden = true; state = 'play'; last = performance.now(); windStart();
   }
   $('resumeBtn').addEventListener('click', resume);
   $('quitBtn').addEventListener('click', () => { $('pauseScreen').hidden = true; state = 'play'; endRun(false); });
   $('pauseBtn').addEventListener('click', () => state === 'play' ? pause() : resume());
-  $('muteBtn').addEventListener('click', () => { save.mute = !save.mute; persist(); $('muteBtn').textContent = save.mute ? 'Son : coupé' : 'Son : activé'; });
+  $('muteBtn').addEventListener('click', () => { save.mute = !save.mute; if (save.mute) windStop(); persist(); $('muteBtn').textContent = save.mute ? 'Son : coupé' : 'Son : activé'; });
 
   /* ================= Contrôles ================= */
   const keys = new Set();
