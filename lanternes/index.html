@@ -242,7 +242,7 @@
       <div class="clock"><b id="clock">03:00</b><small id="clockSub">avant le gardien</small></div>
       <div class="right">
         <div class="chip"><span class="coin"></span><span id="gold">0</span></div>
-        <div class="chip"><small>Yōkai</small><span id="kills">0</span></div>
+        <div class="chip"><small>Tués</small><span id="kills">0</span></div>
         <button class="icon-btn" id="pauseBtn" aria-label="Pause">II</button>
       </div>
     </div>
@@ -319,8 +319,8 @@
   };
 
   const ARENA = 2400, CELL = 48, STAGES = 50;
-  const HPG = 1.17;   // PV des yōkai : ×1,17 par niveau
-  const DMG = 1.12;   // dégâts des yōkai : ×1,12 par niveau
+  const HPG = 1.17;   // PV des morts-vivants : ×1,17 par niveau
+  const DMG = 1.12;   // dégâts des morts-vivants : ×1,12 par niveau
 
   /* ================= Icônes ================= */
   const svg = p => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
@@ -416,29 +416,29 @@
 
   // Régions : 10 niveaux chacune
   const ZONES = [
-    { name: 'Cour du temple', hue: 248, sat: 15, light: 32, grout: '#221e3a', outside: '#0b0a18', dark: 0.8, tree: 'sakura', part: 'petal',
-      boss: { name: 'Oni géant', c1: '#b8322f', c2: '#d9453e', moves: [] }, mix: { wisp: 10, fox: 6 } },
-    { name: 'Forêt de bambous', hue: 105, sat: 18, light: 25, grout: '#141f14', outside: '#070d07', dark: 0.8, tree: 'bamboo', part: 'leaf',
-      boss: { name: 'Roi Kappa', c1: '#2f6b48', c2: '#4fa36b', moves: ['dash', 'summon'] }, mix: { wisp: 5, fox: 6, kappa: 4, gaki: 4 } },
-    { name: 'Village sous la neige', hue: 215, sat: 18, light: 45, grout: '#5d6a83', outside: '#1b2233', dark: 0.72, tree: 'pine', part: 'snow',
-      boss: { name: 'Reine des neiges', c1: '#7fb8ff', c2: '#d6ecff', moves: ['dash', 'ring'] }, mix: { fox: 5, kappa: 3, tengu: 3, yuki: 5 } },
-    { name: 'Marais des brumes', hue: 165, sat: 18, light: 22, grout: '#0f2420', outside: '#050f0d', dark: 0.84, tree: 'dead', part: 'fog',
-      boss: { name: 'Seigneur des brumes', c1: '#5a3f7a', c2: '#8a6bb8', moves: ['ring', 'summon'] }, mix: { gaki: 8, kappa: 4, tengu: 3, yuki: 3, wisp: 4 } },
-    { name: 'Mont des Démons', hue: 8, sat: 28, light: 20, grout: '#1a0b0b', outside: '#0d0505', dark: 0.8, tree: 'rock', part: 'ember',
-      boss: { name: 'Roi des Oni', c1: '#5b0f14', c2: '#a51f2a', moves: ['dash', 'ring', 'summon'] }, mix: { brute: 5, tengu: 4, yuki: 4, gaki: 5, fox: 3 } },
+    { name: 'Cimetière du temple', hue: 248, sat: 15, light: 32, grout: '#221e3a', outside: '#0b0a18', dark: 0.8, tree: 'sakura', part: 'petal',
+      boss: { name: 'Zombie géant', c1: '#4d6b44', c2: '#7fa86a', look: 'stitch', moves: [] }, mix: { zombie: 10, chien: 6 } },
+    { name: 'Forêt maudite', hue: 105, sat: 18, light: 25, grout: '#141f14', outside: '#070d07', dark: 0.8, tree: 'bamboo', part: 'leaf',
+      boss: { name: 'Gonflé colossal', c1: '#6f8a44', c2: '#a8c26a', look: 'eyes', moves: ['dash', 'summon'] }, mix: { zombie: 5, chien: 6, gonfle: 4, rat: 4 } },
+    { name: 'Village abandonné', hue: 215, sat: 18, light: 45, grout: '#5d6a83', outside: '#1b2233', dark: 0.72, tree: 'pine', part: 'snow',
+      boss: { name: 'Liche des glaces', c1: '#3e5a7a', c2: '#c9d8e8', look: 'crown', moves: ['dash', 'ring'] }, mix: { chien: 5, gonfle: 3, squelette: 3, spectre: 5 } },
+    { name: 'Marais des noyés', hue: 165, sat: 18, light: 22, grout: '#0f2420', outside: '#050f0d', dark: 0.84, tree: 'dead', part: 'fog',
+      boss: { name: 'Nécromancien', c1: '#3a2a4a', c2: '#a89ab8', look: 'hood', moves: ['ring', 'summon'] }, mix: { rat: 8, gonfle: 4, squelette: 3, spectre: 3, zombie: 4 } },
+    { name: 'Mont des Damnés', hue: 8, sat: 28, light: 20, grout: '#1a0b0b', outside: '#0d0505', dark: 0.8, tree: 'rock', part: 'ember',
+      boss: { name: 'Roi des Morts', c1: '#4a1a1e', c2: '#9a7a6a', look: 'king', moves: ['dash', 'ring', 'summon'] }, mix: { abomination: 5, squelette: 4, spectre: 4, rat: 5, chien: 3 } },
   ];
   const zoneOf = s => ZONES[clamp(Math.floor((s - 1) / 10), 0, 4)];
 
   // Techniques en combat (améliorées pendant la partie)
   const WEAPONS = {
     shuriken: { name: 'Shurikens', color: '#d9e2ef', lv: [
-      { cd: 1.0, n: 1, dmg: 10, pierce: 1, d: 'Lance une étoile vers le yōkai le plus proche.' },
+      { cd: 1.0, n: 1, dmg: 10, pierce: 1, d: 'Lance une étoile vers le monstre le plus proche.' },
       { cd: 0.9, n: 1, dmg: 14, pierce: 1, d: 'Dégâts +40 %, lancer plus rapide.' },
       { cd: 0.9, n: 2, dmg: 14, pierce: 1, d: 'Lance 2 shurikens à la fois.' },
       { cd: 0.8, n: 2, dmg: 18, pierce: 2, d: 'Traverse 2 ennemis, dégâts accrus.' },
       { cd: 0.65, n: 3, dmg: 22, pierce: 3, d: 'Rafale de 3 shurikens perçants.' } ] },
     katana: { name: 'Katana', color: '#ffd28a', lv: [
-      { cd: 1.15, dmg: 22, r: 90, back: false, d: 'Tranche en arc le yōkai le plus proche.' },
+      { cd: 1.15, dmg: 22, r: 90, back: false, d: 'Tranche en arc le monstre le plus proche.' },
       { cd: 1.05, dmg: 30, r: 98, back: false, d: 'Lame plus longue, coup plus fort.' },
       { cd: 1.0, dmg: 30, r: 98, back: true, d: 'Tranche aussi derrière toi.' },
       { cd: 0.9, dmg: 42, r: 112, back: true, d: 'Portée et dégâts accrus.' },
@@ -456,7 +456,7 @@
       { cd: 2.6, n: 2, dmg: 26, r: 75, dur: 3.5, d: 'Feu plus intense.' },
       { cd: 2.3, n: 3, dmg: 32, r: 85, dur: 3.8, d: '3 brasiers à la fois.' } ] },
     bolt: { name: 'Foudre du ciel', color: '#fff27a', lv: [
-      { cd: 2.2, n: 1, dmg: 35, d: 'La foudre frappe un yōkai au hasard.' },
+      { cd: 2.2, n: 1, dmg: 35, d: 'La foudre frappe un monstre au hasard.' },
       { cd: 2.0, n: 2, dmg: 35, d: 'Frappe 2 cibles.' },
       { cd: 2.0, n: 2, dmg: 52, d: 'Éclairs plus puissants.' },
       { cd: 1.8, n: 3, dmg: 55, d: 'Frappe 3 cibles plus souvent.' },
@@ -472,14 +472,15 @@
   };
 
   const ENEMY = {
-    wisp:  { hp: 8,  speed: 72,  dmg: 5,  r: 11, xp: 1, col: '#5fd4ff' },
-    fox:   { hp: 7,  speed: 132, dmg: 4,  r: 10, xp: 1, col: '#ff8a3d' },
-    gaki:  { hp: 5,  speed: 96,  dmg: 3,  r: 8,  xp: 1, col: '#c9b48a' },
-    kappa: { hp: 42, speed: 50,  dmg: 10, r: 17, xp: 3, col: '#4fa36b' },
-    tengu: { hp: 22, speed: 64,  dmg: 7,  r: 13, xp: 2, col: '#d8443a' },
-    yuki:  { hp: 20, speed: 78,  dmg: 8, r: 12, xp: 2, col: '#cfe8ff' },
-    brute: { hp: 95, speed: 58,  dmg: 15, r: 20, xp: 5, col: '#a33a2e' },
+    zombie:      { hp: 8,  speed: 66,  dmg: 5,  r: 12, xp: 1, col: '#7fa86a' }, // lent, en masse
+    chien:       { hp: 7,  speed: 135, dmg: 4,  r: 10, xp: 1, col: '#8c8a6e' }, // chien zombie, rapide
+    rat:         { hp: 5,  speed: 98,  dmg: 3,  r: 7,  xp: 1, col: '#77726c' }, // arrive en meute de 4
+    gonfle:      { hp: 42, speed: 46,  dmg: 10, r: 18, xp: 3, col: '#a8c26a' }, // explose en mourant
+    squelette:   { hp: 22, speed: 62,  dmg: 7,  r: 12, xp: 2, col: '#ece6d2' }, // archer à distance
+    spectre:     { hp: 20, speed: 78,  dmg: 8,  r: 12, xp: 2, col: '#bfe9ff' }, // fonce sur toi
+    abomination: { hp: 95, speed: 56,  dmg: 15, r: 21, xp: 5, col: '#8f6464' }, // colosse recousu
   };
+
 
   /* ================= Sauvegarde ================= */
   const SAVE_KEY = 'lanternes-save-v2';
@@ -698,7 +699,7 @@
       type: 'boss', x, y, r: grand ? 50 : 40, hp, maxHp: hp, elite: false, grand,
       speed: 62 * (1 + Math.min(0.4, s * 0.008)), dmg: 16 * Math.pow(DMG, s - 1), xp: 40,
       flash: 0, kx: 0, ky: 0, orbitCd: 0, ph: 0, dir: 0, atk: 2.5, tele: 0, dashT: 0, dvx: 0, dvy: 0, moves,
-      c1: z.c1, c2: z.c2,
+      c1: z.c1, c2: z.c2, look: z.look,
     };
     enemies.push(e);
     boss = e;
@@ -711,7 +712,7 @@
     let sum = 0; for (const k in mix) sum += mix[k];
     let r = Math.random() * sum;
     for (const k in mix) if ((r -= mix[k]) < 0) return k;
-    return 'wisp';
+    return 'zombie';
   }
 
   /* ---------- Dégâts ---------- */
@@ -731,6 +732,11 @@
     const col = e.type === 'boss' ? e.c2 : ENEMY[e.type].col;
     burst(e.x, e.y, col, e.type === 'boss' ? 50 : e.elite ? 18 : 7);
     dropGem(e.x, e.y, e.xp);
+    if (e.type === 'gonfle') { // éclate en nuage toxique : ne reste pas collé !
+      burst(e.x, e.y, '#c9d94a', 26); burst(e.x, e.y, '#7a4f86', 10);
+      pools.push({ x: e.x, y: e.y, r: 70, dmg: 0, life: 0.5, max: 0.5, tick: 99, toxic: true });
+      if (Math.hypot(player.x - e.x, player.y - e.y) < 70 + player.r) hurtPlayer(e.dmg * 1.2);
+    }
     const cv = Math.max(1, Math.round(Math.pow(1.15, run.effS - 1)));
     if (e.type === 'boss') {
       boss = null; $('boss').hidden = true;
@@ -789,7 +795,7 @@
         }
         beep(1200, 0.03, 'triangle', 0.015, 300);
       } else if (id === 'katana') {
-        // vise le yōkai le plus proche à portée, sinon la direction de course
+        // vise le monstre le plus proche à portée, sinon la direction de course
         let tgt = null, best = (s.r + 70) ** 2;
         for (const e of enemies) { const d = (e.x - P.x) ** 2 + (e.y - P.y) ** 2 - e.r * e.r; if (d < best) { best = d; tgt = e; } }
         const dirs = [tgt ? Math.atan2(tgt.y - P.y, tgt.x - P.x) : Math.atan2(P.fy, P.fx)]; if (s.back) dirs.push(dirs[0] + Math.PI);
@@ -897,7 +903,7 @@
     while (spawnAcc >= 1) {
       spawnAcc--;
       const t = pickType();
-      if (t === 'gaki') { const [x, y] = spawnPos(); for (let i = 0; i < 4; i++) spawnEnemy('gaki', undefined, undefined, [clamp(x + rand(-30, 30), 20, ARENA - 20), clamp(y + rand(-30, 30), 20, ARENA - 20)]); }
+      if (t === 'rat') { const [x, y] = spawnPos(); for (let i = 0; i < 4; i++) spawnEnemy('rat', undefined, undefined, [clamp(x + rand(-30, 30), 20, ARENA - 20), clamp(y + rand(-30, 30), 20, ARENA - 20)]); }
       else spawnEnemy(t);
     }
     if (time >= nextRing) {
@@ -909,17 +915,18 @@
     if (!run.endless && !run.bossSpawned && time >= run.dur) { run.bossSpawned = true; spawnBoss(); }
     if (run.endless && time >= nextBoss) { nextBoss += 120; spawnBoss(); }
 
-    // Yōkai
+    // Morts-vivants
     for (const e of enemies) {
       const dx = P.x - e.x, dy = P.y - e.y, d = Math.hypot(dx, dy) || 1;
       let vx = dx / d * e.speed, vy = dy / d * e.speed;
       if (e.type === 'boss') [vx, vy] = bossAI(e, dt, dx, dy, d);
-      else if (e.type === 'tengu') {
+      else if (e.type === 'squelette') {
         if (d < 230) { vx = -vx * 0.7 + (-dy / d) * e.speed * 0.6; vy = -vy * 0.7 + (dx / d) * e.speed * 0.6; }
         e.shoot -= dt;
-        if (e.shoot <= 0 && d < 460) { e.shoot = rand(2.2, 3.2); foes.push({ x: e.x, y: e.y, vx: dx / d * 210, vy: dy / d * 210, life: 3, dmg: e.dmg, kind: 'feather' }); }
-      } else if (e.type === 'fox') { e.ph += dt * 6; vx += Math.cos(e.ph) * 30; vy += Math.sin(e.ph) * 30; }
-      else if (e.type === 'yuki') {
+        if (e.shoot <= 0 && d < 460) { e.shoot = rand(2.2, 3.2); foes.push({ x: e.x, y: e.y, vx: dx / d * 230, vy: dy / d * 230, life: 3, dmg: e.dmg, kind: 'arrow' }); }
+      } else if (e.type === 'chien') { e.ph += dt * 6; vx += Math.cos(e.ph) * 30; vy += Math.sin(e.ph) * 30; }
+      else if (e.type === 'zombie') { e.ph += dt; vx += Math.cos(e.ph * 1.3) * 14; vy += Math.sin(e.ph * 1.7) * 14; }
+      else if (e.type === 'spectre') {
         e.dashCd -= dt;
         if (e.dash > 0) { e.dash -= dt; vx *= 3.6; vy *= 3.6; }
         else if (e.dashCd <= 0 && d < 380) { e.dash = 0.35; e.dashCd = rand(2.5, 4); }
@@ -1094,6 +1101,12 @@
 
     for (const p of pools) {
       const a = Math.min(1, p.life / 0.5, (p.max - p.life) / 0.2 + 0.3);
+      if (p.toxic) { // nuage du Gonflé
+        const k = p.life / p.max, g = ctx.createRadialGradient(p.x, p.y, 4, p.x, p.y, p.r * (1.2 - k * 0.4));
+        g.addColorStop(0, `rgba(200,220,80,${0.7 * k})`); g.addColorStop(1, 'rgba(120,80,140,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 1.2, 0, TAU); ctx.fill();
+        continue;
+      }
       const g = ctx.createRadialGradient(p.x, p.y, 4, p.x, p.y, p.r);
       g.addColorStop(0, `rgba(255,220,120,${0.85 * a})`); g.addColorStop(0.6, `rgba(255,120,40,${0.55 * a})`); g.addColorStop(1, 'rgba(255,60,20,0)');
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, TAU); ctx.fill();
@@ -1119,8 +1132,9 @@
       } else {
         const a = Math.atan2(f.vy, f.vx);
         ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(a);
-        ctx.fillStyle = '#e8e0d0'; ctx.beginPath(); ctx.ellipse(0, 0, 9, 3.5, 0, 0, TAU); ctx.fill();
-        ctx.strokeStyle = '#d8443a'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(-9, 0); ctx.lineTo(9, 0); ctx.stroke();
+        ctx.strokeStyle = '#8a6a44'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-11, 0); ctx.lineTo(8, 0); ctx.stroke(); // flèche d'os
+        ctx.fillStyle = '#ece6d2'; ctx.beginPath(); ctx.moveTo(12, 0); ctx.lineTo(6, -3.5); ctx.lineTo(6, 3.5); ctx.fill();
+        ctx.fillStyle = '#6aa84a'; ctx.beginPath(); ctx.moveTo(-11, 0); ctx.lineTo(-15, -4); ctx.lineTo(-8, 0); ctx.lineTo(-15, 4); ctx.fill();
         ctx.restore();
       }
     }
@@ -1179,7 +1193,7 @@
     };
     hole(P.x, P.y, 300);
     for (const l of lanterns) hole(l.x, l.y, 170 + Math.sin(t * 7 + l.f) * 6, 0.85);
-    for (const p of pools) hole(p.x, p.y, p.r * 2.2, 0.9);
+    for (const p of pools) if (!p.toxic) hole(p.x, p.y, p.r * 2.2, 0.9);
     for (const b of bolts) hole(b.x, b.y, 160);
     if (boss) hole(boss.x, boss.y, 140, 0.7);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -1196,8 +1210,8 @@
       ctx.fillStyle = g.coin ? 'rgba(255,209,102,0.2)' : 'rgba(111,240,224,0.18)';
       ctx.beginPath(); ctx.arc(g.x, g.y, g.v > 4 && !g.coin ? 14 : 9, 0, TAU); ctx.fill();
     }
-    for (const e of enemies) if ((e.type === 'wisp' || e.elite) && vis(e.x, e.y, 30)) {
-      ctx.fillStyle = e.elite ? 'rgba(255,209,102,0.16)' : 'rgba(95,212,255,0.16)'; ctx.beginPath(); ctx.arc(e.x, e.y - 4, e.r * 1.8, 0, TAU); ctx.fill();
+    for (const e of enemies) if ((e.type === 'spectre' || e.elite) && vis(e.x, e.y, 30)) {
+      ctx.fillStyle = e.elite ? 'rgba(255,209,102,0.16)' : 'rgba(191,233,255,0.14)'; ctx.beginPath(); ctx.arc(e.x, e.y - 4, e.r * 1.8, 0, TAU); ctx.fill();
     }
     for (const f of foes) if (f.kind === 'orb') { ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.beginPath(); ctx.arc(f.x, f.y, 14, 0, TAU); ctx.fill(); }
     ctx.globalCompositeOperation = 'source-over';
@@ -1310,83 +1324,128 @@
   }
   function drawEnemy(e, t) {
     const { x, y, r } = e, fl = e.flash > 0;
+    const C = c => fl ? '#fff' : c;
     shadow(x, y, r);
     if (e.elite) { ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(x, y, r + 5, 0, TAU); ctx.stroke(); }
-    if (e.type === 'wisp') {
-      const wob = Math.sin(t * 10 + e.ph) * 3;
-      ctx.fillStyle = fl ? '#fff' : '#5fd4ff';
-      ctx.beginPath(); ctx.moveTo(x + wob, y - r * 2.1);
-      ctx.quadraticCurveTo(x + r * 1.2, y - r * 0.4, x + r, y);
-      ctx.arc(x, y, r, 0, Math.PI);
-      ctx.quadraticCurveTo(x - r * 1.2, y - r * 0.4, x + wob, y - r * 2.1); ctx.fill();
-      ctx.fillStyle = fl ? '#fff' : '#c8f4ff'; ctx.beginPath(); ctx.arc(x, y + 1, r * 0.55, 0, TAU); ctx.fill();
-      ctx.fillStyle = '#13112a'; ctx.fillRect(x - 4, y - 1, 2.5, 4); ctx.fillRect(x + 1.5, y - 1, 2.5, 4);
-    } else if (e.type === 'fox') {
+    if (e.type === 'zombie') {
+      const sw = Math.sin(t * 6 + e.ph) * 3;
       ctx.save(); ctx.translate(x, y); ctx.rotate(e.dir);
-      ctx.fillStyle = fl ? '#fff' : '#f6efe2';
-      ctx.beginPath(); ctx.ellipse(-r * 1.4, Math.sin(t * 12 + e.ph) * 3, r * 0.9, r * 0.45, 0, 0, TAU); ctx.fill();
-      ctx.fillStyle = fl ? '#fff' : '#ff8a3d';
-      ctx.beginPath(); ctx.ellipse(0, 0, r * 1.15, r * 0.8, 0, 0, TAU); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(r * 0.3, -r * 0.6); ctx.lineTo(r * 0.7, -r * 1.3); ctx.lineTo(r * 0.95, -r * 0.4); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(r * 0.3, r * 0.6); ctx.lineTo(r * 0.7, r * 1.3); ctx.lineTo(r * 0.95, r * 0.4); ctx.fill();
-      ctx.fillStyle = '#13112a'; ctx.fillRect(r * 0.55, -r * 0.35, 3, 2); ctx.fillRect(r * 0.55, r * 0.2, 3, 2);
+      ctx.fillStyle = C('#6e9460'); // bras tendus vers le ninja
+      ctx.fillRect(r * 0.1, -r * 0.9 + sw * 0.3, r * 1.25, 5); ctx.fillRect(r * 0.1, r * 0.9 - 5 - sw * 0.3, r * 1.25, 5);
+      ctx.fillStyle = C('#4d3f5c'); ctx.beginPath(); ctx.ellipse(-r * 0.15, 0, r * 0.75, r, 0, 0, TAU); ctx.fill(); // chemise
+      ctx.fillStyle = C('#3a2f46'); ctx.fillRect(-r * 0.6, r * 0.2, r * 0.4, r * 0.5); // déchirure
+      ctx.fillStyle = C('#7fa86a'); ctx.beginPath(); ctx.arc(r * 0.15, 0, r * 0.68, 0, TAU); ctx.fill(); // tête
+      ctx.fillStyle = C('#5d8250'); ctx.beginPath(); ctx.arc(-r * 0.05, -r * 0.2, r * 0.2, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#f2ead2'; ctx.beginPath(); ctx.arc(r * 0.45, -r * 0.25, 2.6, 0, TAU); ctx.arc(r * 0.45, r * 0.25, 2.6, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#c0262d'; ctx.beginPath(); ctx.arc(r * 0.52, -r * 0.25, 1.2, 0, TAU); ctx.arc(r * 0.52, r * 0.25, 1.2, 0, TAU); ctx.fill();
       ctx.restore();
-    } else if (e.type === 'gaki') {
-      ctx.fillStyle = fl ? '#fff' : '#c9b48a'; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
-      ctx.fillStyle = fl ? '#fff' : '#a8936a'; ctx.beginPath(); ctx.ellipse(x, y + 3, r * 0.7, r * 0.5, 0, 0, TAU); ctx.fill();
-      ctx.fillStyle = '#13112a'; ctx.beginPath(); ctx.arc(x - 3, y - 2, 1.8, 0, TAU); ctx.arc(x + 3, y - 2, 1.8, 0, TAU); ctx.fill();
-      ctx.fillRect(x - 2, y + 2, 4, 2);
-    } else if (e.type === 'kappa') {
-      ctx.fillStyle = fl ? '#fff' : '#2f6b48'; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
-      ctx.fillStyle = fl ? '#fff' : '#4fa36b'; ctx.beginPath(); ctx.arc(x, y - 2, r * 0.82, 0, TAU); ctx.fill();
-      ctx.fillStyle = '#bfe3cf'; ctx.beginPath(); ctx.ellipse(x, y - r * 0.55, r * 0.45, r * 0.25, 0, 0, TAU); ctx.fill();
-      ctx.fillStyle = '#13112a'; ctx.beginPath(); ctx.arc(x - r * 0.3, y + 1, 2.2, 0, TAU); ctx.arc(x + r * 0.3, y + 1, 2.2, 0, TAU); ctx.fill();
-      ctx.fillStyle = '#f2c84b'; ctx.beginPath(); ctx.ellipse(x, y + r * 0.4, r * 0.3, r * 0.18, 0, 0, TAU); ctx.fill();
-    } else if (e.type === 'tengu') {
-      const flap = Math.sin(t * 14 + e.ph) * 0.4;
-      ctx.fillStyle = fl ? '#fff' : '#1e1c2e';
-      ctx.beginPath(); ctx.ellipse(x - r * 1.1, y, r * 0.9, r * 0.45, -0.4 - flap, 0, TAU); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(x + r * 1.1, y, r * 0.9, r * 0.45, 0.4 + flap, 0, TAU); ctx.fill();
-      ctx.fillStyle = fl ? '#fff' : '#d8443a'; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+    } else if (e.type === 'chien') {
+      const run = t * 16 + e.ph;
       ctx.save(); ctx.translate(x, y); ctx.rotate(e.dir);
-      ctx.fillStyle = fl ? '#fff' : '#b32d25'; ctx.beginPath(); ctx.moveTo(r * 0.4, -3); ctx.lineTo(r * 1.6, 0); ctx.lineTo(r * 0.4, 3); ctx.fill();
+      ctx.fillStyle = '#2b2a22';
+      for (const [lx, ly, k] of [[r * 0.6, -r * 0.6, 0], [r * 0.6, r * 0.6, 1], [-r * 0.6, -r * 0.6, 1], [-r * 0.6, r * 0.6, 0]]) { ctx.beginPath(); ctx.arc(lx + Math.sin(run + k * Math.PI) * 3, ly, 2.6, 0, TAU); ctx.fill(); }
+      ctx.strokeStyle = C('#6b6852'); ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-r * 1.2, 0); ctx.lineTo(-r * 1.7, Math.sin(run) * 3); ctx.stroke(); // moignon de queue
+      ctx.fillStyle = C('#7d7a62'); ctx.beginPath(); ctx.ellipse(0, 0, r * 1.25, r * 0.62, 0, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#47452f'; ctx.lineWidth = 1.5; // côtes apparentes
+      for (let i = 0; i < 4; i++) { const cx = -r * 0.45 + i * r * 0.25; ctx.beginPath(); ctx.moveTo(cx, -r * 0.5); ctx.lineTo(cx, r * 0.5); ctx.stroke(); }
+      ctx.fillStyle = C('#9b2a2a'); ctx.beginPath(); ctx.ellipse(-r * 0.6, r * 0.2, r * 0.25, r * 0.18, 0.4, 0, TAU); ctx.fill(); // plaie
+      ctx.fillStyle = C('#8c8a6e'); ctx.beginPath(); ctx.arc(r * 1.05, 0, r * 0.52, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(r * 1.55, 0, r * 0.38, r * 0.26, 0, 0, TAU); ctx.fill(); // museau
+      ctx.fillStyle = C('#5f5d48');
+      ctx.beginPath(); ctx.moveTo(r * 0.8, -r * 0.35); ctx.lineTo(r * 0.55, -r * 0.95); ctx.lineTo(r * 1.1, -r * 0.45); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(r * 0.8, r * 0.35); ctx.lineTo(r * 0.55, r * 0.95); ctx.lineTo(r * 1.1, r * 0.45); ctx.fill();
+      ctx.fillStyle = '#ff3b3b'; ctx.fillRect(r * 1.15, -r * 0.3, 3, 2.5); ctx.fillRect(r * 1.15, r * 0.3 - 2.5, 3, 2.5);
+      ctx.fillStyle = '#f2ead2'; ctx.fillRect(r * 1.75, -2, 3, 1.5); ctx.fillRect(r * 1.75, 0.5, 3, 1.5); // crocs
       ctx.restore();
-      ctx.fillStyle = '#fff'; ctx.fillRect(x - r * 0.45, y - r * 0.4, 4, 2); ctx.fillRect(x + r * 0.15, y - r * 0.4, 4, 2);
-    } else if (e.type === 'yuki') {
-      ctx.globalAlpha = e.dash > 0 ? 0.6 : 0.92;
-      ctx.fillStyle = fl ? '#fff' : '#cfe8ff';
-      ctx.beginPath(); ctx.arc(x, y - 2, r, Math.PI, 0); ctx.lineTo(x + r, y + r);
-      for (let i = 0; i < 4; i++) ctx.lineTo(x + r - (i + 0.5) * r / 2, y + r * (i % 2 ? 1 : 0.55));
-      ctx.lineTo(x - r, y + r); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = '#13112a'; ctx.fillRect(x - r, y - r * 0.9, r * 2, r * 0.5);
-      ctx.fillStyle = '#7fb8ff'; ctx.fillRect(x - 5, y - 2, 3, 3); ctx.fillRect(x + 2, y - 2, 3, 3);
+    } else if (e.type === 'rat') {
+      ctx.save(); ctx.translate(x, y); ctx.rotate(e.dir);
+      ctx.strokeStyle = '#c98a94'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(-r, 0); ctx.quadraticCurveTo(-r * 1.8, Math.sin(t * 14 + e.ph) * 5, -r * 2.4, 0); ctx.stroke();
+      ctx.fillStyle = C('#77726c'); ctx.beginPath(); ctx.ellipse(0, 0, r * 1.15, r * 0.7, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = C('#5a5651'); ctx.beginPath(); ctx.arc(-r * 0.2, -r * 0.1, r * 0.35, 0, TAU); ctx.fill(); // pelage pelé
+      ctx.fillStyle = C('#c98a94'); ctx.beginPath(); ctx.arc(r * 0.45, -r * 0.6, 2.4, 0, TAU); ctx.arc(r * 0.45, r * 0.6, 2.4, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#ff3b3b'; ctx.beginPath(); ctx.arc(r * 0.8, -r * 0.3, 1.3, 0, TAU); ctx.arc(r * 0.8, r * 0.3, 1.3, 0, TAU); ctx.fill();
+      ctx.restore();
+    } else if (e.type === 'gonfle') {
+      const p = 1 + Math.sin(t * 5 + e.ph) * 0.06, rr = r * p;
+      ctx.fillStyle = C('#9db464'); ctx.beginPath(); ctx.arc(x, y, rr, 0, TAU); ctx.fill();
+      ctx.fillStyle = C('#b9cf7c'); ctx.beginPath(); ctx.arc(x - rr * 0.2, y - rr * 0.25, rr * 0.6, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#7a4f86'; ctx.lineWidth = 1.5; // veines
+      ctx.beginPath(); ctx.moveTo(x - rr * 0.7, y + rr * 0.1); ctx.quadraticCurveTo(x - rr * 0.3, y + rr * 0.4, x, y + rr * 0.2); ctx.moveTo(x + rr * 0.6, y - rr * 0.3); ctx.quadraticCurveTo(x + rr * 0.3, y, x + rr * 0.5, y + rr * 0.4); ctx.stroke();
+      ctx.fillStyle = '#c9d94a';
+      for (const [px, py, pr] of [[0.45, 0.35, 0.16], [-0.5, -0.45, 0.12], [0.1, 0.6, 0.1], [0.55, -0.45, 0.11]]) { ctx.beginPath(); ctx.arc(x + rr * px, y + rr * py, rr * pr, 0, TAU); ctx.fill(); }
+      ctx.fillStyle = '#2b1f2e'; ctx.beginPath(); ctx.arc(x - rr * 0.25, y - rr * 0.05, 2.4, 0, TAU); ctx.arc(x + rr * 0.15, y - rr * 0.1, 2, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#4a2a35'; ctx.beginPath(); ctx.ellipse(x - rr * 0.05, y + rr * 0.3, rr * 0.25, rr * 0.12, 0, 0, TAU); ctx.fill();
+    } else if (e.type === 'squelette') {
+      ctx.save(); ctx.translate(x, y); ctx.rotate(e.dir);
+      ctx.strokeStyle = '#6b4a2a'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(r * 0.5, 0, r * 1.1, -1.1, 1.1); ctx.stroke(); // arc
+      ctx.strokeStyle = '#d9d2bc'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(r * 0.5 + Math.cos(-1.1) * r * 1.1, Math.sin(-1.1) * r * 1.1); ctx.lineTo(r * 0.5 + Math.cos(1.1) * r * 1.1, Math.sin(1.1) * r * 1.1); ctx.stroke();
+      ctx.restore();
+      ctx.strokeStyle = C('#d9d2bc'); ctx.lineWidth = 2; // cage thoracique
+      ctx.beginPath(); ctx.moveTo(x, y + r * 0.2); ctx.lineTo(x, y + r * 1.1); ctx.stroke();
+      for (let i = 0; i < 3; i++) { const yy = y + r * 0.4 + i * r * 0.25, w = r * (0.7 - i * 0.12); ctx.beginPath(); ctx.moveTo(x - w, yy); ctx.quadraticCurveTo(x, yy - 4, x + w, yy); ctx.stroke(); }
+      ctx.fillStyle = C('#ece6d2'); ctx.beginPath(); ctx.arc(x, y - r * 0.2, r * 0.7, 0, TAU); ctx.fill(); // crâne
+      ctx.fillRect(x - r * 0.35, y + r * 0.2, r * 0.7, r * 0.3);
+      ctx.fillStyle = '#1b1820'; ctx.beginPath(); ctx.arc(x - r * 0.28, y - r * 0.25, r * 0.2, 0, TAU); ctx.arc(x + r * 0.28, y - r * 0.25, r * 0.2, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#ffb347'; ctx.beginPath(); ctx.arc(x - r * 0.28, y - r * 0.25, 1.4, 0, TAU); ctx.arc(x + r * 0.28, y - r * 0.25, 1.4, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#1b1820'; for (let i = 0; i < 3; i++) ctx.fillRect(x - r * 0.25 + i * r * 0.2, y + r * 0.25, 1.5, r * 0.22);
+    } else if (e.type === 'spectre') {
+      ctx.globalAlpha = e.dash > 0 ? 0.5 : 0.82;
+      const wav = t * 8 + e.ph;
+      ctx.fillStyle = C('#bfe9ff');
+      ctx.beginPath(); ctx.arc(x, y - 2, r, Math.PI, 0); ctx.lineTo(x + r, y + r * 0.6);
+      for (let i = 0; i <= 5; i++) ctx.lineTo(x + r - i * r * 0.4, y + r * (i % 2 ? 1.25 : 0.7) + Math.sin(wav + i) * 2);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#0d1a2a';
+      ctx.beginPath(); ctx.ellipse(x - r * 0.35, y - r * 0.15, r * 0.18, r * 0.28, 0, 0, TAU); ctx.ellipse(x + r * 0.35, y - r * 0.15, r * 0.18, r * 0.28, 0, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(x, y + r * 0.4, r * 0.2, r * 0.3, 0, 0, TAU); ctx.fill(); // bouche hurlante
       ctx.globalAlpha = 1;
-    } else if (e.type === 'brute') {
+    } else if (e.type === 'abomination') {
       ctx.save(); ctx.translate(x, y); ctx.rotate(e.dir);
-      ctx.fillStyle = '#4a3a2a'; ctx.fillRect(r * 0.4, r * 0.5, r * 1.3, 6);
-      ctx.fillStyle = '#2a2018'; ctx.beginPath(); ctx.arc(r * 1.7, r * 0.5 + 3, 6, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#5a4a3a'; ctx.fillRect(r * 0.5, r * 0.55, r * 0.9, 5); // manche
+      ctx.fillStyle = '#b8bcc4'; ctx.fillRect(r * 1.3, r * 0.2, r * 0.7, r * 0.75); // hachoir
+      ctx.fillStyle = '#8a2a2a'; ctx.fillRect(r * 1.3, r * 0.75, r * 0.7, r * 0.2);
       ctx.restore();
-      ctx.fillStyle = fl ? '#fff' : '#7a2a22'; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
-      ctx.fillStyle = fl ? '#fff' : '#a33a2e'; ctx.beginPath(); ctx.arc(x, y - 3, r * 0.8, 0, TAU); ctx.fill();
-      ctx.fillStyle = '#efe6cf';
-      ctx.beginPath(); ctx.moveTo(x - r * 0.5, y - r * 0.6); ctx.lineTo(x - r * 0.6, y - r * 1.2); ctx.lineTo(x - r * 0.2, y - r * 0.75); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(x + r * 0.5, y - r * 0.6); ctx.lineTo(x + r * 0.6, y - r * 1.2); ctx.lineTo(x + r * 0.2, y - r * 0.75); ctx.fill();
-      ctx.fillStyle = '#ffd54a'; ctx.fillRect(x - 8, y - 6, 5, 4); ctx.fillRect(x + 3, y - 6, 5, 4);
+      ctx.fillStyle = C('#8f6464'); ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+      ctx.fillStyle = C('#7c8f5e'); ctx.beginPath(); ctx.arc(x - r * 0.45, y + r * 0.2, r * 0.5, 0, TAU); ctx.fill(); // chair rapiécée
+      ctx.fillStyle = C('#b58a7a'); ctx.beginPath(); ctx.arc(x + r * 0.2, y - r * 0.25, r * 0.55, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#2b1f22'; ctx.lineWidth = 1.5; // points de suture
+      ctx.beginPath(); ctx.moveTo(x - r * 0.8, y - r * 0.2); ctx.lineTo(x + r * 0.7, y + r * 0.5); ctx.stroke();
+      for (let i = 0; i < 5; i++) { const k = i / 4, sx = x - r * 0.8 + k * r * 1.5, sy = y - r * 0.2 + k * r * 0.7; ctx.beginPath(); ctx.moveTo(sx - 2, sy - 4); ctx.lineTo(sx + 2, sy + 4); ctx.stroke(); }
+      ctx.fillStyle = '#ffe14a';
+      for (const [ex, ey, er] of [[0.05, -0.4, 3.5], [0.45, -0.3, 2.6], [-0.3, -0.5, 2.2]]) { ctx.beginPath(); ctx.arc(x + r * ex, y + r * ey, er, 0, TAU); ctx.fill(); }
+      ctx.fillStyle = '#1b1418'; ctx.fillRect(x - r * 0.2, y + r * 0.05, r * 0.5, 4);
     } else if (e.type === 'boss') {
-      ctx.fillStyle = '#efe6cf';
-      ctx.beginPath(); ctx.moveTo(x - r * 0.6, y - r * 0.6); ctx.lineTo(x - r * 0.75, y - r * 1.35); ctx.lineTo(x - r * 0.25, y - r * 0.8); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(x + r * 0.6, y - r * 0.6); ctx.lineTo(x + r * 0.75, y - r * 1.35); ctx.lineTo(x + r * 0.25, y - r * 0.8); ctx.fill();
-      ctx.fillStyle = fl ? '#fff' : e.c1; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
-      ctx.fillStyle = fl ? '#fff' : e.c2; ctx.beginPath(); ctx.arc(x, y - 4, r * 0.85, 0, TAU); ctx.fill();
-      const er = r * 0.15;
-      ctx.fillStyle = '#ffd54a'; ctx.beginPath(); ctx.arc(x - r * 0.33, y - r * 0.25, er, 0, TAU); ctx.arc(x + r * 0.33, y - r * 0.25, er, 0, TAU); ctx.fill();
-      ctx.fillStyle = '#13112a'; ctx.beginPath(); ctx.arc(x - r * 0.33, y - r * 0.25, er * 0.42, 0, TAU); ctx.arc(x + r * 0.33, y - r * 0.25, er * 0.42, 0, TAU); ctx.fill();
-      ctx.fillStyle = '#13112a'; ctx.fillRect(x - r * 0.4, y + r * 0.2, r * 0.8, r * 0.25);
-      ctx.fillStyle = '#fff';
-      for (let i = 0; i < 4; i++) { const tx = x - r * 0.35 + i * r * 0.2; ctx.beginPath(); ctx.moveTo(tx, y + r * 0.2); ctx.lineTo(tx + r * 0.1, y + r * 0.35); ctx.lineTo(tx + r * 0.2, y + r * 0.2); ctx.fill(); }
-      if (e.grand) { ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.moveTo(x - 14, y - r * 0.95); ctx.lineTo(x - 8, y - r * 1.25); ctx.lineTo(x, y - r * 1.05); ctx.lineTo(x + 8, y - r * 1.25); ctx.lineTo(x + 14, y - r * 0.95); ctx.fill(); }
+      const look = e.look;
+      ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.arc(x, y, r * 1.12, 0, TAU); ctx.fill();
+      if (look === 'hood') { ctx.fillStyle = C('#1d1426'); ctx.beginPath(); ctx.arc(x, y + 2, r * 1.08, 0, TAU); ctx.fill(); }
+      ctx.fillStyle = C(e.c1); ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+      ctx.fillStyle = C(e.c2); ctx.beginPath(); ctx.arc(x - r * 0.05, y - 4, r * 0.85, 0, TAU); ctx.fill();
+      if (look === 'hood') { ctx.fillStyle = C('#2a1d38'); ctx.beginPath(); ctx.arc(x, y - r * 0.15, r, Math.PI * 1.05, Math.PI * 1.95); ctx.lineTo(x + r * 0.6, y - r * 0.55); ctx.lineTo(x - r * 0.6, y - r * 0.55); ctx.fill(); }
+      if (look === 'stitch' || look === 'king') {
+        ctx.strokeStyle = '#2b1f22'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(x - r * 0.75, y - r * 0.55); ctx.quadraticCurveTo(x, y - r * 0.85, x + r * 0.7, y - r * 0.5); ctx.stroke();
+        for (let i = 0; i < 6; i++) { const k = i / 5, sx = x - r * 0.65 + k * r * 1.3, sy = y - r * 0.62 - Math.sin(k * Math.PI) * r * 0.12; ctx.beginPath(); ctx.moveTo(sx, sy - 5); ctx.lineTo(sx, sy + 5); ctx.stroke(); }
+      }
+      const glow = look === 'crown' ? '#7fe9ff' : look === 'hood' ? '#c084fc' : '#ff3b3b';
+      const er = r * 0.14;
+      ctx.fillStyle = '#120e14'; ctx.beginPath(); ctx.arc(x - r * 0.33, y - r * 0.2, er * 1.3, 0, TAU); ctx.arc(x + r * 0.33, y - r * 0.2, er * 1.3, 0, TAU); ctx.fill();
+      ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(x - r * 0.33, y - r * 0.2, er * 0.7, 0, TAU); ctx.arc(x + r * 0.33, y - r * 0.2, er * 0.7, 0, TAU); ctx.fill();
+      if (look === 'eyes') { ctx.fillStyle = '#ffe14a'; for (const [ex, ey] of [[0, -0.55], [-0.6, 0.15], [0.6, 0.2], [0.25, 0.55]]) { ctx.beginPath(); ctx.arc(x + r * ex, y + r * ey, er * 0.6, 0, TAU); ctx.fill(); } }
+      // mâchoire pourrie
+      ctx.fillStyle = '#1b1418'; ctx.fillRect(x - r * 0.42, y + r * 0.18, r * 0.84, r * 0.28);
+      ctx.fillStyle = '#e6dcc0';
+      for (let i = 0; i < 5; i++) { const tx = x - r * 0.38 + i * r * 0.17; ctx.fillRect(tx, y + r * 0.18, r * 0.1, r * (i % 2 ? 0.1 : 0.16)); }
+      if (look === 'crown' || look === 'king' || e.grand) {
+        ctx.fillStyle = look === 'crown' ? '#a8e6ff' : '#ffd166';
+        ctx.beginPath(); ctx.moveTo(x - r * 0.45, y - r * 0.8); ctx.lineTo(x - r * 0.4, y - r * 1.2); ctx.lineTo(x - r * 0.15, y - r * 0.95); ctx.lineTo(x, y - r * 1.3); ctx.lineTo(x + r * 0.15, y - r * 0.95); ctx.lineTo(x + r * 0.4, y - r * 1.2); ctx.lineTo(x + r * 0.45, y - r * 0.8); ctx.closePath(); ctx.fill();
+      }
+      if (look === 'king') {
+        ctx.fillStyle = '#d9cfb0';
+        ctx.beginPath(); ctx.moveTo(x - r * 0.7, y - r * 0.5); ctx.lineTo(x - r * 1.05, y - r * 1.2); ctx.lineTo(x - r * 0.45, y - r * 0.75); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(x + r * 0.7, y - r * 0.5); ctx.lineTo(x + r * 1.05, y - r * 1.2); ctx.lineTo(x + r * 0.45, y - r * 0.75); ctx.fill();
+      }
     }
-    if ((e.type === 'kappa' || e.type === 'tengu' || e.type === 'brute' || e.elite) && e.hp < e.maxHp) {
+    if ((e.type === 'gonfle' || e.type === 'squelette' || e.type === 'abomination' || e.elite) && e.hp < e.maxHp) {
       ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(x - r, y - r - 9, r * 2, 3);
       ctx.fillStyle = '#e5484d'; ctx.fillRect(x - r, y - r - 9, r * 2 * Math.max(0, e.hp / e.maxHp), 3);
     }
@@ -1480,7 +1539,7 @@
   }
   function statsHtml() {
     return `<div><small>Temps</small><strong>${fmtT(time)}</strong></div>` +
-      `<div><small>Yōkai</small><strong>${kills}</strong></div>` +
+      `<div><small>Tués</small><strong>${kills}</strong></div>` +
       `<div><small>Niveau</small><strong>${player.level}</strong></div>`;
   }
 
@@ -1646,7 +1705,7 @@
       <div class="items">${ARMS.map(it => gearCard('arms', it, save.arms[it.id], save.arm === it.id)).join('')}</div>`;
   }
   function tabArmor() {
-    return `<h3>Armurerie<small>Armures</small></h3><p class="lead">L’armure ajoute des PV et de la défense. La défense réduit chaque coup reçu. Les yōkai frappent plus fort à chaque nuit, alors garde ton armure à niveau. Ascension tous les 10 niveaux&nbsp;: +40&nbsp;%.</p>
+    return `<h3>Armurerie<small>Armures</small></h3><p class="lead">L’armure ajoute des PV et de la défense. La défense réduit chaque coup reçu. Les morts-vivants frappent plus fort à chaque nuit, alors garde ton armure à niveau. Ascension tous les 10 niveaux&nbsp;: +40&nbsp;%.</p>
       <div class="items">${ARMORS.map(it => gearCard('armor', it, save.armors[it.id], save.armor === it.id)).join('')}</div>`;
   }
   function tabCharms() {
@@ -1703,7 +1762,7 @@
     const cleared = Object.keys(save.cleared).length;
     return `<h3>Options</h3>
       <div class="opt"><b>Son</b><div class="row" style="justify-content:flex-start"><button class="btn sm ghost" data-act="mute">${save.mute ? 'Activer le son' : 'Couper le son'}</button></div></div>
-      <div class="opt"><b>Statistiques</b><div class="statline"><span>Nuits gagnées <b>${cleared} / ${STAGES}</b></span><span>Parties <b>${save.runs}</b></span><span>Yōkai vaincus <b>${fmtN(save.kills)}</b></span></div></div>
+      <div class="opt"><b>Statistiques</b><div class="statline"><span>Nuits gagnées <b>${cleared} / ${STAGES}</b></span><span>Parties <b>${save.runs}</b></span><span>Monstres tués <b>${fmtN(save.kills)}</b></span></div></div>
       <div class="opt"><b>Code de sauvegarde</b><p class="lead">Ta progression est enregistrée dans ce navigateur. Copie ce code pour la reprendre ailleurs, puis colle-le ci-dessous sur l’autre appareil.</p>
         <textarea id="saveOut" readonly>${btoa(unescape(encodeURIComponent(JSON.stringify(save))))}</textarea>
         <div class="row" style="justify-content:flex-start"><button class="btn sm ghost" data-act="copy">Copier le code</button></div>
