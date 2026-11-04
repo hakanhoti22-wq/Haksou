@@ -12,7 +12,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <title>Pointage MIC</title>
 <style>
-:root{--bg:#0b1220;--card:#131c2e;--line:#22304a;--txt:#e2e8f0;--mut:#8a9bb5;--ok:#22c55e;--ko:#f97316;--acc:#38bdf8}
+:root{--bg:#0b1220;--card:#131c2e;--line:#22304a;--txt:#e2e8f0;--mut:#8a9bb5;--ok:#22c55e;--ko:#f97316;--acc:#38bdf8;--pro:#a78bfa}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
 body{padding:calc(env(safe-area-inset-top) + 12px) 16px calc(env(safe-area-inset-bottom) + 84px)}
@@ -22,6 +22,8 @@ h2{font-size:15px;color:var(--mut);font-weight:600;margin:20px 0 8px;text-transf
 .status{display:flex;align-items:center;gap:12px}
 .dot{width:14px;height:14px;border-radius:50%;background:var(--mut);flex:none}
 .dot.in{background:var(--ok);box-shadow:0 0 0 6px #22c55e33}
+.dot.pro{background:var(--pro);box-shadow:0 0 0 6px #a78bfa33}
+.dot.pending{background:var(--ko);box-shadow:0 0 0 6px #f9731633}
 .big{font-size:26px;font-weight:700}
 .mut{color:var(--mut);font-size:14px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -29,25 +31,34 @@ h2{font-size:15px;color:var(--mut);font-weight:600;margin:20px 0 8px;text-transf
 button{font:inherit;border:0;border-radius:12px;padding:14px;font-weight:600;color:#fff;background:#24324d;width:100%;cursor:pointer}
 button.in{background:var(--ok);color:#06240f}
 button.out{background:var(--ko);color:#2a1100}
+button.pro{background:var(--pro);color:#1d1240}
 button.sm{padding:8px 12px;width:auto;font-size:14px}
+button.on{outline:2px solid var(--acc)}
 button:disabled{opacity:.4}
 input{font:inherit;width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:#0e1626;color:var(--txt)}
 label{display:block;font-size:14px;color:var(--mut);margin:10px 0 4px}
-.row{display:flex;gap:8px;align-items:center}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ask{border-color:#f97316;background:#2a1a0e}
+.ask .big{font-size:20px;margin-bottom:4px}
 .day{border-top:1px solid var(--line);padding:10px 0}
 .day:first-child{border-top:0}
 .day .h{display:flex;justify-content:space-between;font-weight:600}
-.sess{display:flex;justify-content:space-between;font-size:14px;color:var(--mut);font-variant-numeric:tabular-nums;margin-top:3px}
+.ev{display:flex;justify-content:space-between;align-items:center;font-size:14px;color:var(--mut);font-variant-numeric:tabular-nums;margin-top:3px}
+.ev b{font-weight:600;color:var(--txt)}
+.tag{font-size:12px;padding:1px 7px;border-radius:99px;background:#24324d;margin-left:6px}
 .x{background:none;color:var(--mut);padding:0 4px;width:auto;font-size:13px}
 code{display:block;word-break:break-all;background:#0e1626;border:1px solid var(--line);padding:10px;border-radius:10px;font-size:12px;margin:6px 0}
-nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:#0e1626ee;backdrop-filter:blur(10px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:#0e1626ee;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:1000}
 nav button{background:none;border-radius:0;color:var(--mut);padding:14px 0}
-nav button.on{color:var(--acc)}
-#map{height:280px;border-radius:12px;margin-top:8px}
-.toast{position:fixed;left:16px;right:16px;bottom:calc(env(safe-area-inset-bottom) + 76px);background:#1e293b;border:1px solid var(--line);padding:12px 14px;border-radius:12px;opacity:0;transition:.3s;pointer-events:none}
+nav button.cur{color:var(--acc)}
+#map{height:340px;border-radius:12px;margin-top:8px}
+.vtx{width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid var(--ok);margin:-9px 0 0 -9px}
+.toast{position:fixed;left:16px;right:16px;bottom:calc(env(safe-area-inset-bottom) + 76px);background:#1e293b;border:1px solid var(--line);padding:12px 14px;border-radius:12px;opacity:0;transition:.3s;pointer-events:none;z-index:1001}
 .toast.show{opacity:1}
 .warn{border-color:#f9731666;background:#2a1a0e}
-ol{padding-left:20px;margin:6px 0}li{margin:4px 0}
+ol{padding-left:20px;margin:6px 0}li{margin:5px 0}
+.step{background:#0e1626;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:6px 0;font-size:14px}
+.step .ind{padding-left:16px;border-left:2px solid var(--line);margin:6px 0 0 4px}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -57,6 +68,16 @@ ol{padding-left:20px;margin:6px 0}li{margin:4px 0}
 <!-- ============ POINTAGE ============ -->
 <section id="t-home">
   <div class="card warn" id="noCfg" hidden>Configure d’abord l’URL du script dans <b>Réglages</b>.</div>
+
+  <div class="card ask" id="askCard" hidden>
+    <div class="big">🚗 Sortie du site à <span id="askTime"></span></div>
+    <div class="mut" style="margin-bottom:12px">C’est un trajet professionnel ?</div>
+    <div class="grid">
+      <button class="pro" id="bPro">Oui, pro<br><small>le timbrage continue</small></button>
+      <button class="out" id="bNo">Non, je pars<br><small>détimbrer</small></button>
+    </div>
+  </div>
+
   <div class="card">
     <div class="status"><div class="dot" id="dot"></div><div><div class="big" id="stTxt">…</div><div class="mut" id="stSub"></div></div></div>
   </div>
@@ -68,10 +89,12 @@ ol{padding-left:20px;margin:6px 0}li{margin:4px 0}
     <button class="in" id="bIn">Timbrer arrivée</button>
     <button class="out" id="bOut">Timbrer départ</button>
   </div>
+  <div class="mut" style="margin-top:10px" id="hoursTxt"></div>
+
   <h2>GPS (quand l’app est ouverte)</h2>
   <div class="card">
     <div class="row" style="justify-content:space-between"><div id="gpsTxt" class="mut">GPS inactif</div><button class="sm" id="bGps">Activer</button></div>
-    <div class="mut" style="margin-top:8px">Le pointage automatique en arrière-plan est fait par l’app <b>Raccourcis</b> d’iOS (voir Réglages). Ici, le GPS ne sert qu’à vérifier quand l’app est à l’écran.</div>
+    <div class="mut" style="margin-top:8px">En arrière-plan, c’est l’app <b>Raccourcis</b> d’iOS qui timbre (voir Réglages). Ici, le GPS utilise la zone exacte que tu as dessinée.</div>
   </div>
   <div class="mut" id="pending"></div>
 </section>
@@ -91,32 +114,75 @@ ol{padding-left:20px;margin:6px 0}li{margin:4px 0}
     <div style="margin-top:12px"><button id="bSave">Enregistrer et tester</button></div>
   </div>
 
-  <h2>Zone du MIC</h2>
+  <h2>Plage horaire de travail</h2>
   <div class="card">
-    <div class="mut">Touche la carte ou déplace le point pour placer le centre. iOS ne gère que des <b>cercles</b> : pas besoin de dessin de polygone.</div>
+    <div class="mut">Si tu sors du site pendant cette plage, l’iPhone te demande si le trajet est professionnel. En dehors, la sortie détimbre directement.</div>
+    <div class="grid" style="margin-top:6px">
+      <div><label>Début</label><input type="time" id="hStart"></div>
+      <div><label>Fin</label><input type="time" id="hEnd"></div>
+    </div>
+    <div style="margin-top:12px"><button id="bHours">Enregistrer la plage</button></div>
+  </div>
+
+  <h2>Zone du site</h2>
+  <div class="card">
+    <div class="row">
+      <button class="sm" id="bDraw">✏️ Dessiner la zone</button>
+      <button class="sm" id="bUndo" hidden>↶ Annuler point</button>
+      <button class="sm in" id="bDone" hidden>✓ Terminer</button>
+      <button class="sm" id="bHere">📍 Ma position</button>
+    </div>
+    <div class="mut" id="drawHelp" style="margin-top:8px">Touche « Dessiner », puis touche la carte pour poser les coins du site, un par un. Tu peux ensuite déplacer chaque coin.</div>
     <div id="map"></div>
-    <label>Rayon : <b id="rTxt"></b> m</label><input type="range" id="cRad" min="80" max="600" step="10">
-    <div class="row" style="margin-top:10px"><button class="sm" id="bHere">📍 Centrer sur ma position</button></div>
+    <div class="mut" style="margin-top:8px"><span style="color:var(--ok)">■</span> zone exacte (app ouverte) · <span style="color:var(--acc)">◌</span> cercle pour Raccourcis (arrière-plan)</div>
+    <div class="step" style="margin-top:10px">
+      Pour l’app Raccourcis, place le lieu sur : <code id="circTxt">–</code><button class="sm" data-copy="circTxt">Copier les coordonnées</button>
+      <div style="margin-top:6px">et règle le rayon sur <b id="circR">–</b> m.</div>
+    </div>
   </div>
 
   <h2>Pointage automatique (iPhone)</h2>
   <div class="card">
-    <div class="mut">Copie ces deux adresses, elles servent dans les automatisations Raccourcis :</div>
-    <label>URL arrivée</label><code id="uIn">–</code><button class="sm" data-copy="uIn">Copier</button>
-    <label>URL départ</label><code id="uOut">–</code><button class="sm" data-copy="uOut">Copier</button>
-    <ol class="mut" style="margin-top:14px">
-      <li>App <b>Raccourcis</b> → onglet <b>Automatisation</b> → <b>+</b> → <b>Arrivée</b>.</li>
-      <li>Lieu → <b>Choisir</b> → cherche « Marly Innovation Center » (ou ajuste le point), règle le rayon (~150–250 m).</li>
-      <li>Coche <b>Exécuter immédiatement</b> (et décoche « Notifier » si tu veux) → Suivant.</li>
-      <li><b>Nouveau raccourci vide</b> → action <b>Obtenir le contenu de l’URL</b> → colle l’<b>URL arrivée</b>.</li>
-      <li>Refais pareil avec <b>Départ</b> et l’<b>URL départ</b>.</li>
-      <li>Réglages iOS → Confidentialité → Service de localisation → <b>Raccourcis : Toujours</b> + <b>Position exacte</b>.</li>
+    <div class="mut">Les adresses à coller dans les automatisations :</div>
+    <label>① URL arrivée</label><code id="uIn">–</code><button class="sm" data-copy="uIn">Copier</button>
+    <label>② URL sortie</label><code id="uLeave">–</code><button class="sm" data-copy="uLeave">Copier</button>
+    <label>③ URL trajet pro</label><code id="uPro">–</code><button class="sm" data-copy="uPro">Copier</button>
+    <label>④ URL détimbrer</label><code id="uOut">–</code><button class="sm" data-copy="uOut">Copier</button>
+
+    <h2>Automatisation « Arrivée »</h2>
+    <ol class="mut">
+      <li>App <b>Raccourcis</b> → <b>Automatisation</b> → <b>+</b> → <b>Arrivée</b>.</li>
+      <li><b>Lieu</b> → colle les coordonnées ci-dessus dans la recherche, puis règle le rayon.</li>
+      <li><b>Exécuter immédiatement</b> → Suivant → <b>Nouveau raccourci vide</b>.</li>
+      <li>Action <b>Obtenir le contenu de l’URL</b> → colle l’<b>URL ①</b>.</li>
     </ol>
+
+    <h2>Automatisation « Départ »</h2>
+    <ol class="mut">
+      <li><b>+</b> → <b>Départ</b> → même lieu et même rayon → <b>Exécuter immédiatement</b> → raccourci vide.</li>
+      <li>Construis ces actions :</li>
+    </ol>
+    <div class="step">
+      <b>Obtenir le contenu de l’URL</b> → URL ②
+      <div style="margin-top:6px"><b>Si</b> <i>Contenu de l’URL</i> <b>est</b> <code style="display:inline;padding:2px 6px">QUESTION</code></div>
+      <div class="ind">
+        <b>Choisir dans le menu</b> · invite : « Trajet professionnel ? »<br>options : <b>Oui</b> / <b>Non</b>
+        <div class="ind">Oui → <b>Obtenir le contenu de l’URL</b> → URL ③</div>
+        <div class="ind">Non → <b>Obtenir le contenu de l’URL</b> → URL ④</div>
+        <div>Fin du menu</div>
+      </div>
+      <div>Fin de la condition</div>
+    </div>
+    <ol class="mut" start="3">
+      <li>Réglages iOS → Confidentialité → Service de localisation → <b>Raccourcis : Toujours</b> + <b>Position exacte</b>.</li>
+      <li>Réglages iOS → Notifications → <b>Raccourcis</b> : autoriser.</li>
+    </ol>
+    <div class="mut" style="margin-top:8px">L’iPhone affiche la question en notification : touche-la pour répondre. Si tu ne réponds pas, le timbrage continue et l’app te repose la question ici. Si tu reviens sur le site le même jour, la sortie est comptée comme professionnelle.</div>
   </div>
 </section>
 
 <nav>
-  <button data-tab="home" class="on">Pointage</button>
+  <button data-tab="home" class="cur">Pointage</button>
   <button data-tab="hist">Historique</button>
   <button data-tab="set">Réglages</button>
 </nav>
@@ -125,23 +191,55 @@ ol{padding-left:20px;margin:6px 0}li{margin:4px 0}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 const $ = s => document.querySelector(s);
-const DEF = { url: '', token: '', lat: 46.7782, lon: 7.1500, radius: 200 };
+const C0 = [46.7782, 7.1500];
+const DEF = {
+  url: '', token: '', start: '06:30', end: '18:00',
+  poly: [[C0[0] + 9e-4, C0[1] - 13e-4], [C0[0] + 9e-4, C0[1] + 13e-4], [C0[0] - 9e-4, C0[1] + 13e-4], [C0[0] - 9e-4, C0[1] - 13e-4]]
+};
 const LS = {
   get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
 };
 let cfg = { ...DEF, ...LS.get('pm_cfg', {}) };
-let events = LS.get('pm_events', []);   // [{t, a:'in'|'out', src, row}]
-let queue = LS.get('pm_queue', []);     // pointages hors-ligne en attente
+let events = LS.get('pm_events', []);   // [{row, t, a:'in'|'out'|'leave'|'pro'|'back', src}]
+let queue = LS.get('pm_queue', []);     // actions hors-ligne en attente
+const saveCfg = () => LS.set('pm_cfg', cfg);
 
 /* ---------- utilitaires ---------- */
 const pad = n => String(n).padStart(2, '0');
 const hm = d => pad(d.getHours()) + ':' + pad(d.getMinutes());
 const dur = ms => { const m = Math.max(0, Math.round(ms / 6e4)); return Math.floor(m / 60) + ' h ' + pad(m % 60); };
 const dayKey = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
-const toast = (m) => { const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), 2600); };
+const toast = m => { const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), 2800); };
 function distM(a, b, c, d) { const R = 6371e3, r = x => x * Math.PI / 180; const x = Math.sin(r(c - a) / 2) ** 2 + Math.cos(r(a)) * Math.cos(r(c)) * Math.sin(r(d - b) / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(x)); }
 
+/* ---------- géométrie de la zone ---------- */
+function inPoly(lat, lon, poly) {
+  let ins = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [yi, xi] = poly[i], [yj, xj] = poly[j];
+    if ((yi > lat) !== (yj > lat) && lon < (xj - xi) * (lat - yi) / (yj - yi) + xi) ins = !ins;
+  }
+  return ins;
+}
+function distToPoly(lat, lon, poly) { // distance (m) au bord le plus proche
+  const k = Math.cos(lat * Math.PI / 180), xy = ([a, b]) => [b * 111320 * k, a * 110540];
+  const P = xy([lat, lon]); let m = Infinity;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const A = xy(poly[j]), B = xy(poly[i]), dx = B[0] - A[0], dy = B[1] - A[1];
+    const t = Math.max(0, Math.min(1, ((P[0] - A[0]) * dx + (P[1] - A[1]) * dy) / (dx * dx + dy * dy || 1)));
+    m = Math.min(m, Math.hypot(P[0] - A[0] - t * dx, P[1] - A[1] - t * dy));
+  }
+  return m;
+}
+function enclosing(poly) { // cercle pour Raccourcis : contient toute la zone + 30 m de marge
+  const la = poly.map(p => p[0]), lo = poly.map(p => p[1]);
+  const c = [(Math.min(...la) + Math.max(...la)) / 2, (Math.min(...lo) + Math.max(...lo)) / 2];
+  const r = Math.max(...poly.map(p => distM(c[0], c[1], p[0], p[1])));
+  return { lat: +c[0].toFixed(5), lon: +c[1].toFixed(5), r: Math.max(100, Math.ceil((r + 30) / 10) * 10) };
+}
+
+/* ---------- API ---------- */
 function apiUrl(params) {
   const u = new URL(cfg.url);
   u.searchParams.set('token', cfg.token);
@@ -156,76 +254,88 @@ async function api(params) {
   return j;
 }
 
-/* ---------- sessions ---------- */
-function sessions() {
-  const ev = [...events, ...queue.map(q => ({ t: q.at, a: q.action, src: q.src, pending: true }))]
-    .sort((x, y) => x.t < y.t ? -1 : 1);
+/* ---------- état et sessions ---------- */
+const lastEv = () => events[events.length - 1];
+function status() { // out | in | pro | pending
+  const l = lastEv();
+  if (!l || l.a === 'out') return 'out';
+  return l.a === 'leave' ? 'pending' : l.a === 'pro' ? 'pro' : 'in';
+}
+function sessions() { // temps de travail : arrivée → départ (les sorties pro comptent)
   const out = []; let open = null;
-  for (const e of ev) {
-    if (e.a === 'in') { if (!open) open = e; }
-    else if (open) { out.push({ s: new Date(open.t), e: new Date(e.t), inEv: open, outEv: e }); open = null; }
-    else out.push({ s: null, e: new Date(e.t), outEv: e }); // départ sans arrivée
+  for (const e of events) {
+    const t = new Date(e.t);
+    if ((e.a === 'in' || e.a === 'back') && !open) open = t;
+    else if (e.a === 'out' && open) { out.push({ s: open, e: t }); open = null; }
   }
-  if (open) out.push({ s: new Date(open.t), e: null, inEv: open });
+  if (open) out.push({ s: open, e: null });
   return out;
 }
-const state = () => { const s = sessions(); const l = s[s.length - 1]; return l && l.s && !l.e ? l : null; };
 
 /* ---------- rendu ---------- */
 function render() {
   $('#noCfg').hidden = !!cfg.url;
-  const cur = state(), now = new Date();
-  $('#dot').className = 'dot' + (cur ? ' in' : '');
-  $('#stTxt').textContent = cur ? 'Au travail' : 'Hors site';
-  $('#stSub').textContent = cur ? 'depuis ' + hm(cur.s) + ' · ' + dur(now - cur.s) : (events.length ? 'Dernier départ : ' + lastOutTxt() : 'Aucun pointage');
-  $('#bIn').disabled = !!cur; $('#bOut').disabled = !cur;
+  const st = status(), l = lastEv(), now = new Date();
+  const ss = sessions(), cur = ss.length && !ss[ss.length - 1].e ? ss[ss.length - 1] : null;
+  $('#dot').className = 'dot ' + st;
+  $('#stTxt').textContent = { out: 'Hors site', in: 'Au travail', pro: 'Trajet pro', pending: 'Sortie à confirmer' }[st];
+  $('#stSub').textContent = cur ? 'depuis ' + hm(cur.s) + ' · ' + dur(now - cur.s) + (st === 'pro' ? ' · sorti à ' + hm(new Date(l.t)) : '')
+    : (l ? 'Dernier départ : ' + whenTxt(new Date(l.t)) : 'Aucun pointage');
+  $('#askCard').hidden = st !== 'pending';
+  if (st === 'pending') $('#askTime').textContent = hm(new Date(l.t));
+  $('#bIn').disabled = st === 'in'; $('#bOut').disabled = st === 'out';
+  $('#bIn').textContent = st === 'pro' || st === 'pending' ? 'Je suis de retour' : 'Timbrer arrivée';
 
-  const today = dayKey(now);
-  const monday = new Date(now); monday.setHours(0, 0, 0, 0); monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
-  let tTot = 0, wTot = 0;
-  for (const s of sessions()) {
-    if (!s.s) continue;
-    const ms = (s.e || now) - s.s;
-    if (dayKey(s.s) === today) tTot += ms;
-    if (s.s >= monday) wTot += ms;
-  }
-  $('#today').textContent = dur(tTot); $('#week').textContent = dur(wTot);
-  $('#pending').textContent = queue.length ? `${queue.length} pointage(s) en attente d’envoi (hors-ligne)` : '';
+  const today = dayKey(now), monday = new Date(now);
+  monday.setHours(0, 0, 0, 0); monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+  let tT = 0, wT = 0;
+  for (const s of ss) { const ms = (s.e || now) - s.s; if (dayKey(s.s) === today) tT += ms; if (s.s >= monday) wT += ms; }
+  $('#today').textContent = dur(tT); $('#week').textContent = dur(wT);
+  $('#hoursTxt').textContent = `Plage horaire : ${cfg.start} – ${cfg.end}. Une sortie pendant cette plage demande si le trajet est professionnel.`;
+  $('#pending').textContent = queue.length ? `${queue.length} action(s) en attente d’envoi (hors-ligne)` : '';
   renderHist(); renderUrls();
 }
-function lastOutTxt() { const o = [...events].reverse().find(e => e.a === 'out'); if (!o) return '–'; const d = new Date(o.t); return (dayKey(d) === dayKey(new Date()) ? '' : d.toLocaleDateString('fr-CH') + ' ') + hm(d); }
+const whenTxt = d => (dayKey(d) === dayKey(new Date()) ? '' : d.toLocaleDateString('fr-CH') + ' ') + hm(d);
 
+const EVL = { in: ['Arrivée', '#22c55e'], back: ['Retour', '#22c55e'], out: ['Départ', '#f97316'], pro: ['Sortie pro', '#a78bfa'], leave: ['Sortie à confirmer', '#f97316'] };
 function renderHist() {
   const by = {};
-  for (const s of sessions()) { const k = dayKey(s.s || s.e); (by[k] = by[k] || []).push(s); }
+  for (const e of events) { const k = dayKey(new Date(e.t)); (by[k] = by[k] || { ev: [], ms: 0 }).ev.push(e); }
+  for (const s of sessions()) { const k = dayKey(s.s); by[k] && (by[k].ms += (s.e || new Date()) - s.s); }
   const keys = Object.keys(by).sort().reverse();
   if (!keys.length) { $('#hist').innerHTML = '<div class="mut">Aucun pointage pour l’instant.</div>'; return; }
   $('#hist').innerHTML = keys.map(k => {
-    const list = by[k]; const tot = list.reduce((a, s) => a + (s.s ? (s.e || new Date()) - s.s : 0), 0);
     const d = new Date(k + 'T12:00');
-    return `<div class="day"><div class="h"><span>${d.toLocaleDateString('fr-CH', { weekday: 'long', day: 'numeric', month: 'long' })}</span><span>${dur(tot)}</span></div>` +
-      list.map(s => `<div class="sess"><span>${s.s ? hm(s.s) : '??'} → ${s.e ? hm(s.e) : 'en cours'}${s.s && s.e ? ' · ' + dur(s.e - s.s) : ''}</span><span>` +
-        [s.inEv, s.outEv].filter(e => e && e.row).map(e => `<button class="x" data-del="${e.row}" title="Supprimer">✕${e.a === 'in' ? 'arr' : 'dép'}</button>`).join('') +
-        `</span></div>`).join('') + '</div>';
+    return `<div class="day"><div class="h"><span>${d.toLocaleDateString('fr-CH', { weekday: 'long', day: 'numeric', month: 'long' })}</span><span>${dur(by[k].ms)}</span></div>` +
+      by[k].ev.map(e => `<div class="ev"><span><b>${hm(new Date(e.t))}</b> <span style="color:${EVL[e.a][1]}">${EVL[e.a][0]}</span>${e.src && e.src !== 'manuel' ? `<span class="tag">${e.src}</span>` : ''}</span>` +
+        (e.row ? `<button class="x" data-del="${e.row}" title="Supprimer">✕</button>` : '') + '</div>').join('') + '</div>';
   }).join('');
 }
 function renderUrls() {
-  const ok = cfg.url && cfg.token;
-  $('#uIn').textContent = ok ? apiUrl({ action: 'in', src: 'raccourci' }) : 'Configure l’URL et le token';
-  $('#uOut').textContent = ok ? apiUrl({ action: 'out', src: 'raccourci' }) : 'Configure l’URL et le token';
+  const ok = cfg.url && cfg.token, u = p => ok ? apiUrl({ ...p, fmt: 'text', src: 'raccourci' }) : 'Configure l’URL et le token';
+  $('#uIn').textContent = u({ action: 'in' });
+  $('#uLeave').textContent = u({ action: 'leave' });
+  $('#uPro').textContent = u({ action: 'pro' });
+  $('#uOut').textContent = u({ action: 'out' });
 }
 
 /* ---------- actions ---------- */
 async function refresh(silent) {
   if (!cfg.url) return render();
-  try { await flush(); const j = await api({ action: 'list', days: 120 }); events = j.events; LS.set('pm_events', events); render(); if (!silent) toast('À jour'); }
-  catch (e) { render(); if (!silent) toast('Hors-ligne : ' + e.message); }
+  try {
+    await flush();
+    const j = await api({ action: 'list', days: 120 });
+    events = j.events; LS.set('pm_events', events);
+    if (j.hours) { cfg.start = j.hours.start; cfg.end = j.hours.end; saveCfg(); fillHours(); }
+    render(); if (!silent) toast('À jour');
+  } catch (e) { render(); if (!silent) toast('Hors-ligne : ' + e.message); }
 }
-async function punch(action, src) {
-  const at = new Date().toISOString();
-  queue.push({ action, src, at }); LS.set('pm_queue', queue); render();
-  toast(action === 'in' ? 'Arrivée timbrée ' + hm(new Date()) : 'Départ timbré ' + hm(new Date()));
+async function send(action, src) {
+  queue.push({ action, src, at: new Date().toISOString() }); LS.set('pm_queue', queue);
   await refresh(true);
+  const st = status();
+  if (queue.length) toast('Enregistré hors-ligne, envoi dès que possible');
+  else toast({ in: st === 'in' ? 'Arrivée timbrée ✅' : 'Déjà timbré', out: 'Détimbré ✅', pro: 'Trajet pro : le timbrage continue', leave: st === 'pending' ? 'Sortie détectée : trajet pro ?' : 'Détimbré (hors plage horaire)' }[action]);
 }
 async function flush() {
   while (queue.length) {
@@ -234,16 +344,20 @@ async function flush() {
     queue.shift(); LS.set('pm_queue', queue);
   }
 }
-$('#bIn').onclick = () => punch('in', 'manuel');
-$('#bOut').onclick = () => punch('out', 'manuel');
+$('#bIn').onclick = () => send('in', 'manuel');
+$('#bOut').onclick = () => send('out', 'manuel');
+$('#bPro').onclick = () => send('pro', 'manuel');
+$('#bNo').onclick = () => send('out', 'manuel');
 $('#bRef').onclick = () => refresh();
 $('#hist').onclick = async e => {
   const r = e.target.dataset.del; if (!r || !confirm('Supprimer ce pointage ?')) return;
   try { await api({ action: 'delete', row: r }); await refresh(true); toast('Supprimé'); } catch (err) { toast(err.message); }
 };
 $('#bCsv').onclick = () => {
-  const rows = [['Date', 'Arrivée', 'Départ', 'Durée (h)']];
-  for (const s of sessions()) if (s.s) rows.push([dayKey(s.s), hm(s.s), s.e ? hm(s.e) : '', s.e ? ((s.e - s.s) / 36e5).toFixed(2) : '']);
+  const rows = [['Date', 'Heure', 'Événement', 'Source']];
+  for (const e of events) { const d = new Date(e.t); rows.push([dayKey(d), hm(d), EVL[e.a][0], e.src || '']); }
+  rows.push([], ['Date', 'Début', 'Fin', 'Durée (h)']);
+  for (const s of sessions()) rows.push([dayKey(s.s), hm(s.s), s.e ? hm(s.e) : '', s.e ? ((s.e - s.s) / 36e5).toFixed(2) : '']);
   const blob = new Blob(['﻿' + rows.map(r => r.join(';')).join('\n')], { type: 'text/csv' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'pointage-mic.csv'; a.click();
 };
@@ -252,49 +366,95 @@ document.addEventListener('click', e => {
   navigator.clipboard.writeText($('#' + id).textContent).then(() => toast('Copié !'), () => toast('Copie impossible'));
 });
 
-/* ---------- GPS au premier plan ---------- */
-let watch = null;
+/* ---------- GPS au premier plan (zone exacte) ---------- */
+let watch = null, busy = false;
 $('#bGps').onclick = () => {
   if (watch !== null) { navigator.geolocation.clearWatch(watch); watch = null; $('#bGps').textContent = 'Activer'; $('#gpsTxt').textContent = 'GPS inactif'; return; }
   if (!navigator.geolocation) return toast('GPS non disponible');
   $('#bGps').textContent = 'Arrêter'; $('#gpsTxt').textContent = 'Recherche…';
   watch = navigator.geolocation.watchPosition(onPos, err => { $('#gpsTxt').textContent = 'Erreur GPS : ' + err.message; }, { enableHighAccuracy: true, maximumAge: 10000, timeout: 30000 });
 };
-function onPos(p) {
+async function onPos(p) {
   const { latitude: la, longitude: lo, accuracy: acc } = p.coords;
-  const d = distM(la, lo, cfg.lat, cfg.lon);
-  const inside = d <= cfg.radius, outside = d > cfg.radius + 50; // marge anti-oscillation
-  $('#gpsTxt').textContent = `${inside ? '✅ Sur le site' : '📍 À ' + (d >= 1000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d) + ' m')} (± ${Math.round(acc)} m)`;
-  if (acc > 100) return; // ignore les mesures imprécises
-  const v = inside ? true : outside ? false : null; if (v === null) return;
-  const cur = state();
-  if (v && !cur) punch('in', 'gps-app');
-  if (!v && cur) punch('out', 'gps-app');
+  const inside = inPoly(la, lo, cfg.poly), d = inside ? 0 : distToPoly(la, lo, cfg.poly);
+  $('#gpsTxt').textContent = `${inside ? '✅ Sur le site' : '📍 À ' + (d >= 1000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d) + ' m') + ' de la zone'} (± ${Math.round(acc)} m)`;
+  if (acc > 100 || busy || !cfg.url) return; // ignore les mesures imprécises
+  const st = status();
+  busy = true;
+  try {
+    if (inside && st !== 'in') await send('in', 'gps-app');
+    else if (!inside && d > 30 && st === 'in') await send('leave', 'gps-app'); // 30 m de marge anti-oscillation
+  } finally { busy = false; }
 }
 
-/* ---------- Réglages + carte ---------- */
-$('#cUrl').value = cfg.url; $('#cTok').value = cfg.token; $('#cRad').value = cfg.radius; $('#rTxt').textContent = cfg.radius;
+/* ---------- Réglages ---------- */
+$('#cUrl').value = cfg.url; $('#cTok').value = cfg.token;
+function fillHours() { $('#hStart').value = cfg.start; $('#hEnd').value = cfg.end; }
+fillHours();
 $('#bSave').onclick = async () => {
-  cfg.url = $('#cUrl').value.trim(); cfg.token = $('#cTok').value.trim(); LS.set('pm_cfg', cfg); renderUrls();
+  cfg.url = $('#cUrl').value.trim(); cfg.token = $('#cTok').value.trim(); saveCfg(); renderUrls();
   try { await api({ action: 'list', days: 1 }); toast('Connexion OK ✅'); refresh(true); } catch (e) { toast('Échec : ' + e.message); }
 };
-let map, marker, circle;
+$('#bHours').onclick = async () => {
+  const s = $('#hStart').value, e = $('#hEnd').value;
+  if (!s || !e || s >= e) return toast('Plage horaire invalide');
+  cfg.start = s; cfg.end = e; saveCfg(); render();
+  try { await api({ action: 'config', start: s, end: e }); toast('Plage enregistrée ✅'); } catch (err) { toast('Enregistré sur le téléphone, mais pas dans la Sheet : ' + err.message); }
+};
+
+/* ---------- carte : dessin de la zone ---------- */
+let map, polyL, circL, vtx = [], drawing = false, draft = [];
 function initMap() {
-  if (map || !window.L) { map && map.invalidateSize(); return; }
-  map = L.map('map').setView([cfg.lat, cfg.lon], 16);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
-  marker = L.marker([cfg.lat, cfg.lon], { draggable: true }).addTo(map);
-  circle = L.circle([cfg.lat, cfg.lon], { radius: cfg.radius, color: '#22c55e' }).addTo(map);
-  marker.on('dragend', () => setCenter(marker.getLatLng()));
-  map.on('click', e => setCenter(e.latlng));
+  if (map) return map.invalidateSize();
+  if (!window.L) return toast('Carte indisponible (hors-ligne ?)');
+  map = L.map('map');
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 20, maxNativeZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
+  polyL = L.polygon(cfg.poly, { color: '#22c55e', weight: 3, fillOpacity: .2 }).addTo(map);
+  circL = L.circle([0, 0], { radius: 1, color: '#38bdf8', weight: 2, dashArray: '6 6', fill: false, interactive: false }).addTo(map);
+  map.fitBounds(polyL.getBounds(), { padding: [30, 30] });
+  map.on('click', e => { if (!drawing) return; draft.push([+e.latlng.lat.toFixed(6), +e.latlng.lng.toFixed(6)]); drawShape(draft); });
+  drawShape(cfg.poly);
 }
-function setCenter(ll) { cfg.lat = +ll.lat.toFixed(6); cfg.lon = +ll.lng.toFixed(6); LS.set('pm_cfg', cfg); marker.setLatLng(ll); circle.setLatLng(ll); }
-$('#cRad').oninput = e => { cfg.radius = +e.target.value; $('#rTxt').textContent = cfg.radius; circle && circle.setRadius(cfg.radius); LS.set('pm_cfg', cfg); };
-$('#bHere').onclick = () => navigator.geolocation.getCurrentPosition(p => { const ll = L.latLng(p.coords.latitude, p.coords.longitude); setCenter(ll); map.setView(ll, 17); }, e => toast(e.message), { enableHighAccuracy: true });
+function drawShape(pts) {
+  polyL.setLatLngs(pts.length ? pts : [[0, 0]]);
+  vtx.forEach(m => m.remove());
+  vtx = pts.map((p, i) => {
+    const m = L.marker(p, { draggable: true, icon: L.divIcon({ className: '', html: '<div class="vtx"></div>', iconSize: [0, 0] }) }).addTo(map);
+    m.on('drag', () => { const ll = m.getLatLng(); pts[i] = [+ll.lat.toFixed(6), +ll.lng.toFixed(6)]; polyL.setLatLngs(pts); if (!drawing) updCircle(); });
+    m.on('dragend', () => { if (!drawing) { cfg.poly = pts; saveCfg(); } });
+    return m;
+  });
+  if (!drawing && pts.length >= 3) updCircle();
+  $('#bUndo').disabled = !draft.length; $('#bDone').disabled = draft.length < 3;
+}
+function updCircle() {
+  const c = enclosing(cfg.poly);
+  circL.setLatLng([c.lat, c.lon]); circL.setRadius(c.r);
+  $('#circTxt').textContent = c.lat + ', ' + c.lon; $('#circR').textContent = c.r;
+}
+function setDrawing(on) {
+  drawing = on;
+  $('#bDraw').textContent = on ? '✕ Annuler' : '✏️ Dessiner la zone';
+  $('#bUndo').hidden = $('#bDone').hidden = !on;
+  $('#drawHelp').textContent = on ? 'Touche la carte pour poser les coins du site, dans l’ordre (minimum 3). Puis « Terminer ».'
+    : 'Touche « Dessiner », puis touche la carte pour poser les coins du site, un par un. Tu peux ensuite déplacer chaque coin.';
+  circL.setStyle({ opacity: on ? 0 : 1 });
+}
+$('#bDraw').onclick = () => {
+  if (!map) return;
+  if (drawing) { setDrawing(false); draft = []; drawShape(cfg.poly); return; }
+  draft = []; setDrawing(true); drawShape(draft);
+};
+$('#bUndo').onclick = () => { draft.pop(); drawShape(draft); };
+$('#bDone').onclick = () => {
+  if (draft.length < 3) return toast('Il faut au moins 3 coins');
+  cfg.poly = draft; draft = []; saveCfg(); setDrawing(false); drawShape(cfg.poly); toast('Zone enregistrée ✅');
+};
+$('#bHere').onclick = () => navigator.geolocation.getCurrentPosition(p => map && map.setView([p.coords.latitude, p.coords.longitude], 18), e => toast(e.message), { enableHighAccuracy: true });
 
 /* ---------- onglets ---------- */
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
-  document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('nav button').forEach(x => x.classList.toggle('cur', x === b));
   ['home', 'hist', 'set'].forEach(t => $('#t-' + t).hidden = t !== b.dataset.tab);
   if (b.dataset.tab === 'set') setTimeout(initMap, 50);
   if (b.dataset.tab === 'hist') refresh(true);
