@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pointage">
+<meta name="theme-color" content="#0b1220">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<title>Pointage MIC</title>
+<style>
+:root{--bg:#0b1220;--card:#131c2e;--line:#22304a;--txt:#e2e8f0;--mut:#8a9bb5;--ok:#22c55e;--ko:#f97316;--acc:#38bdf8}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+body{padding:calc(env(safe-area-inset-top) + 12px) 16px calc(env(safe-area-inset-bottom) + 84px)}
+h1{font-size:20px;margin:4px 0 14px}
+h2{font-size:15px;color:var(--mut);font-weight:600;margin:20px 0 8px;text-transform:uppercase;letter-spacing:.04em}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:12px}
+.status{display:flex;align-items:center;gap:12px}
+.dot{width:14px;height:14px;border-radius:50%;background:var(--mut);flex:none}
+.dot.in{background:var(--ok);box-shadow:0 0 0 6px #22c55e33}
+.big{font-size:26px;font-weight:700}
+.mut{color:var(--mut);font-size:14px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.num{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
+button{font:inherit;border:0;border-radius:12px;padding:14px;font-weight:600;color:#fff;background:#24324d;width:100%;cursor:pointer}
+button.in{background:var(--ok);color:#06240f}
+button.out{background:var(--ko);color:#2a1100}
+button.sm{padding:8px 12px;width:auto;font-size:14px}
+button:disabled{opacity:.4}
+input{font:inherit;width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:#0e1626;color:var(--txt)}
+label{display:block;font-size:14px;color:var(--mut);margin:10px 0 4px}
+.row{display:flex;gap:8px;align-items:center}
+.day{border-top:1px solid var(--line);padding:10px 0}
+.day:first-child{border-top:0}
+.day .h{display:flex;justify-content:space-between;font-weight:600}
+.sess{display:flex;justify-content:space-between;font-size:14px;color:var(--mut);font-variant-numeric:tabular-nums;margin-top:3px}
+.x{background:none;color:var(--mut);padding:0 4px;width:auto;font-size:13px}
+code{display:block;word-break:break-all;background:#0e1626;border:1px solid var(--line);padding:10px;border-radius:10px;font-size:12px;margin:6px 0}
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:#0e1626ee;backdrop-filter:blur(10px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+nav button{background:none;border-radius:0;color:var(--mut);padding:14px 0}
+nav button.on{color:var(--acc)}
+#map{height:280px;border-radius:12px;margin-top:8px}
+.toast{position:fixed;left:16px;right:16px;bottom:calc(env(safe-area-inset-bottom) + 76px);background:#1e293b;border:1px solid var(--line);padding:12px 14px;border-radius:12px;opacity:0;transition:.3s;pointer-events:none}
+.toast.show{opacity:1}
+.warn{border-color:#f9731666;background:#2a1a0e}
+ol{padding-left:20px;margin:6px 0}li{margin:4px 0}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<h1>⏱️ Pointage MIC Marly</h1>
+
+<!-- ============ POINTAGE ============ -->
+<section id="t-home">
+  <div class="card warn" id="noCfg" hidden>Configure d’abord l’URL du script dans <b>Réglages</b>.</div>
+  <div class="card">
+    <div class="status"><div class="dot" id="dot"></div><div><div class="big" id="stTxt">…</div><div class="mut" id="stSub"></div></div></div>
+  </div>
+  <div class="grid">
+    <div class="card"><div class="mut">Aujourd’hui</div><div class="num" id="today">–</div></div>
+    <div class="card"><div class="mut">Cette semaine</div><div class="num" id="week">–</div></div>
+  </div>
+  <div class="grid">
+    <button class="in" id="bIn">Timbrer arrivée</button>
+    <button class="out" id="bOut">Timbrer départ</button>
+  </div>
+  <h2>GPS (quand l’app est ouverte)</h2>
+  <div class="card">
+    <div class="row" style="justify-content:space-between"><div id="gpsTxt" class="mut">GPS inactif</div><button class="sm" id="bGps">Activer</button></div>
+    <div class="mut" style="margin-top:8px">Le pointage automatique en arrière-plan est fait par l’app <b>Raccourcis</b> d’iOS (voir Réglages). Ici, le GPS ne sert qu’à vérifier quand l’app est à l’écran.</div>
+  </div>
+  <div class="mut" id="pending"></div>
+</section>
+
+<!-- ============ HISTORIQUE ============ -->
+<section id="t-hist" hidden>
+  <div class="row" style="justify-content:space-between"><h2 style="margin:0">Historique</h2><div class="row"><button class="sm" id="bRef">↻</button><button class="sm" id="bCsv">Export CSV</button></div></div>
+  <div class="card" id="hist" style="margin-top:10px"></div>
+</section>
+
+<!-- ============ RÉGLAGES ============ -->
+<section id="t-set" hidden>
+  <h2>Connexion Google Sheet</h2>
+  <div class="card">
+    <label>URL de l’application Web Apps Script (…/exec)</label><input id="cUrl" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off">
+    <label>Token (le même que dans le script)</label><input id="cTok" autocomplete="off">
+    <div style="margin-top:12px"><button id="bSave">Enregistrer et tester</button></div>
+  </div>
+
+  <h2>Zone du MIC</h2>
+  <div class="card">
+    <div class="mut">Touche la carte ou déplace le point pour placer le centre. iOS ne gère que des <b>cercles</b> : pas besoin de dessin de polygone.</div>
+    <div id="map"></div>
+    <label>Rayon : <b id="rTxt"></b> m</label><input type="range" id="cRad" min="80" max="600" step="10">
+    <div class="row" style="margin-top:10px"><button class="sm" id="bHere">📍 Centrer sur ma position</button></div>
+  </div>
+
+  <h2>Pointage automatique (iPhone)</h2>
+  <div class="card">
+    <div class="mut">Copie ces deux adresses, elles servent dans les automatisations Raccourcis :</div>
+    <label>URL arrivée</label><code id="uIn">–</code><button class="sm" data-copy="uIn">Copier</button>
+    <label>URL départ</label><code id="uOut">–</code><button class="sm" data-copy="uOut">Copier</button>
+    <ol class="mut" style="margin-top:14px">
+      <li>App <b>Raccourcis</b> → onglet <b>Automatisation</b> → <b>+</b> → <b>Arrivée</b>.</li>
+      <li>Lieu → <b>Choisir</b> → cherche « Marly Innovation Center » (ou ajuste le point), règle le rayon (~150–250 m).</li>
+      <li>Coche <b>Exécuter immédiatement</b> (et décoche « Notifier » si tu veux) → Suivant.</li>
+      <li><b>Nouveau raccourci vide</b> → action <b>Obtenir le contenu de l’URL</b> → colle l’<b>URL arrivée</b>.</li>
+      <li>Refais pareil avec <b>Départ</b> et l’<b>URL départ</b>.</li>
+      <li>Réglages iOS → Confidentialité → Service de localisation → <b>Raccourcis : Toujours</b> + <b>Position exacte</b>.</li>
+    </ol>
+  </div>
+</section>
+
+<nav>
+  <button data-tab="home" class="on">Pointage</button>
+  <button data-tab="hist">Historique</button>
+  <button data-tab="set">Réglages</button>
+</nav>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const DEF = { url: '', token: '', lat: 46.7782, lon: 7.1500, radius: 200 };
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+let cfg = { ...DEF, ...LS.get('pm_cfg', {}) };
+let events = LS.get('pm_events', []);   // [{t, a:'in'|'out', src, row}]
+let queue = LS.get('pm_queue', []);     // pointages hors-ligne en attente
+
+/* ---------- utilitaires ---------- */
+const pad = n => String(n).padStart(2, '0');
+const hm = d => pad(d.getHours()) + ':' + pad(d.getMinutes());
+const dur = ms => { const m = Math.max(0, Math.round(ms / 6e4)); return Math.floor(m / 60) + ' h ' + pad(m % 60); };
+const dayKey = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+const toast = (m) => { const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), 2600); };
+function distM(a, b, c, d) { const R = 6371e3, r = x => x * Math.PI / 180; const x = Math.sin(r(c - a) / 2) ** 2 + Math.cos(r(a)) * Math.cos(r(c)) * Math.sin(r(d - b) / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(x)); }
+
+function apiUrl(params) {
+  const u = new URL(cfg.url);
+  u.searchParams.set('token', cfg.token);
+  for (const k in params) u.searchParams.set(k, params[k]);
+  return u.toString();
+}
+async function api(params) {
+  if (!cfg.url) throw new Error('URL non configurée');
+  const r = await fetch(apiUrl(params), { redirect: 'follow' });
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.error || 'Erreur serveur');
+  return j;
+}
+
+/* ---------- sessions ---------- */
+function sessions() {
+  const ev = [...events, ...queue.map(q => ({ t: q.at, a: q.action, src: q.src, pending: true }))]
+    .sort((x, y) => x.t < y.t ? -1 : 1);
+  const out = []; let open = null;
+  for (const e of ev) {
+    if (e.a === 'in') { if (!open) open = e; }
+    else if (open) { out.push({ s: new Date(open.t), e: new Date(e.t), inEv: open, outEv: e }); open = null; }
+    else out.push({ s: null, e: new Date(e.t), outEv: e }); // départ sans arrivée
+  }
+  if (open) out.push({ s: new Date(open.t), e: null, inEv: open });
+  return out;
+}
+const state = () => { const s = sessions(); const l = s[s.length - 1]; return l && l.s && !l.e ? l : null; };
+
+/* ---------- rendu ---------- */
+function render() {
+  $('#noCfg').hidden = !!cfg.url;
+  const cur = state(), now = new Date();
+  $('#dot').className = 'dot' + (cur ? ' in' : '');
+  $('#stTxt').textContent = cur ? 'Au travail' : 'Hors site';
+  $('#stSub').textContent = cur ? 'depuis ' + hm(cur.s) + ' · ' + dur(now - cur.s) : (events.length ? 'Dernier départ : ' + lastOutTxt() : 'Aucun pointage');
+  $('#bIn').disabled = !!cur; $('#bOut').disabled = !cur;
+
+  const today = dayKey(now);
+  const monday = new Date(now); monday.setHours(0, 0, 0, 0); monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+  let tTot = 0, wTot = 0;
+  for (const s of sessions()) {
+    if (!s.s) continue;
+    const ms = (s.e || now) - s.s;
+    if (dayKey(s.s) === today) tTot += ms;
+    if (s.s >= monday) wTot += ms;
+  }
+  $('#today').textContent = dur(tTot); $('#week').textContent = dur(wTot);
+  $('#pending').textContent = queue.length ? `${queue.length} pointage(s) en attente d’envoi (hors-ligne)` : '';
+  renderHist(); renderUrls();
+}
+function lastOutTxt() { const o = [...events].reverse().find(e => e.a === 'out'); if (!o) return '–'; const d = new Date(o.t); return (dayKey(d) === dayKey(new Date()) ? '' : d.toLocaleDateString('fr-CH') + ' ') + hm(d); }
+
+function renderHist() {
+  const by = {};
+  for (const s of sessions()) { const k = dayKey(s.s || s.e); (by[k] = by[k] || []).push(s); }
+  const keys = Object.keys(by).sort().reverse();
+  if (!keys.length) { $('#hist').innerHTML = '<div class="mut">Aucun pointage pour l’instant.</div>'; return; }
+  $('#hist').innerHTML = keys.map(k => {
+    const list = by[k]; const tot = list.reduce((a, s) => a + (s.s ? (s.e || new Date()) - s.s : 0), 0);
+    const d = new Date(k + 'T12:00');
+    return `<div class="day"><div class="h"><span>${d.toLocaleDateString('fr-CH', { weekday: 'long', day: 'numeric', month: 'long' })}</span><span>${dur(tot)}</span></div>` +
+      list.map(s => `<div class="sess"><span>${s.s ? hm(s.s) : '??'} → ${s.e ? hm(s.e) : 'en cours'}${s.s && s.e ? ' · ' + dur(s.e - s.s) : ''}</span><span>` +
+        [s.inEv, s.outEv].filter(e => e && e.row).map(e => `<button class="x" data-del="${e.row}" title="Supprimer">✕${e.a === 'in' ? 'arr' : 'dép'}</button>`).join('') +
+        `</span></div>`).join('') + '</div>';
+  }).join('');
+}
+function renderUrls() {
+  const ok = cfg.url && cfg.token;
+  $('#uIn').textContent = ok ? apiUrl({ action: 'in', src: 'raccourci' }) : 'Configure l’URL et le token';
+  $('#uOut').textContent = ok ? apiUrl({ action: 'out', src: 'raccourci' }) : 'Configure l’URL et le token';
+}
+
+/* ---------- actions ---------- */
+async function refresh(silent) {
+  if (!cfg.url) return render();
+  try { await flush(); const j = await api({ action: 'list', days: 120 }); events = j.events; LS.set('pm_events', events); render(); if (!silent) toast('À jour'); }
+  catch (e) { render(); if (!silent) toast('Hors-ligne : ' + e.message); }
+}
+async function punch(action, src) {
+  const at = new Date().toISOString();
+  queue.push({ action, src, at }); LS.set('pm_queue', queue); render();
+  toast(action === 'in' ? 'Arrivée timbrée ' + hm(new Date()) : 'Départ timbré ' + hm(new Date()));
+  await refresh(true);
+}
+async function flush() {
+  while (queue.length) {
+    const q = queue[0];
+    await api({ action: q.action, src: q.src, at: q.at });
+    queue.shift(); LS.set('pm_queue', queue);
+  }
+}
+$('#bIn').onclick = () => punch('in', 'manuel');
+$('#bOut').onclick = () => punch('out', 'manuel');
+$('#bRef').onclick = () => refresh();
+$('#hist').onclick = async e => {
+  const r = e.target.dataset.del; if (!r || !confirm('Supprimer ce pointage ?')) return;
+  try { await api({ action: 'delete', row: r }); await refresh(true); toast('Supprimé'); } catch (err) { toast(err.message); }
+};
+$('#bCsv').onclick = () => {
+  const rows = [['Date', 'Arrivée', 'Départ', 'Durée (h)']];
+  for (const s of sessions()) if (s.s) rows.push([dayKey(s.s), hm(s.s), s.e ? hm(s.e) : '', s.e ? ((s.e - s.s) / 36e5).toFixed(2) : '']);
+  const blob = new Blob(['﻿' + rows.map(r => r.join(';')).join('\n')], { type: 'text/csv' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'pointage-mic.csv'; a.click();
+};
+document.addEventListener('click', e => {
+  const id = e.target.dataset.copy; if (!id) return;
+  navigator.clipboard.writeText($('#' + id).textContent).then(() => toast('Copié !'), () => toast('Copie impossible'));
+});
+
+/* ---------- GPS au premier plan ---------- */
+let watch = null;
+$('#bGps').onclick = () => {
+  if (watch !== null) { navigator.geolocation.clearWatch(watch); watch = null; $('#bGps').textContent = 'Activer'; $('#gpsTxt').textContent = 'GPS inactif'; return; }
+  if (!navigator.geolocation) return toast('GPS non disponible');
+  $('#bGps').textContent = 'Arrêter'; $('#gpsTxt').textContent = 'Recherche…';
+  watch = navigator.geolocation.watchPosition(onPos, err => { $('#gpsTxt').textContent = 'Erreur GPS : ' + err.message; }, { enableHighAccuracy: true, maximumAge: 10000, timeout: 30000 });
+};
+function onPos(p) {
+  const { latitude: la, longitude: lo, accuracy: acc } = p.coords;
+  const d = distM(la, lo, cfg.lat, cfg.lon);
+  const inside = d <= cfg.radius, outside = d > cfg.radius + 50; // marge anti-oscillation
+  $('#gpsTxt').textContent = `${inside ? '✅ Sur le site' : '📍 À ' + (d >= 1000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d) + ' m')} (± ${Math.round(acc)} m)`;
+  if (acc > 100) return; // ignore les mesures imprécises
+  const v = inside ? true : outside ? false : null; if (v === null) return;
+  const cur = state();
+  if (v && !cur) punch('in', 'gps-app');
+  if (!v && cur) punch('out', 'gps-app');
+}
+
+/* ---------- Réglages + carte ---------- */
+$('#cUrl').value = cfg.url; $('#cTok').value = cfg.token; $('#cRad').value = cfg.radius; $('#rTxt').textContent = cfg.radius;
+$('#bSave').onclick = async () => {
+  cfg.url = $('#cUrl').value.trim(); cfg.token = $('#cTok').value.trim(); LS.set('pm_cfg', cfg); renderUrls();
+  try { await api({ action: 'list', days: 1 }); toast('Connexion OK ✅'); refresh(true); } catch (e) { toast('Échec : ' + e.message); }
+};
+let map, marker, circle;
+function initMap() {
+  if (map || !window.L) { map && map.invalidateSize(); return; }
+  map = L.map('map').setView([cfg.lat, cfg.lon], 16);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
+  marker = L.marker([cfg.lat, cfg.lon], { draggable: true }).addTo(map);
+  circle = L.circle([cfg.lat, cfg.lon], { radius: cfg.radius, color: '#22c55e' }).addTo(map);
+  marker.on('dragend', () => setCenter(marker.getLatLng()));
+  map.on('click', e => setCenter(e.latlng));
+}
+function setCenter(ll) { cfg.lat = +ll.lat.toFixed(6); cfg.lon = +ll.lng.toFixed(6); LS.set('pm_cfg', cfg); marker.setLatLng(ll); circle.setLatLng(ll); }
+$('#cRad').oninput = e => { cfg.radius = +e.target.value; $('#rTxt').textContent = cfg.radius; circle && circle.setRadius(cfg.radius); LS.set('pm_cfg', cfg); };
+$('#bHere').onclick = () => navigator.geolocation.getCurrentPosition(p => { const ll = L.latLng(p.coords.latitude, p.coords.longitude); setCenter(ll); map.setView(ll, 17); }, e => toast(e.message), { enableHighAccuracy: true });
+
+/* ---------- onglets ---------- */
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x === b));
+  ['home', 'hist', 'set'].forEach(t => $('#t-' + t).hidden = t !== b.dataset.tab);
+  if (b.dataset.tab === 'set') setTimeout(initMap, 50);
+  if (b.dataset.tab === 'hist') refresh(true);
+});
+
+render(); refresh(true);
+setInterval(render, 30000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(true); });
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+</script>
+</body>
+</html>
