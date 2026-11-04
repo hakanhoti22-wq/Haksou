@@ -37,21 +37,11 @@ Sur l'iPhone, ouvre l'adresse dans Safari → **Partager → Sur l'écran d'accu
 > iOS ne surveille en arrière-plan que des **cercles**. La zone dessinée sert quand l'app est ouverte. Le cercle calculé (zone + 30 m) sert à l'app Raccourcis.
 
 ### 4. Automatisations iPhone (l'étape clé)
-Les 4 URL à copier sont dans **Réglages → Pointage automatique**.
+Deux automatisations dans l'app **Raccourcis**, avec **une seule action chacune** (« Obtenir le contenu de l'URL ») :
+- **Arrivée** au MIC → URL ①
+- **Départ** du MIC → URL ②
 
-**Arrivée** : Raccourcis → Automatisation → **+** → **Arrivée** → lieu = coordonnées du cercle, rayon indiqué → **Exécuter immédiatement** → raccourci vide → **Obtenir le contenu de l'URL** (URL ①).
-
-**Départ** : même lieu, **Départ**, **Exécuter immédiatement**, puis :
-```
-Obtenir le contenu de l'URL  (URL ② sortie)
-Si  Contenu de l'URL  est  QUESTION
-    Choisir dans le menu « Trajet professionnel ? »  Oui / Non
-        Oui → Obtenir le contenu de l'URL (URL ③ trajet pro)
-        Non → Obtenir le contenu de l'URL (URL ④ détimbrer)
-    Fin du menu
-Fin de la condition
-```
-Réglages iOS : **Raccourcis → Position : Toujours + Position exacte**, et **Notifications** autorisées.
+Les URL sont dans **Réglages** de l'app. Le pas à pas est dans [IPHONE.md](IPHONE.md).
 
 ## Règles de pointage
 | Situation | Résultat |
@@ -60,7 +50,7 @@ Réglages iOS : **Raccourcis → Position : Toujours + Position exacte**, et **N
 | Sortie **pendant la plage horaire** | Question « Trajet professionnel ? » |
 | → Oui | Sortie pro, le timbrage continue |
 | → Non | Départ, à l'heure réelle de la sortie |
-| → pas de réponse | Le timbrage continue, l'app repose la question. Si tu reviens le même jour, la sortie compte comme pro. |
+| → pas de réponse | Retour sur le site le même jour = trajet pro. Sinon = départ à l'heure de la sortie. |
 | Sortie **hors plage horaire** | Départ direct |
 | Journée jamais fermée (sortie pro sans retour, oubli) | Départ automatique à l'heure de fin de plage, à vérifier |
 
