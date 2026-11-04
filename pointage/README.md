@@ -26,18 +26,43 @@ L'app est déjà en ligne sur https://hakanhoti22-wq.github.io/Haksou/pointage/ 
 ⚠️ Ne change pas les réglages GitHub Pages : ils servent l'app de traduction.
 Sur l'iPhone, ouvre l'adresse dans Safari → **Partager → Sur l'écran d'accueil**.
 
-### 3. Configurer l'app
-Onglet **Réglages** : colle l'URL `/exec` et le token → **Enregistrer et tester**. Vérifie le cercle sur la carte.
+### 3. Configurer l'app (onglet Réglages)
+1. Colle l'URL `/exec` et le token → **Enregistrer et tester**.
+2. **Plage horaire** : 06:30 – 18:00 par défaut → **Enregistrer la plage**.
+3. **Zone du site** : touche **✏️ Dessiner la zone**, pose les coins du site sur la carte, puis **Terminer**. Tu peux ensuite déplacer chaque coin.
+   L'app affiche le **cercle pour Raccourcis** (coordonnées + rayon) qui englobe ta zone.
+
+> iOS ne surveille en arrière-plan que des **cercles**. La zone dessinée sert quand l'app est ouverte. Le cercle calculé (zone + 30 m) sert à l'app Raccourcis.
 
 ### 4. Automatisations iPhone (l'étape clé)
-1. App **Raccourcis** → **Automatisation** → **+** → **Arrivée**.
-2. **Lieu** → cherche « Marly Innovation Center », règle le rayon (150–250 m conseillé).
-3. Choisis **Exécuter immédiatement**.
-4. **Nouveau raccourci vide** → action **Obtenir le contenu de l'URL** → colle l'**URL arrivée** (copiée depuis Réglages).
-5. Fais pareil avec **Départ** et l'**URL départ**.
-6. **Réglages iOS → Confidentialité → Service de localisation → Raccourcis** : *Toujours* + *Position exacte*.
+Les 4 URL à copier sont dans **Réglages → Pointage automatique**.
+
+**Arrivée** : Raccourcis → Automatisation → **+** → **Arrivée** → lieu = coordonnées du cercle, rayon indiqué → **Exécuter immédiatement** → raccourci vide → **Obtenir le contenu de l'URL** (URL ①).
+
+**Départ** : même lieu, **Départ**, **Exécuter immédiatement**, puis :
+```
+Obtenir le contenu de l'URL  (URL ② sortie)
+Si  Contenu de l'URL  est  QUESTION
+    Choisir dans le menu « Trajet professionnel ? »  Oui / Non
+        Oui → Obtenir le contenu de l'URL (URL ③ trajet pro)
+        Non → Obtenir le contenu de l'URL (URL ④ détimbrer)
+    Fin du menu
+Fin de la condition
+```
+Réglages iOS : **Raccourcis → Position : Toujours + Position exacte**, et **Notifications** autorisées.
+
+## Règles de pointage
+| Situation | Résultat |
+|---|---|
+| Entrée sur le site | Arrivée |
+| Sortie **pendant la plage horaire** | Question « Trajet professionnel ? » |
+| → Oui | Sortie pro, le timbrage continue |
+| → Non | Départ, à l'heure réelle de la sortie |
+| → pas de réponse | Le timbrage continue, l'app repose la question. Si tu reviens le même jour, la sortie compte comme pro. |
+| Sortie **hors plage horaire** | Départ direct |
+| Journée jamais fermée (sortie pro sans retour, oubli) | Départ automatique à l'heure de fin de plage, à vérifier |
 
 ## Bon à savoir
-- iOS peut déclencher l'automatisation avec 1 à 5 minutes de décalage. Tu peux corriger un pointage directement dans la Google Sheet.
-- Sans réseau au moment du passage, le Raccourci échoue. Tu peux alors timbrer à la main dans l'app, qui garde le pointage et l'envoie plus tard.
-- Les pointages en double (deux « Arrivée » de suite) sont ignorés automatiquement.
+- iOS peut déclencher l'automatisation avec 1 à 5 minutes de décalage. Tu peux corriger un pointage dans l'historique (✕) ou dans la Google Sheet.
+- Sans réseau au moment du passage, le raccourci échoue. Tu peux alors timbrer à la main dans l'app, qui garde le pointage et l'envoie plus tard.
+- Après une modification de `apps-script.gs` : Déployer → Gérer les déploiements → Modifier → **Nouvelle version**.
