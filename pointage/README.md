@@ -65,3 +65,11 @@ Chacun a **sa propre Google Sheet** : tes heures restent privées et chacun a so
 2. Ton collègue ouvre le lien dans **Safari** et accepte l'import : la zone dessinée et la plage horaire sont déjà réglées.
 3. Il ajoute l'app à son écran d'accueil (**Partager → Sur l'écran d'accueil**).
 4. Il suit les étapes **1, 3 et 4** de ce guide (sa Google Sheet, sa connexion, ses automatisations Raccourcis).
+
+## Corriger l'historique
+Dans l'onglet **Historique** :
+- **Touche un pointage** (ou ✏️) pour changer sa date, son heure ou son type.
+- **＋** ajoute un pointage oublié.
+- **☑︎ Sélectionner** permet de supprimer plusieurs pointages ou des journées entières.
+
+> Modifier et ajouter demandent la version du script du 5 novembre 2026 ou plus récente. Recolle `apps-script.gs` (en gardant ton TOKEN), puis Déployer → Gérer les déploiements → ✏️ → **Nouvelle version**.

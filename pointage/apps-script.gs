@@ -12,6 +12,8 @@
  *          hors plage → Départ + réponse DETIMBRE
  *   pro    la sortie à confirmer était professionnelle → le timbrage continue
  *   out    départ (ou la sortie à confirmer n'était PAS pro → départ à l'heure de la sortie)
+ *   edit   modifie un pointage (row=, at= nouvelle heure ISO, type=in|out|pro|back)
+ *   add    ajoute un pointage oublié (type=, at=)
  *   config lit / enregistre la plage horaire (start=06:30&end=18:00)
  *   list   historique (JSON)          delete  supprime une ligne (row=)
  * Ajoute fmt=text pour une réponse en texte simple (utilisé par l'app Raccourcis).
@@ -78,6 +80,26 @@ function doGet(e) {
         if (row >= 2 && row <= sh.getLastRow()) sh.deleteRow(row);
         return reply({ ok: true });
       }
+      case 'edit': {
+        const row = Number(p.row);
+        if (!(row >= 2 && row <= sh.getLastRow())) return reply({ ok: false, error: 'Ligne introuvable' });
+        if (p.at) {
+          const t = new Date(p.at);
+          if (isNaN(t)) return reply({ ok: false, error: 'Heure invalide' });
+          sh.getRange(row, 1).setValue(t);
+          sh.getRange(row, 4, 1, 2).setValues([[day_(t), Utilities.formatDate(t, TZ, 'HH:mm')]]);
+        }
+        if (LABEL[p.type]) sh.getRange(row, 2).setValue(LABEL[p.type]);
+        sort_(sh);
+        return reply({ ok: true, edited: true });
+      }
+      case 'add': {
+        const t = new Date(p.at);
+        if (!LABEL[p.type] || isNaN(t)) return reply({ ok: false, error: 'Type ou heure invalide' });
+        add(p.type, 'ajout manuel', t);
+        sort_(sh);
+        return reply({ ok: true, added: true });
+      }
       case 'config': {
         const ok = s => /^\d\d:\d\d$/.test(s || '');
         if (ok(p.start) && ok(p.end)) PropertiesService.getScriptProperties().setProperties({ start: p.start, end: p.end });
@@ -111,6 +133,11 @@ function sheet_() {
     sh.setFrozenRows(1);
   }
   return sh;
+}
+// Garde la feuille dans l'ordre chronologique (le dernier pointage = la dernière ligne).
+function sort_(sh) {
+  const n = sh.getLastRow() - 1;
+  if (n > 1) sh.getRange(2, 1, n, 5).sort({ column: 1, ascending: true });
 }
 function last_(sh) {
   const n = sh.getLastRow();
