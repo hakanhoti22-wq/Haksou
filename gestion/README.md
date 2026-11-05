@@ -19,6 +19,8 @@ Chaque entreprise **active seulement les modules dont elle a besoin** : un resta
 
 ---
 
+> 🚀 **Guide complet de mise en service, étape par étape : [MISE-EN-LIGNE.md](MISE-EN-LIGNE.md)**
+
 ## 🧪 1. Essayer tout de suite (mode démo)
 
 L'appli fonctionne **sans rien configurer**, en mode démo : les données restent dans le navigateur, avec des exemples déjà remplis.
