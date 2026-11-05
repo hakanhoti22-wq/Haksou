@@ -82,3 +82,15 @@ La Google Sheet contient un onglet **Résumé**, mis à jour automatiquement (to
 Sur l'accueil, la barre **Cette semaine** montre ta progression vers ton objectif (42 h par défaut, modifiable dans Réglages).
 
 > Modifier, ajouter, les absences, le Résumé et la suppression groupée demandent la dernière version du script. Recolle `apps-script.gs` (en gardant ton TOKEN), puis Déployer → Gérer les déploiements → ✏️ → **Nouvelle version**.
+
+## Bouton « Timbrer », Siri et Apple Watch
+Dans **Réglages → Bouton « Timbrer » & Siri**, l'app donne 4 adresses (⑤ à ⑧). Pour chacune, crée un raccourci dans l'app Raccourcis : **Obtenir le contenu de l'URL** + **Afficher le résultat**, puis renomme-le :
+- **Timbrer** : arrivée si tu n'es pas timbré, départ sinon. Mets-le en widget sur l'écran d'accueil, ou dans le Centre de contrôle (iOS 18+).
+- **Je commence** / **Je pars** : « Dis Siri, je pars ».
+- **Mes heures** : Siri lit ton total du jour et de la semaine.
+Dans chaque raccourci, ⓘ → **Afficher sur Apple Watch** pour l'avoir sur la montre.
+
+## Relevé mensuel par mail
+1. Dans l'app : **Réglages → Relevé mensuel par mail**, indique ton adresse (et celle de ton chef en copie) → **Enregistrer**.
+2. **Une seule fois** : Google Sheet → **Extensions → Apps Script** → en haut, choisis la fonction **installerMail** → **▶ Exécuter** → autorise l'accès.
+3. **Envoyer un test** pour vérifier. Ensuite, le relevé PDF du mois précédent part tout seul le 1er de chaque mois vers 7h.
