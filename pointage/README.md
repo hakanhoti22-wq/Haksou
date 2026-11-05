@@ -70,6 +70,10 @@ Chacun a **sa propre Google Sheet** : tes heures restent privées et chacun a so
 Dans l'onglet **Historique** :
 - **Touche un pointage** (ou ✏️) pour changer sa date, son heure ou son type.
 - **＋** ajoute un pointage oublié.
-- **☑︎ Sélectionner** permet de supprimer plusieurs pointages ou des journées entières.
+- **☑︎ Sélectionner** permet de supprimer plusieurs pointages ou des journées entières (en un seul envoi).
+- **‹ ›** passe d'un mois à l'autre, avec le total du mois.
+- **PDF** imprime ou enregistre le relevé du mois affiché (Partager → Enregistrer dans Fichiers).
 
-> Modifier et ajouter demandent la version du script du 5 novembre 2026 ou plus récente. Recolle `apps-script.gs` (en gardant ton TOKEN), puis Déployer → Gérer les déploiements → ✏️ → **Nouvelle version**.
+Sur l'accueil, la barre **Cette semaine** montre ta progression vers ton objectif (42 h par défaut, modifiable dans Réglages).
+
+> Modifier, ajouter et la suppression groupée demandent la version du script du 5 novembre 2026 ou plus récente. Recolle `apps-script.gs` (en gardant ton TOKEN), puis Déployer → Gérer les déploiements → ✏️ → **Nouvelle version**.

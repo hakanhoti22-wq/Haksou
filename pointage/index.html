@@ -53,6 +53,28 @@ label{display:block;font-size:14px;color:var(--mut);margin:10px 0 4px}
 #editBox .card{width:100%;max-width:480px;margin:0}
 select{font:inherit;width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:#0e1626;color:var(--txt)}
 .evt{cursor:pointer;flex:1}
+.bar{height:8px;border-radius:99px;background:#24324d;margin-top:8px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--ok);border-radius:99px;transition:width .4s}
+.bar.over i{background:var(--acc)}
+#monthNav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px}
+#monthNav .t{text-align:center;flex:1}
+#monthNav .t b{display:block;text-transform:capitalize}
+#printArea{display:none}
+@media print{
+  @page{margin:14mm}
+  body{background:#fff!important;color:#000!important;padding:0!important}
+  body>*:not(#printArea){display:none!important}
+  #printArea{display:block;font:11pt/1.35 -apple-system,Helvetica,Arial,sans-serif;color:#000}
+  #printArea h1{font-size:18pt;margin:0 0 2mm}
+  #printArea .sub{color:#444;margin-bottom:6mm}
+  #printArea table{width:100%;border-collapse:collapse}
+  #printArea th,#printArea td{border-bottom:1px solid #bbb;padding:2mm 1.5mm;text-align:left;vertical-align:top}
+  #printArea th{border-bottom:2px solid #000;font-size:9.5pt;text-transform:uppercase;letter-spacing:.03em}
+  #printArea td.n,#printArea th.n{text-align:right;font-variant-numeric:tabular-nums}
+  #printArea tr.wk td{background:#f1f1f1;font-weight:600}
+  #printArea tfoot td{border-top:2px solid #000;border-bottom:0;font-weight:700;font-size:12pt}
+  #printArea .sign{margin-top:16mm;display:flex;justify-content:space-between;color:#444}
+}
 .x{background:none;color:var(--mut);padding:0 4px;width:auto;font-size:13px}
 code{display:block;word-break:break-all;background:#0e1626;border:1px solid var(--line);padding:10px;border-radius:10px;font-size:12px;margin:6px 0}
 nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:#0e1626ee;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:1000}
@@ -90,7 +112,7 @@ ol{padding-left:20px;margin:6px 0}li{margin:5px 0}
   </div>
   <div class="grid">
     <div class="card"><div class="mut">Aujourd’hui</div><div class="num" id="today">–</div></div>
-    <div class="card"><div class="mut">Cette semaine</div><div class="num" id="week">–</div></div>
+    <div class="card"><div class="mut">Cette semaine</div><div class="num" id="week">–</div><div class="mut" id="weekGoal" style="font-size:12px"></div><div class="bar" id="weekBar"><i></i></div></div>
   </div>
   <div class="grid">
     <button class="in" id="bIn">Timbrer arrivée</button>
@@ -108,8 +130,9 @@ ol{padding-left:20px;margin:6px 0}li{margin:5px 0}
 
 <!-- ============ HISTORIQUE ============ -->
 <section id="t-hist" hidden>
-  <div class="row" style="justify-content:space-between"><h2 style="margin:0">Historique</h2><div class="row"><button class="sm" id="bAdd">＋</button><button class="sm" id="bSel">☑︎ Sélectionner</button><button class="sm" id="bRef">↻</button><button class="sm" id="bCsv">CSV</button></div></div>
+  <div class="row" style="justify-content:space-between"><h2 style="margin:0">Historique</h2><div class="row"><button class="sm" id="bAdd">＋</button><button class="sm" id="bSel">☑︎ Sélectionner</button><button class="sm" id="bRef">↻</button><button class="sm" id="bPdf">PDF</button><button class="sm" id="bCsv">CSV</button></div></div>
   <div class="mut" id="selHelp" style="margin-top:8px" hidden>Coche une journée entière ou des pointages un par un, puis touche « Supprimer ».</div>
+  <div id="monthNav"><button class="sm" id="mPrev">‹</button><div class="t"><b id="mTitle"></b><span class="mut" id="mTotal"></span></div><button class="sm" id="mNext">›</button></div>
   <div class="card" id="hist" style="margin-top:10px"></div>
   <div id="selBar" hidden><button class="sm" id="bSelAll" style="flex:1">Tout</button><button class="out" id="bSelDel" style="flex:2;padding:10px">Supprimer (0)</button><button class="sm" id="bSelCancel" style="flex:1">Annuler</button></div>
 </section>
@@ -131,6 +154,10 @@ ol{padding-left:20px;margin:6px 0}li{margin:5px 0}
       <div><label>Fin</label><input type="time" id="hEnd"></div>
     </div>
     <div style="margin-top:12px"><button id="bHours">Enregistrer la plage</button></div>
+    <div class="grid" style="margin-top:6px">
+      <div><label>Heures par semaine (objectif)</label><input type="number" id="cWeekH" min="1" max="80" step="0.5" inputmode="decimal"></div>
+      <div><label>Ton nom (pour le PDF)</label><input id="cName" autocomplete="name"></div>
+    </div>
   </div>
 
   <h2>Zone du site</h2>
@@ -208,6 +235,8 @@ ol{padding-left:20px;margin:6px 0}li{margin:5px 0}
   </div>
 </div>
 
+<div id="printArea"></div>
+
 <nav>
   <button data-tab="home" class="cur">Pointage</button>
   <button data-tab="hist">Historique</button>
@@ -232,6 +261,8 @@ let events = LS.get('pm_events', []);   // [{row, t, a:'in'|'out'|'leave'|'pro'|
 let queue = LS.get('pm_queue', []);     // actions hors-ligne en attente
 const saveCfg = () => LS.set('pm_cfg', cfg);
 let selMode = false; const sel = new Set(); // sélection dans l'historique
+const monthKey = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+let curMonth = monthKey(new Date()); // mois affiché dans l'historique
 
 /* ---------- utilitaires ---------- */
 const pad = n => String(n).padStart(2, '0');
@@ -321,6 +352,9 @@ function render() {
   let tT = 0, wT = 0;
   for (const s of ss) { const ms = (s.e || now) - s.s; if (dayKey(s.s) === today) tT += ms; if (s.s >= monday) wT += ms; }
   $('#today').textContent = dur(tT); $('#week').textContent = dur(wT);
+  const goal = (+cfg.weekH || 42) * 36e5, pct = Math.min(100, wT / goal * 100);
+  $('#weekBar').firstChild.style.width = pct + '%'; $('#weekBar').classList.toggle('over', wT >= goal);
+  $('#weekGoal').textContent = wT >= goal ? `objectif ${cfg.weekH || 42} h atteint · +${dur(wT - goal)}` : `sur ${cfg.weekH || 42} h · reste ${dur(goal - wT)}`;
   $('#hoursTxt').textContent = `Plage horaire : ${cfg.start} – ${cfg.end}. Une sortie pendant cette plage demande si le trajet est professionnel.`;
   $('#pending').textContent = queue.length ? `${queue.length} action(s) en attente d’envoi (hors-ligne)` : '';
   renderHist(); renderUrls();
@@ -332,8 +366,12 @@ function renderHist() {
   const by = {};
   for (const e of events) { const k = dayKey(new Date(e.t)); (by[k] = by[k] || { ev: [], ms: 0 }).ev.push(e); }
   for (const s of sessions()) { const k = dayKey(s.s); by[k] && (by[k].ms += (s.e || new Date()) - s.s); }
-  const keys = Object.keys(by).sort().reverse();
-  if (!keys.length) { $('#hist').innerHTML = '<div class="mut">Aucun pointage pour l’instant.</div>'; return; }
+  const [my, mm] = curMonth.split('-').map(Number), now = new Date();
+  const keys = Object.keys(by).filter(k => k.startsWith(curMonth)).sort().reverse();
+  $('#mTitle').textContent = new Date(my, mm - 1, 15).toLocaleDateString('fr-CH', { month: 'long', year: 'numeric' });
+  $('#mTotal').textContent = keys.length ? `${dur(keys.reduce((a, k) => a + by[k].ms, 0))} · ${keys.length} jour(s)` : '';
+  $('#mNext').disabled = curMonth >= monthKey(now);
+  if (!keys.length) { $('#hist').innerHTML = '<div class="mut">Aucun pointage ce mois-ci.</div>'; return; }
   $('#hist').innerHTML = keys.map(k => {
     const d = new Date(k + 'T12:00');
     const rows = by[k].ev.filter(e => e.row).map(e => e.row);
@@ -363,7 +401,7 @@ async function refresh(silent) {
   try {
     await flush();
     if (cfg.hoursDirty) { await api({ action: 'config', start: cfg.start, end: cfg.end }); cfg.hoursDirty = false; saveCfg(); }
-    const j = await api({ action: 'list', days: 120 });
+    const j = await api({ action: 'list', days: 400 });
     events = j.events; LS.set('pm_events', events);
     if (j.hours) { cfg.start = j.hours.start; cfg.end = j.hours.end; saveCfg(); fillHours(); }
     render(); if (!silent) toast('À jour');
@@ -400,14 +438,17 @@ async function deleteRows(rows) {
   rows = [...new Set(rows.map(Number))].sort((a, b) => b - a); // du bas vers le haut : les numéros ne se décalent pas
   let done = 0;
   try {
-    for (const r of rows) { toast(`Suppression… ${done + 1}/${rows.length}`); await api({ action: 'delete', row: r }); done++; }
+    toast(`Suppression de ${rows.length} pointage(s)…`);
+    const j = await api({ action: 'delete', rows: rows.join(',') }); // tout d'un coup (script à jour)
+    if (j.deleted !== undefined) done = j.deleted;
+    else for (const r of rows) { toast(`Suppression… ${done + 1}/${rows.length}`); await api({ action: 'delete', row: r }); done++; } // ancien script : une par une
     toast(`${done} pointage(s) supprimé(s) ✅`);
   } catch (err) { toast(`Erreur après ${done} suppression(s) : ${err.message}`); }
   await refresh(true);
 }
 $('#bSel').onclick = () => setSel(!selMode);
 $('#bSelCancel').onclick = () => setSel(false);
-$('#bSelAll').onclick = () => { const rows = events.filter(e => e.row).map(e => e.row); const all = rows.every(r => sel.has(r)); rows.forEach(r => all ? sel.delete(r) : sel.add(r)); renderHist(); updSel(); };
+$('#bSelAll').onclick = () => { const rows = [...document.querySelectorAll('#hist input[data-row]')].map(c => +c.dataset.row); const all = rows.every(r => sel.has(r)); rows.forEach(r => all ? sel.delete(r) : sel.add(r)); renderHist(); updSel(); };
 $('#bSelDel').onclick = async () => {
   if (!sel.size || !confirm(`Supprimer définitivement ${sel.size} pointage(s) ?`)) return;
   const rows = [...sel]; setSel(false); await deleteRows(rows);
@@ -422,6 +463,49 @@ $('#hist').onclick = async e => {
   const ed = e.target.closest('[data-edit]'); if (ed) return openEdit(+ed.dataset.edit);
   const r = e.target.dataset.del; if (!r || !confirm('Supprimer ce pointage ?')) return;
   await deleteRows([r]);
+};
+
+/* ---------- mois affiché ---------- */
+function shiftMonth(n) {
+  const [y, m] = curMonth.split('-').map(Number), d = new Date(y, m - 1 + n, 1);
+  if (monthKey(d) > monthKey(new Date())) return;
+  curMonth = monthKey(d); if (selMode) setSel(false); else renderHist();
+}
+$('#mPrev').onclick = () => shiftMonth(-1);
+$('#mNext').onclick = () => shiftMonth(1);
+
+/* ---------- export PDF (impression) du mois affiché ---------- */
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function monthReport() {
+  const days = {};
+  for (const e of events) { const k = dayKey(new Date(e.t)); if (k.startsWith(curMonth)) (days[k] = days[k] || { ev: [], ms: 0 }).ev.push(e); }
+  for (const s of sessions()) { const k = dayKey(s.s); days[k] && (days[k].ms += (s.e || new Date()) - s.s); }
+  let rows = '', total = 0, wk = 0, wkNo = null;
+  const weekNo = d => { const t = new Date(d); t.setHours(0, 0, 0, 0); t.setDate(t.getDate() + 3 - (t.getDay() + 6) % 7); const w1 = new Date(t.getFullYear(), 0, 4); return 1 + Math.round(((t - w1) / 864e5 - 3 + (w1.getDay() + 6) % 7) / 7); };
+  const flushWeek = () => { if (wkNo !== null) rows += `<tr class="wk"><td colspan="4">Total semaine ${wkNo}</td><td class="n">${dur(wk)}</td></tr>`; wk = 0; };
+  for (const k of Object.keys(days).sort()) {
+    const d = new Date(k + 'T12:00'), ev = days[k].ev, n = weekNo(d);
+    if (n !== wkNo) { flushWeek(); wkNo = n; }
+    const first = ev.find(e => e.a === 'in' || e.a === 'back'), last = [...ev].reverse().find(e => e.a === 'out');
+    const pros = []; let o = null;
+    for (const e of ev) { if (e.a === 'pro' || e.a === 'leave') o = e; else if (e.a === 'back' && o) { pros.push(hm(new Date(o.t)) + '–' + hm(new Date(e.t))); o = null; } }
+    if (o) pros.push(hm(new Date(o.t)) + (o.a === 'leave' ? ' (à confirmer)' : '–…'));
+    rows += `<tr><td>${esc(d.toLocaleDateString('fr-CH', { weekday: 'short', day: '2-digit', month: '2-digit' }))}</td><td class="n">${first ? hm(new Date(first.t)) : '–'}</td><td class="n">${last ? hm(new Date(last.t)) : '–'}</td><td>${pros.join('<br>') || ''}</td><td class="n">${dur(days[k].ms)}</td></tr>`;
+    total += days[k].ms; wk += days[k].ms;
+  }
+  flushWeek();
+  const [y, m] = curMonth.split('-').map(Number), title = new Date(y, m - 1, 15).toLocaleDateString('fr-CH', { month: 'long', year: 'numeric' });
+  return `<h1>Relevé d’heures — ${esc(title)}</h1>
+    <div class="sub">${cfg.name ? esc(cfg.name) + ' · ' : ''}Marly Innovation Center · imprimé le ${new Date().toLocaleDateString('fr-CH')}</div>
+    <table><thead><tr><th>Jour</th><th class="n">Arrivée</th><th class="n">Départ</th><th>Sorties pro</th><th class="n">Total</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="5">Aucun pointage ce mois-ci.</td></tr>'}</tbody>
+    <tfoot><tr><td colspan="4">Total du mois · ${Object.keys(days).length} jour(s)</td><td class="n">${dur(total)}</td></tr></tfoot></table>
+    <div class="sign"><span>Signature collaborateur : ____________________</span><span>Visa : ____________________</span></div>`;
+}
+$('#bPdf').onclick = () => {
+  $('#printArea').innerHTML = monthReport();
+  toast('Dans la fenêtre d’impression : Partager → Enregistrer dans Fichiers (PDF)');
+  setTimeout(() => window.print(), 300);
 };
 
 /* ---------- modifier / ajouter un pointage ---------- */
@@ -496,6 +580,9 @@ $('#bSave').onclick = async () => {
   cfg.url = $('#cUrl').value.trim(); cfg.token = $('#cTok').value.trim(); saveCfg(); renderUrls();
   try { await api({ action: 'list', days: 1 }); toast('Connexion OK ✅'); refresh(true); } catch (e) { toast('Échec : ' + e.message); }
 };
+$('#cWeekH').value = cfg.weekH || 42; $('#cName').value = cfg.name || '';
+$('#cWeekH').onchange = e => { const v = +e.target.value; if (v > 0 && v <= 80) { cfg.weekH = v; saveCfg(); render(); toast('Objectif : ' + v + ' h / semaine'); } };
+$('#cName').onchange = e => { cfg.name = e.target.value.trim(); saveCfg(); };
 $('#bHours').onclick = async () => {
   const s = $('#hStart').value, e = $('#hEnd').value;
   if (!s || !e || s >= e) return toast('Plage horaire invalide');
