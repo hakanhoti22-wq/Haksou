@@ -49,6 +49,10 @@ label{display:block;font-size:14px;color:var(--mut);margin:10px 0 4px}
 .ck{width:22px;height:22px;accent-color:var(--ko);flex:none;margin:0 10px 0 0}
 .day .h label,.ev label{display:flex;align-items:center;margin:0;color:inherit;font-size:inherit;cursor:pointer}
 #selBar{position:fixed;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom) + 64px);display:flex;gap:8px;z-index:1001;background:#0e1626;border:1px solid var(--line);border-radius:14px;padding:8px;box-shadow:0 8px 24px #0008}
+#editBox{position:fixed;inset:0;background:#000a;display:flex;align-items:flex-end;justify-content:center;z-index:1100;padding:12px 12px calc(env(safe-area-inset-bottom) + 12px)}
+#editBox .card{width:100%;max-width:480px;margin:0}
+select{font:inherit;width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:#0e1626;color:var(--txt)}
+.evt{cursor:pointer;flex:1}
 .x{background:none;color:var(--mut);padding:0 4px;width:auto;font-size:13px}
 code{display:block;word-break:break-all;background:#0e1626;border:1px solid var(--line);padding:10px;border-radius:10px;font-size:12px;margin:6px 0}
 nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:#0e1626ee;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:1000}
@@ -104,7 +108,7 @@ ol{padding-left:20px;margin:6px 0}li{margin:5px 0}
 
 <!-- ============ HISTORIQUE ============ -->
 <section id="t-hist" hidden>
-  <div class="row" style="justify-content:space-between"><h2 style="margin:0">Historique</h2><div class="row"><button class="sm" id="bSel">☑︎ Sélectionner</button><button class="sm" id="bRef">↻</button><button class="sm" id="bCsv">CSV</button></div></div>
+  <div class="row" style="justify-content:space-between"><h2 style="margin:0">Historique</h2><div class="row"><button class="sm" id="bAdd">＋</button><button class="sm" id="bSel">☑︎ Sélectionner</button><button class="sm" id="bRef">↻</button><button class="sm" id="bCsv">CSV</button></div></div>
   <div class="mut" id="selHelp" style="margin-top:8px" hidden>Coche une journée entière ou des pointages un par un, puis touche « Supprimer ».</div>
   <div class="card" id="hist" style="margin-top:10px"></div>
   <div id="selBar" hidden><button class="sm" id="bSelAll" style="flex:1">Tout</button><button class="out" id="bSelDel" style="flex:2;padding:10px">Supprimer (0)</button><button class="sm" id="bSelCancel" style="flex:1">Annuler</button></div>
@@ -189,6 +193,20 @@ ol{padding-left:20px;margin:6px 0}li{margin:5px 0}
     </details>
   </div>
 </section>
+
+<div id="editBox" hidden>
+  <div class="card">
+    <div class="big" id="edTitle" style="font-size:20px">Modifier le pointage</div>
+    <div class="grid">
+      <div><label>Date</label><input type="date" id="edDate"></div>
+      <div><label>Heure</label><input type="time" id="edTime"></div>
+    </div>
+    <label>Type</label>
+    <select id="edType"><option value="in">Arrivée</option><option value="out">Départ</option><option value="pro">Sortie pro</option><option value="back">Retour</option></select>
+    <div class="grid" style="margin-top:14px"><button id="edCancel">Annuler</button><button class="in" id="edSave">Enregistrer</button></div>
+    <button class="x" id="edDel" style="width:100%;margin-top:12px;color:var(--ko)">Supprimer ce pointage</button>
+  </div>
+</div>
 
 <nav>
   <button data-tab="home" class="cur">Pointage</button>
@@ -327,7 +345,7 @@ function renderHist() {
       by[k].ev.map(e => {
         const txt = `<b>${hm(new Date(e.t))}</b>&nbsp;<span style="color:${EVL[e.a][1]}">${EVL[e.a][0]}</span>${e.src && e.src !== 'manuel' ? `<span class="tag">${e.src}</span>` : ''}`;
         if (selMode) return `<div class="ev">${e.row ? `<label><input type="checkbox" class="ck" data-row="${e.row}" ${sel.has(e.row) ? 'checked' : ''}>${txt}</label>` : `<span>${txt}</span>`}</div>`;
-        return `<div class="ev"><span>${txt}</span>` + (e.row ? `<button class="x" data-del="${e.row}" title="Supprimer">✕</button>` : '') + '</div>';
+        return `<div class="ev"><span class="evt" ${e.row ? `data-edit="${e.row}"` : ''}>${txt}</span>` + (e.row ? `<button class="x" data-edit="${e.row}" title="Modifier">✏️</button><button class="x" data-del="${e.row}" title="Supprimer">✕</button>` : '') + '</div>';
       }).join('') + '</div>';
   }).join('');
 }
@@ -401,8 +419,40 @@ $('#hist').onchange = e => {
   renderHist(); updSel();
 };
 $('#hist').onclick = async e => {
+  const ed = e.target.closest('[data-edit]'); if (ed) return openEdit(+ed.dataset.edit);
   const r = e.target.dataset.del; if (!r || !confirm('Supprimer ce pointage ?')) return;
   await deleteRows([r]);
+};
+
+/* ---------- modifier / ajouter un pointage ---------- */
+let edRow = null;
+function openEdit(row) {
+  const ev = row ? events.find(e => e.row === row) : null;
+  if (row && !ev) return;
+  edRow = row || null;
+  const d = ev ? new Date(ev.t) : new Date();
+  $('#edTitle').textContent = row ? 'Modifier le pointage' : 'Ajouter un pointage';
+  $('#edDate').value = dayKey(d); $('#edTime').value = hm(d);
+  $('#edType').value = ev ? (ev.a === 'leave' ? 'pro' : ev.a) : (status() === 'out' ? 'in' : 'out');
+  $('#edDel').hidden = !row;
+  $('#editBox').hidden = false;
+}
+const closeEdit = () => { $('#editBox').hidden = true; edRow = null; };
+$('#bAdd').onclick = () => { if (!cfg.url) return toast('Configure d’abord la Google Sheet'); openEdit(null); };
+$('#edCancel').onclick = closeEdit;
+$('#editBox').onclick = e => { if (e.target.id === 'editBox') closeEdit(); };
+$('#edDel').onclick = async () => { const r = edRow; if (!confirm('Supprimer ce pointage ?')) return; closeEdit(); await deleteRows([r]); };
+$('#edSave').onclick = async () => {
+  const [y, mo, da] = $('#edDate').value.split('-').map(Number), [h, mi] = $('#edTime').value.split(':').map(Number);
+  if (!y || isNaN(h)) return toast('Date ou heure invalide');
+  const at = new Date(y, mo - 1, da, h, mi).toISOString(), type = $('#edType').value, row = edRow;
+  $('#edSave').disabled = true;
+  try {
+    const j = await api(row ? { action: 'edit', row, at, type } : { action: 'add', at, type });
+    if (!j.edited && !j.added) throw new Error('Mets à jour le script Google : Déployer → Gérer les déploiements → ✏️ → Nouvelle version');
+    closeEdit(); toast(row ? 'Pointage modifié ✅' : 'Pointage ajouté ✅'); await refresh(true);
+  } catch (err) { toast(err.message); }
+  finally { $('#edSave').disabled = false; }
 };
 $('#bCsv').onclick = () => {
   const rows = [['Date', 'Heure', 'Événement', 'Source']];
