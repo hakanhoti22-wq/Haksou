@@ -2,6 +2,7 @@
 // Règle légale : une facture reçoit son numéro définitif quand on l'émet, puis elle est verrouillée.
 // Pour la corriger, on crée une note de crédit (qui l'annule en tout ou en partie).
 import { db, session, issueDocument, memberName } from '../db.js';
+import { icon } from '../icons.js';
 import { STATUS } from '../meta.js';
 import { $, $$, esc, isoDate, addDays, fmtDate, fmtTime, money, round2, toast, chip, empty, options, downloadCSV } from '../utils.js';
 import { editClient } from './clients.js';
@@ -74,8 +75,8 @@ export async function render(el, ctx) {
   el.innerHTML = `
     <div class="toolbar">
       <div class="seg">${[['devis', 'Devis'], ['facture', 'Factures'], ['avoir', 'Notes de crédit']].map(([k, t]) => `<button data-t="${k}" class="${tab === k ? 'on' : ''}">${t}</button>`).join('')}</div>
-      <span class="grow"></span><button class="sm ghost" id="csv">⬇︎ CSV</button>
-      ${tab !== 'avoir' ? `<button class="primary" id="new">＋ ${tab === 'devis' ? 'Nouveau devis' : 'Nouvelle facture'}</button>` : ''}
+      <span class="grow"></span><button class="sm ghost" id="csv">CSV</button>
+      ${tab !== 'avoir' ? `<button class="primary" id="new">${tab === 'devis' ? 'Nouveau devis' : 'Nouvelle facture'}</button>` : ''}
     </div>
     <div class="tiles three">${kpi.map(([t, v, cls, n]) => `<div class="card"><div class="mut">${t}</div><div class="num ${cls}">${v === null ? n : money(v, cur())}</div></div>`).join('')}</div>
     ${tab === 'avoir' ? '<p class="mut small">Une note de crédit se crée depuis une facture émise (bouton « Note de crédit »).</p>' : ''}
@@ -113,21 +114,21 @@ async function editor(el, ctx, id) {
       <b class="doc-no">${esc(title(d))}</b> ${stChip(d)}
       <span class="grow"></span>
       ${(d.kind === 'devis' || (locked && d.kind === 'facture' && d.status !== 'annulee')) ? `<select id="status" class="sm">${statuses.map(([k, [t]]) => `<option value="${k}" ${k === d.status ? 'selected' : ''}>${t}</option>`).join('')}</select>` : ''}
-      <button class="sm" id="pdf">📄 PDF</button>
-      ${d.kind === 'devis' || locked ? '<button class="sm" id="send">📤 Envoyer</button>' : ''}
+      <button class="sm" id="pdf">PDF</button>
+      ${d.kind === 'devis' || locked ? '<button class="sm" id="send">Envoyer</button>' : ''}
       ${d.kind === 'devis' ? '<button class="sm ok" id="convert">→ Facturer</button>' : ''}
-      ${locked && d.kind === 'facture' && d.status !== 'annulee' ? '<button class="sm" id="credit">↩︎ Note de crédit</button>' : ''}
-      ${d.kind !== 'avoir' ? '<button class="sm ghost" id="dup" title="Créer une copie modifiable">⧉ Dupliquer</button>' : ''}
-      ${!locked ? '<button class="sm icon danger" id="del" title="Supprimer">🗑</button>' : ''}
+      ${locked && d.kind === 'facture' && d.status !== 'annulee' ? '<button class="sm" id="credit">Note de crédit</button>' : ''}
+      ${d.kind !== 'avoir' ? '<button class="sm ghost" id="dup" title="Créer une copie modifiable">Dupliquer</button>' : ''}
+      ${!locked ? `<button class="sm icon danger" id="del" title="Supprimer">${icon('trash', 16)}</button>` : ''}
     </div>
-    ${locked ? `<div class="card notice">🔒 <b>${LABEL[d.kind]} émise : elle ne peut plus être modifiée ni supprimée</b> (obligation de conservation 10 ans).
+    ${locked ? `<div class="card notice"><b>${LABEL[d.kind]} émise : elle ne peut plus être modifiée ni supprimée</b> (obligation de conservation 10 ans).
       ${d.kind === 'facture' ? 'Pour corriger une erreur, crée une <b>note de crédit</b> puis, si besoin, une nouvelle facture avec « Dupliquer ».' : ''}</div>`
-      : isInvoice(d) ? `<div class="card notice info">📝 <b>Brouillon</b> : modifiable librement. Le numéro définitif sera attribué quand tu cliqueras sur <b>Émettre</b>.</div>` : ''}
-    ${src ? `<div class="card notice">↩︎ Note de crédit sur la <a href="#/factures/${src.id}">facture ${esc(src.number)}</a> (${money(docTotals(src).ttc, cur())}).</div>` : ''}
-    ${credits.length ? `<div class="card notice">↩︎ Notes de crédit : ${credits.map(a => `<a href="#/factures/${a.id}">${esc(a.number || 'brouillon')}</a> (${money(docTotals(a).ttc, cur())})`).join(', ')}</div>` : ''}
+      : isInvoice(d) ? `<div class="card notice info"><b>Brouillon</b> : modifiable librement. Le numéro définitif sera attribué quand tu cliqueras sur <b>Émettre</b>.</div>` : ''}
+    ${src ? `<div class="card notice">Note de crédit sur la <a href="#/factures/${src.id}">facture ${esc(src.number)}</a> (${money(docTotals(src).ttc, cur())}).</div>` : ''}
+    ${credits.length ? `<div class="card notice">Notes de crédit : ${credits.map(a => `<a href="#/factures/${a.id}">${esc(a.number || 'brouillon')}</a> (${money(docTotals(a).ttc, cur())})`).join(', ')}</div>` : ''}
     <div class="card">
       <div class="grid2">
-        <label>Client<div class="row nowrap"><select id="client" class="grow" ${ro || (src ? 'disabled' : '')}>${options(clients, d.client_id, { blank: '— Choisir un client —' })}</select>${locked || src ? '' : '<button type="button" class="sm" id="newClient">＋</button>'}</div></label>
+        <label>Client<div class="row nowrap"><select id="client" class="grow" ${ro || (src ? 'disabled' : '')}>${options(clients, d.client_id, { blank: '— Choisir un client —' })}</select>${locked || src ? '' : '<button type="button" class="sm" id="newClient">+</button>'}</div></label>
         <label>Numéro<input value="${esc(d.number || (isInvoice(d) ? 'attribué à l\'émission' : ''))}" id="number" ${isInvoice(d) ? 'disabled' : ''}></label>
         <label>Date<input type="date" id="date" value="${d.date || ''}" ${ro}></label>
         ${d.kind !== 'avoir' ? `<label>${d.kind === 'devis' ? 'Valable jusqu\'au' : 'Échéance de paiement'}<input type="date" id="due" value="${d.due_date || ''}" ${ro}></label>` : ''}
@@ -136,8 +137,8 @@ async function editor(el, ctx, id) {
     <div class="card">
       <div class="scroll"><table class="tbl lines"><thead><tr><th>Désignation</th><th class="n">Qté</th><th class="n">Prix unit.</th><th class="n">Total</th>${locked ? '' : '<th></th>'}</tr></thead><tbody id="lines"></tbody></table></div>
       ${locked ? '' : `<datalist id="itemlist">${items.map(i => `<option value="${esc(i.name)}">`).join('')}</datalist>
-      <div class="row"><button class="sm" id="addLine">＋ Ligne</button>${items.length ? `<select id="addItem" class="sm"><option value="">＋ Article du stock…</option>${items.map(i => `<option value="${i.id}">${esc(i.name)} · ${money(i.price, cur())}</option>`).join('')}</select>` : ''}
-        <button class="sm" id="addHour">＋ Heure de main d'œuvre</button></div>`}
+      <div class="row"><button class="sm" id="addLine">Ajouter une ligne</button>${items.length ? `<select id="addItem" class="sm"><option value="">Article du stock…</option>${items.map(i => `<option value="${i.id}">${esc(i.name)} · ${money(i.price, cur())}</option>`).join('')}</select>` : ''}
+        <button class="sm" id="addHour">Heure de main d'œuvre</button></div>`}
       <div class="totals-wrap">
         <label>Notes (visibles sur le document)<textarea id="notes" rows="3" ${ro}>${esc(d.notes)}</textarea></label>
         <div class="totals"><div><span>Total HT</span><b id="ht"></b></div>
@@ -146,7 +147,7 @@ async function editor(el, ctx, id) {
       </div>
     </div>
     ${log.length ? `<h2>Historique</h2><div class="card list compact">${log.map(l => `<div class="item small"><span class="mut">${fmtDate(l.at)} ${fmtTime(l.at)}</span><span class="grow">${esc(logText(l, d))}</span><span class="mut">${esc(memberName(l.actor_id))}</span></div>`).join('')}</div>` : ''}
-    ${locked ? '' : `<div class="savebar"><span class="mut small" id="saveState">Enregistré</span><button id="save">Enregistrer</button>${isInvoice(d) ? `<button class="primary" id="issue">✅ Émettre ${d.kind === 'avoir' ? 'la note de crédit' : 'la facture'}</button>` : ''}</div>`}`;
+    ${locked ? '' : `<div class="savebar"><span class="mut small" id="saveState">Enregistré</span><button id="save">Enregistrer</button>${isInvoice(d) ? `<button class="primary" id="issue">Émettre ${d.kind === 'avoir' ? 'la note de crédit' : 'la facture'}</button>` : ''}</div>`}`;
 
   const setDirty = () => { dirty = true; $('#saveState').textContent = 'Modifications non enregistrées'; $('#saveState').classList.add('warn-t'); };
   const drawTotals = () => { const t = docTotals(d); $('#ht').textContent = money(t.ht, cur()); $('#tva').textContent = money(t.tva, cur()); $('#ttc').textContent = money(t.ttc, cur()); };
@@ -158,7 +159,7 @@ async function editor(el, ctx, id) {
       <td class="n"><input data-k="qty" type="number" step="any" class="xs" value="${l.qty}"></td>
       <td class="n"><input data-k="price" type="number" step="0.05" class="sm-in" value="${l.price}"></td>
       <td class="n lt">${money((+l.qty || 0) * (+l.price || 0), cur())}</td>
-      <td><button class="icon sm ghost" data-rm="${i}" title="Retirer">✕</button></td></tr>`).join('');
+      <td><button class="icon sm ghost" data-rm="${i}" title="Retirer">${icon('x', 15)}</button></td></tr>`).join('');
     drawTotals();
   };
   drawLines();
@@ -169,7 +170,7 @@ async function editor(el, ctx, id) {
     if (d.kind === 'devis') patch.number = d.number;
     Object.assign(d, await db.update('documents', d.id, patch), { lines: d.lines });
     dirty = false;
-    if ($('#saveState')) { $('#saveState').textContent = 'Enregistré ✓'; $('#saveState').classList.remove('warn-t'); }
+    if ($('#saveState')) { $('#saveState').textContent = 'Enregistré'; $('#saveState').classList.remove('warn-t'); }
     if (!quiet) toast('Enregistré');
   };
   const client = () => clients.find(c => c.id === d.client_id);
@@ -201,7 +202,7 @@ async function editor(el, ctx, id) {
         if (!d.lines.some(l => l.desc || +l.price)) throw new Error('Ajoute au moins une ligne.');
         if (!confirm(`Émettre ${d.kind === 'avoir' ? 'cette note de crédit' : 'cette facture'} de ${money(docTotals(d).ttc, cur())} ?\n\nElle recevra son numéro définitif et ne pourra plus être modifiée.`)) return;
         const num = await issueDocument(d.id);
-        toast(`${LABEL[d.kind]} ${num} émise ✅`); ctx.refresh();
+        toast(`${LABEL[d.kind]} ${num} émise`); ctx.refresh();
       } catch (e) { toast(e.message, 'err'); }
     });
   }

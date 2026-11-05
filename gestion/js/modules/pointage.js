@@ -46,31 +46,31 @@ export async function render(el, ctx) {
   const canEdit = ctx.admin || session.company.punch_self_edit !== false;
 
   el.innerHTML = `
-    ${session.support ? '<div class="card notice">🛟 Mode support : tu vois ici les heures de l\'équipe et le journal. Ton propre pointage n\'est pas proposé.</div>' : ''}
+    ${session.support ? '<div class="card notice">Mode support : tu vois ici les heures de l\'équipe et le journal. Ton propre pointage n\'est pas proposé.</div>' : ''}
     <div class="card hero" ${session.support ? 'hidden' : ''}>
       <div class="status"><span class="dot ${present ? 'in' : ''}"></span><div>
         <div class="big">${present ? 'Au travail' : 'Absent'}</div>
         <div class="mut">${last ? `Dernier pointage : ${last.type === 'in' ? 'arrivée' : 'départ'} ${isoDate(last.at) === isoDate(now) ? 'à' : 'le ' + fmtDay(last.at) + ' à'} ${fmtTime(last.at)}` : 'Aucun pointage pour l\'instant'}</div>
       </div></div>
-      <button class="${present ? 'out' : 'in'} huge" id="punch">${present ? '⏹ Pointer mon départ' : '▶︎ Pointer mon arrivée'}</button>
+      <button class="${present ? 'out' : 'in'} huge" id="punch">${present ? 'Pointer mon départ' : 'Pointer mon arrivée'}</button>
     </div>
-    ${offline ? '<div class="card notice">📶 <b>Pas de connexion</b> : tu peux quand même pointer, l\'envoi se fera automatiquement.</div>' : ''}
-    ${waiting.length ? `<div class="card notice">⏳ <b>${waiting.length} pointage${waiting.length > 1 ? 's' : ''} en attente d'envoi</b> (pas de réseau). ${waiting.length > 1 ? 'Ils partiront' : 'Il partira'} automatiquement dès le retour de la connexion : tu peux fermer l'appli.</div>` : ''}
+    ${offline ? '<div class="card notice warn"><b>Pas de connexion</b> : tu peux quand même pointer, l\'envoi se fera automatiquement.</div>' : ''}
+    ${waiting.length ? `<div class="card notice warn"><b>${waiting.length} pointage${waiting.length > 1 ? 's' : ''} en attente d'envoi</b> (pas de réseau). ${waiting.length > 1 ? 'Ils partiront' : 'Il partira'} automatiquement dès le retour de la connexion : tu peux fermer l'appli.</div>` : ''}
     <div class="tiles">
       <div class="card"><div class="mut">Aujourd'hui</div><div class="num" id="todayMin">${fmtMin(today.min)}</div></div>
       <div class="card"><div class="mut">Cette semaine</div><div class="num">${fmtMin(weekMin)}</div>
         <div class="bar ${weekMin > goal ? 'over' : ''}"><i style="width:${Math.min(100, weekMin / goal * 100)}%"></i></div><div class="mut small">Objectif ${fmtMin(goal)}</div></div>
     </div>
     <div id="team"></div>
-    <div class="section-h"><h2>Mon historique</h2>${canEdit ? '<button class="sm" id="add">＋ Pointage oublié</button>' : ''}</div>
+    <div class="section-h"><h2>Mon historique</h2>${canEdit ? '<button class="sm" id="add">Pointage oublié</button>' : ''}</div>
     <div class="card" id="hist">${histHTML(days)}
-      <p class="mut small">${canEdit ? 'Touche un pointage pour le corriger. ✎ = corrigé ou ajouté après coup : chaque correction est enregistrée avec son motif et visible par ton responsable.' : '🔒 Les corrections sont faites par ton responsable : signale-lui une erreur ou un oubli.'}</p></div>`;
+      <p class="mut small">${canEdit ? 'Touche un pointage pour le corriger. ✎ = corrigé ou ajouté après coup : chaque correction est enregistrée avec son motif et visible par ton responsable.' : 'Les corrections sont faites par ton responsable : signale-lui une erreur ou un oubli.'}</p></div>`;
 
   $('#punch').onclick = async () => {
     $('#punch').disabled = true;
     try {
       const r = await punchNow(present ? 'out' : 'in');
-      toast((present ? 'Départ enregistré 👋' : 'Arrivée enregistrée ✅') + (r.queued ? ' · pas de réseau : envoi automatique dès le retour de la connexion' : ''), r.queued ? 'info' : 'ok');
+      toast((present ? 'Départ enregistré' : 'Arrivée enregistrée') + (r.queued ? ' · pas de réseau : envoi automatique dès le retour de la connexion' : ''), r.queued ? 'info' : 'ok');
       ctx.refresh();
     } catch (e) { toast(e.message, 'err'); $('#punch').disabled = false; }
   };
@@ -86,7 +86,7 @@ function histHTML(days) {
   if (!list.length) return empty('Aucun pointage ces dernières semaines.');
   return list.map(([date, d]) => `<div class="day">
     <div class="between"><b>${fmtDay(date)}</b><span>${d.missing ? chip('Départ oublié', 'err') : ''} <b>${fmtMin(d.min)}</b></span></div>
-    <div class="punches">${d.list.map(p => `<button class="pill p-${p.type}" ${p.pending ? 'disabled title="En attente d\'envoi"' : `data-punch="${p.id}"`} title="${p.manual || p.edited ? esc('Corrigé' + (p.note ? ' : ' + p.note : '')) : p.offline ? 'Pointé hors ligne' : ''}">${p.type === 'in' ? '▶︎' : '⏹'} ${fmtTime(p.at)}${p.manual || p.edited ? ' ✎' : ''}${p.pending ? ' ⏳' : p.offline ? ' 📶' : ''}</button>`).join('')}</div>
+    <div class="punches">${d.list.map(p => `<button class="pill p-${p.type}" ${p.pending ? 'disabled title="En attente d\'envoi"' : `data-punch="${p.id}"`} title="${p.manual || p.edited ? esc('Corrigé' + (p.note ? ' : ' + p.note : '')) : p.offline ? 'Pointé hors ligne' : ''}">${fmtTime(p.at)}${p.manual || p.edited ? ' ✎' : ''}${p.pending ? ' ⏳' : ''}</button>`).join('')}</div>
   </div>`).join('');
 }
 
@@ -99,9 +99,9 @@ function editPunch(p, ctx, userId) {
       ${p ? `<p class="mut small">Enregistré : ${p.type === 'in' ? 'arrivée' : 'départ'} le ${fmtDay(p.at)} à ${fmtTime(p.at)}${p.note ? ` · dernier motif : « ${esc(p.note)} »` : ''}</p>` : ''}
       <div class="grid2"><label>Date<input type="date" name="date" value="${isoDate(d)}" required></label>
       <label>Heure<input type="time" name="time" value="${timeInput(d)}" required></label></div>
-      <label>Type<select name="type"><option value="in" ${p?.type === 'in' ? 'selected' : ''}>▶︎ Arrivée</option><option value="out" ${p?.type === 'out' ? 'selected' : ''}>⏹ Départ</option></select></label>
+      <label>Type<select name="type"><option value="in" ${p?.type === 'in' ? 'selected' : ''}>Arrivée</option><option value="out" ${p?.type === 'out' ? 'selected' : ''}>Départ</option></select></label>
       <label>Motif *<input name="note" required placeholder="Ex. oubli de pointer, badge en panne, erreur…" maxlength="200"></label>
-      <p class="mut small">📋 La correction et son motif sont enregistrés dans le journal${ctx.admin ? '' : ' que voit ton responsable'}.</p>`,
+      <p class="mut small">La correction et son motif sont enregistrés dans le journal${ctx.admin ? '' : ' que voit ton responsable'}.</p>`,
     footer: p ? '<button type="button" class="danger" id="del">Supprimer</button>' : '',
     onSubmit: async f => {
       const [y, mo, da] = f.date.split('-').map(Number), [h, mi] = f.time.split(':').map(Number);
@@ -139,9 +139,9 @@ async function renderTeam(box, ctx) {
   const log = (await db.list('audit_log', { eq: { table_name: 'punches' }, order: 'at', asc: false })).slice(0, 40);
 
   box.innerHTML = `
-    <div class="section-h"><h2>Équipe</h2><div class="row"><button class="sm" id="csv">⬇︎ CSV du mois</button><button class="sm" id="pdf">📄 Relevé d'heures du mois</button></div></div>
+    <div class="section-h"><h2>Équipe</h2><div class="row"><button class="sm" id="csv">CSV du mois</button><button class="sm" id="pdf">Relevé d'heures du mois</button></div></div>
     <div class="card"><div class="mut">Présents maintenant</div>
-      <div class="chips">${presentNow.length ? presentNow.map(r => chip('● ' + r.m.name, 'ok')).join('') : '<span class="mut">Personne</span>'}</div></div>
+      <div class="chips">${presentNow.length ? presentNow.map(r => chip(r.m.name, 'ok')).join('') : '<span class="mut">Personne</span>'}</div></div>
     <div class="card">
       <div class="weeknav"><button class="sm icon" id="prev">‹</button><b>Semaine du ${fmtDay(wk)}</b><button class="sm icon" id="next">›</button></div>
       <div class="scroll"><table class="tbl"><thead><tr><th>Employé</th>${dates.map(d => `<th class="n">${fmtDay(d)}</th>`).join('')}<th class="n">Total</th></tr></thead>

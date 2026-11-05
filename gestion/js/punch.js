@@ -48,7 +48,7 @@ export function flush() {
       }
       write(read().filter(x => x.id !== q.id));
     }
-    if (sent) { toast(`${sent} pointage${sent > 1 ? 's' : ''} hors ligne envoyé${sent > 1 ? 's' : ''} ✅`); window.dispatchEvent(new Event('haksou:synced')); }
+    if (sent) { toast(`${sent} pointage${sent > 1 ? 's' : ''} hors ligne envoyé${sent > 1 ? 's' : ''}`); window.dispatchEvent(new Event('haksou:synced')); }
     return sent;
   })().finally(() => { flushing = null; });
   return flushing;

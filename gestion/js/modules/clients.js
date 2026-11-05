@@ -13,7 +13,7 @@ export async function render(el, ctx) {
     on.includes('interventions') ? db.list('interventions') : [],
   ]);
   el.innerHTML = `
-    <div class="toolbar"><input type="search" id="q" placeholder="🔍 Rechercher un client…" value="${esc(q)}"><button class="primary" id="new">＋ Client</button></div>
+    <div class="toolbar"><input type="search" id="q" placeholder="Rechercher un client…" value="${esc(q)}"><button class="primary" id="new">Nouveau client</button></div>
     <div class="card list" id="list"></div>`;
   const draw = () => {
     const s = q.toLowerCase();
@@ -42,7 +42,7 @@ export function editClient(c, onSaved) {
       <div class="grid2"><label>E-mail<input type="email" name="email" value="${esc(c?.email)}"></label><label>Téléphone<input type="tel" name="phone" value="${esc(c?.phone)}"></label></div>
       <label>Adresse<textarea name="address" rows="2">${esc(c?.address)}</textarea></label>
       <label>Notes<textarea name="notes" rows="2">${esc(c?.notes)}</textarea></label>
-      ${c ? `<div class="row">${c.phone ? `<a class="btn sm" href="tel:${esc(c.phone)}">📞 Appeler</a>` : ''}${c.email ? `<a class="btn sm" href="mailto:${esc(c.email)}">✉️ E-mail</a>` : ''}${c.address ? `<a class="btn sm" target="_blank" rel="noopener" href="https://maps.google.com/?q=${encodeURIComponent(c.address)}">🗺 Itinéraire</a>` : ''}</div>` : ''}`,
+      ${c ? `<div class="row">${c.phone ? `<a class="btn sm" href="tel:${esc(c.phone)}">Appeler</a>` : ''}${c.email ? `<a class="btn sm" href="mailto:${esc(c.email)}">E-mail</a>` : ''}${c.address ? `<a class="btn sm" target="_blank" rel="noopener" href="https://maps.google.com/?q=${encodeURIComponent(c.address)}">Itinéraire</a>` : ''}</div>` : ''}`,
     footer: c ? '<button type="button" class="danger" id="del">Supprimer</button>' : '',
     onSubmit: async f => {
       const saved = c ? await db.update('clients', c.id, f) : await db.insert('clients', f);

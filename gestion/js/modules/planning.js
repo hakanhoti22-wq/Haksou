@@ -22,8 +22,8 @@ export async function render(el, ctx) {
       <div class="weeknav"><button class="sm icon" id="prev">‹</button><b>Semaine du ${fmtDay(wk)}</b><button class="sm icon" id="next">›</button></div>
       <span class="grow"></span>
       ${offset ? '<button class="sm ghost" id="now">Aujourd\'hui</button>' : ''}
-      ${ctx.admin ? '<button class="sm" id="copy">⧉ Copier la semaine précédente</button>' : ''}
-      <button class="sm" id="pdf">📄 PDF</button>
+      ${ctx.admin ? '<button class="sm" id="copy">Copier la semaine précédente</button>' : ''}
+      <button class="sm" id="pdf">PDF</button>
     </div>
     <div class="card scroll"><table class="tbl plan"><thead><tr><th>Employé</th>${dates.map(d => `<th class="${d === today ? 'today' : ''}">${fmtDay(d)}</th>`).join('')}<th class="n">Total</th></tr></thead>
     <tbody>${members.map(m => {
@@ -31,7 +31,7 @@ export async function render(el, ctx) {
       return `<tr class="${m.id === me.id ? 'mine' : ''}"><td><b>${esc(m.name)}</b></td>${dates.map(d => {
         const l = off(m.id, d);
         return `<td class="cell ${d === today ? 'today' : ''} ${ctx.admin ? 'click' : ''}" data-u="${m.id}" data-d="${d}">
-          ${l ? `<div class="shift leave">🌴 ${esc(l.kind)}</div>` : ''}
+          ${l ? `<div class="shift leave">${esc(l.kind)}</div>` : ''}
           ${mine.filter(s => s.date === d).map(s => `<div class="shift" data-s="${s.id}" title="${esc(s.note || '')}">${s.start_time}–${s.end_time}${s.note ? `<small>${esc(s.note)}</small>` : ''}</div>`).join('')}
         </td>`;
       }).join('')}<td class="n"><b>${fmtMin(mine.reduce((t, s) => t + dur(s), 0))}</b></td></tr>`;

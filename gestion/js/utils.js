@@ -1,4 +1,5 @@
 // Petites fonctions partagées par tous les modules.
+import { icon } from './icons.js';
 
 export const $ = (s, el = document) => el.querySelector(s);
 export const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -55,7 +56,7 @@ export function modal({ title, body, submit = 'Enregistrer', onSubmit, onMount, 
   const wrap = document.createElement('div');
   wrap.className = 'modal';
   wrap.innerHTML = `<form class="sheet" novalidate>
-    <div class="sheet-h"><h3>${esc(title)}</h3><button type="button" class="icon" data-close aria-label="Fermer">✕</button></div>
+    <div class="sheet-h"><h3>${esc(title)}</h3><button type="button" class="icon" data-close aria-label="Fermer">${icon('x')}</button></div>
     <div class="sheet-b">${body}</div>
     <div class="sheet-f">${footer}<span class="grow"></span>
       ${onSubmit ? `<button type="button" class="ghost" data-close>Annuler</button><button type="submit" class="primary">${esc(submit)}</button>` : '<button type="button" data-close>Fermer</button>'}

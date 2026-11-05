@@ -1,5 +1,6 @@
 // Module 4 — Bons d'intervention (photos, signature du client, PDF).
 import { db, session, memberName } from '../db.js';
+import { icon } from '../icons.js';
 import { STATUS } from '../meta.js';
 import { $, $$, esc, isoDate, fmtDate, fmtLongDay, fmtTime, modal, toast, chip, empty, options, compressImage, signaturePad } from '../utils.js';
 import { createPDF, downloadFile, sendFile } from '../pdf.js';
@@ -20,11 +21,11 @@ export async function render(el, ctx) {
   el.innerHTML = `
     <div class="toolbar">
       <div class="seg">${[['actives', 'À faire'], ['miennes', 'Les miennes'], ['toutes', 'Toutes']].map(([k, t]) => `<button data-f="${k}" class="${filter === k ? 'on' : ''}">${t}</button>`).join('')}</div>
-      <span class="grow"></span><button class="primary" id="new">＋ Intervention</button>
+      <span class="grow"></span><button class="primary" id="new">Nouvelle intervention</button>
     </div>
     <div class="card list">${shown.length ? shown.map(i => `<div class="item click" data-id="${i.id}">
       <div class="date-box ${i.date === today ? 'today' : i.date < today && i.status !== 'terminee' ? 'late' : ''}"><b>${i.date ? +i.date.slice(8) : '?'}</b><small>${i.date ? new Date(i.date + 'T12:00').toLocaleDateString('fr-CH', { month: 'short' }) : ''}</small></div>
-      <div class="grow"><b>${esc(i.title)}</b> ${st(i.status)}<div class="mut small">${esc(cname(i.client_id))} · ${esc(memberName(i.user_id))}${i.photos?.length ? ` · 📷 ${i.photos.length}` : ''}${i.signature ? ' · ✍️ signé' : ''}</div></div>
+      <div class="grow"><b>${esc(i.title)}</b> ${st(i.status)}<div class="mut small">${esc(cname(i.client_id))} · ${esc(memberName(i.user_id))}${i.photos?.length ? ` · ${i.photos.length}` : ''}${i.signature ? ' · signé' : ''}</div></div>
       <span class="mut">›</span></div>`).join('') : empty('Aucune intervention ici.')}</div>`;
 
   $$('[data-f]', el).forEach(b => b.onclick = () => { filter = b.dataset.f; ctx.refresh(); });
@@ -33,7 +34,7 @@ export async function render(el, ctx) {
     title: 'Nouvelle intervention',
     body: `
       <label>Titre *<input name="title" placeholder="Ex. Fuite sous évier" required></label>
-      <label>Client<div class="row nowrap"><select name="client_id" id="cl" class="grow">${options(clients, '', { blank: '— Choisir —' })}</select><button type="button" class="sm" id="nc">＋</button></div></label>
+      <label>Client<div class="row nowrap"><select name="client_id" id="cl" class="grow">${options(clients, '', { blank: '— Choisir —' })}</select><button type="button" class="sm" id="nc">+</button></div></label>
       <div class="grid2"><label>Date<input type="date" name="date" value="${today}"></label>
       <label>Technicien<select name="user_id">${options(session.members, me.id)}</select></label></div>
       <label>Demande du client<textarea name="description" rows="3"></textarea></label>`,
@@ -57,9 +58,9 @@ async function detail(el, ctx, id) {
   el.innerHTML = `
     <div class="toolbar">
       <a class="btn sm ghost" href="#/interventions">‹ Retour</a><span class="grow"></span>
-      <button class="sm" id="pdf">📄 Bon PDF</button><button class="sm" id="send">📤 Envoyer</button>
-      ${session.company.modules.includes('factures') ? '<button class="sm" id="invoice">🧾 Facturer</button>' : ''}
-      <button class="sm icon danger" id="del" title="Supprimer">🗑</button>
+      <button class="sm" id="pdf">Bon PDF</button><button class="sm" id="send">Envoyer</button>
+      ${session.company.modules.includes('factures') ? '<button class="sm" id="invoice">Facturer</button>' : ''}
+      <button class="sm icon danger" id="del" title="Supprimer">${icon('trash', 16)}</button>
     </div>
     <form class="card" id="f">
       <div class="grid2">
@@ -70,7 +71,7 @@ async function detail(el, ctx, id) {
         <label>Date<input type="date" name="date" value="${i.date || ''}"></label>
         <label>Durée (heures)<input type="number" step="0.25" min="0" name="hours" value="${i.hours || 0}"></label>
       </div>
-      ${c ? `<div class="client-box"><b>${esc(c.name)}</b> ${c.phone ? `· <a href="tel:${esc(c.phone)}">📞 ${esc(c.phone)}</a>` : ''} ${c.address ? `· <a target="_blank" rel="noopener" href="https://maps.google.com/?q=${encodeURIComponent(c.address)}">🗺 ${esc(c.address.replace(/\n/g, ', '))}</a>` : ''}${c.notes ? `<div class="mut small">📝 ${esc(c.notes)}</div>` : ''}</div>` : ''}
+      ${c ? `<div class="client-box"><b>${esc(c.name)}</b> ${c.phone ? `· <a href="tel:${esc(c.phone)}">${esc(c.phone)}</a>` : ''} ${c.address ? `· <a target="_blank" rel="noopener" href="https://maps.google.com/?q=${encodeURIComponent(c.address)}">${esc(c.address.replace(/\n/g, ', '))}</a>` : ''}${c.notes ? `<div class="mut small">${esc(c.notes)}</div>` : ''}</div>` : ''}
       <label>Demande du client<textarea name="description" rows="2">${esc(i.description)}</textarea></label>
       <label>Travaux réalisés<textarea name="work_done" rows="3" placeholder="Ce qui a été fait…">${esc(i.work_done)}</textarea></label>
       <label>Matériel utilisé<textarea name="materials" rows="2">${esc(i.materials)}</textarea></label>
@@ -78,7 +79,7 @@ async function detail(el, ctx, id) {
     </form>
     <h2>Photos</h2>
     <div class="card"><div class="photos" id="photos"></div>
-      <label class="btn">📷 Ajouter des photos<input type="file" accept="image/*" multiple id="addPhoto" hidden></label></div>
+      <label class="btn">Ajouter des photos<input type="file" accept="image/*" multiple id="addPhoto" hidden></label></div>
     <h2>Signature du client</h2>
     <div class="card" id="sig"></div>`;
 
@@ -111,12 +112,12 @@ async function detail(el, ctx, id) {
     }
     box.innerHTML = `<p class="mut small">Fais signer le client directement sur l'écran pour valider la fin de l'intervention.</p>
       <canvas id="pad" class="pad"></canvas>
-      <div class="row"><input id="signer" placeholder="Nom du signataire" value="${esc(i.signer_name || c?.contact || c?.name || '')}" class="grow"><button class="sm ghost" id="clear">Effacer</button><button class="ok" id="sign">✍️ Valider la signature</button></div>`;
+      <div class="row"><input id="signer" placeholder="Nom du signataire" value="${esc(i.signer_name || c?.contact || c?.name || '')}" class="grow"><button class="sm ghost" id="clear">Effacer</button><button class="ok" id="sign">Valider la signature</button></div>`;
     const pad = signaturePad($('#pad'));
     $('#clear').onclick = () => pad.clear();
     $('#sign').onclick = async () => {
       if (pad.isEmpty()) return toast('Le client doit d\'abord signer', 'err');
-      await save({ signature: pad.toDataURL(), signer_name: $('#signer').value.trim(), signed_at: new Date().toISOString(), status: 'terminee' }, 'Intervention signée et terminée ✅');
+      await save({ signature: pad.toDataURL(), signer_name: $('#signer').value.trim(), signed_at: new Date().toISOString(), status: 'terminee' }, 'Intervention signée et terminée');
       ctx.refresh();
     };
   };

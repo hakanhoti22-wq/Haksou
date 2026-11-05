@@ -20,12 +20,12 @@ export async function render(el, ctx) {
   const shift = n => { const d = new Date(y, mo - 1 + n, 1); month = isoDate(d).slice(0, 7); ctx.refresh(); };
 
   const row = (e, actions = '') => `<div class="item">
-    ${e.receipt ? `<img class="thumb click" src="${e.receipt}" data-img="${e.id}" alt="Ticket">` : '<div class="thumb none">🧾</div>'}
+    ${e.receipt ? `<img class="thumb click" src="${e.receipt}" data-img="${e.id}" alt="Ticket">` : '<div class="thumb none"></div>'}
     <div class="grow click" data-edit="${e.id}"><b>${money(e.amount, cur())}</b> · ${esc(e.category)} ${st(e.status)}
       <div class="mut small">${fmtDate(e.date)}${ctx.admin ? ' · ' + esc(memberName(e.user_id)) : ''}${e.description ? ' · ' + esc(e.description) : ''}</div></div>${actions}</div>`;
 
   el.innerHTML = `
-    <div class="toolbar"><button class="primary" id="new">📷 Nouvelle note de frais</button></div>
+    <div class="toolbar"><button class="primary" id="new">Nouvelle note de frais</button></div>
     ${ctx.admin ? `
       <div class="tiles three">
         <div class="card"><div class="mut">À valider</div><div class="num">${money(sum(pending), cur())}</div></div>
@@ -33,13 +33,13 @@ export async function render(el, ctx) {
         <div class="card"><div class="mut">Ce mois-ci</div><div class="num">${money(sum(all.filter(e => e.date?.startsWith(isoDate().slice(0, 7)) && e.status !== 'refusee')), cur())}</div></div>
       </div>
       <h2>À valider ${pending.length ? chip(pending.length, 'warn') : ''}</h2>
-      <div class="card list">${pending.length ? pending.map(e => row(e, `<div class="row nowrap"><button class="sm ok" data-st="validee" data-id="${e.id}">✓</button><button class="sm danger" data-st="refusee" data-id="${e.id}">✕</button></div>`)).join('') : empty('Rien à valider 🎉')}</div>
+      <div class="card list">${pending.length ? pending.map(e => row(e, `<div class="row nowrap"><button class="sm ok" data-st="validee" data-id="${e.id}">Valider</button><button class="sm danger" data-st="refusee" data-id="${e.id}">Refuser</button></div>`)).join('') : empty('Rien à valider')}</div>
       <h2>À rembourser</h2>
-      <div class="card list">${toPay.length ? toPay.map(e => row(e, `<button class="sm" data-st="remboursee" data-id="${e.id}">💸 Remboursé</button>`)).join('') : empty('Aucun remboursement en attente.')}</div>` : `
+      <div class="card list">${toPay.length ? toPay.map(e => row(e, `<button class="sm" data-st="remboursee" data-id="${e.id}">Remboursé</button>`)).join('') : empty('Aucun remboursement en attente.')}</div>` : `
       <div class="tiles"><div class="card"><div class="mut">En attente de validation</div><div class="num">${money(sum(pending), cur())}</div></div>
       <div class="card"><div class="mut">Validé, à me rembourser</div><div class="num">${money(sum(toPay), cur())}</div></div></div>`}
     <div class="section-h"><div class="weeknav"><button class="sm icon" id="prev">‹</button><b class="cap">${fmtMonth(month + '-01')}</b><button class="sm icon" id="next">›</button></div>
-      <div class="row"><button class="sm ghost" id="csv">⬇︎ CSV</button><button class="sm ghost" id="pdf">📄 Rapport PDF</button></div></div>
+      <div class="row"><button class="sm ghost" id="csv">CSV</button><button class="sm ghost" id="pdf">Rapport PDF</button></div></div>
     <div class="card list">${inMonth.length ? inMonth.map(e => row(e)).join('') : empty('Aucune note de frais ce mois-ci.')}</div>
     ${inMonth.length ? `<div class="card"><h3>Résumé du mois</h3>${summary(inMonth, ctx.admin)}</div>` : ''}`;
 
@@ -89,7 +89,7 @@ function edit(e, ctx) {
   const m = modal({
     title: e ? 'Note de frais' : 'Nouvelle note de frais',
     body: `
-      <label class="receipt" id="rc">${receipt ? `<img src="${receipt}">` : '<span>📷 Photographier le ticket</span>'}<input type="file" accept="image/*" capture="environment" hidden id="file" ${locked ? 'disabled' : ''}></label>
+      <label class="receipt" id="rc">${receipt ? `<img src="${receipt}">` : '<span>Photographier le ticket</span>'}<input type="file" accept="image/*" capture="environment" hidden id="file" ${locked ? 'disabled' : ''}></label>
       <div class="grid2"><label>Montant (${cur()}) *<input type="number" step="0.05" min="0" name="amount" value="${e?.amount ?? ''}" inputmode="decimal" required ${locked ? 'disabled' : ''}></label>
       <label>Date<input type="date" name="date" value="${e?.date || isoDate()}" ${locked ? 'disabled' : ''}></label></div>
       <label>Catégorie<select name="category" ${locked ? 'disabled' : ''}>${CATS.map(c => `<option ${c === e?.category ? 'selected' : ''}>${c}</option>`).join('')}</select></label>

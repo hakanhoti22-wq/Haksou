@@ -1,13 +1,13 @@
 // Liste des modules (ordre du menu).
 export const MODULES = [
-  { id: 'pointage', icon: '⏱️', label: 'Pointage', desc: 'Arrivées, départs et heures de l\'équipe' },
-  { id: 'conges', icon: '🌴', label: 'Congés', desc: 'Demandes d\'absence et validation' },
-  { id: 'planning', icon: '📅', label: 'Planning', desc: 'Horaires de la semaine' },
-  { id: 'interventions', icon: '🔧', label: 'Interventions', desc: 'Bons d\'intervention, photos, signature' },
-  { id: 'factures', icon: '🧾', label: 'Devis & factures', desc: 'Devis, factures, paiements' },
-  { id: 'clients', icon: '👥', label: 'Clients', desc: 'Carnet d\'adresses des clients' },
-  { id: 'stock', icon: '📦', label: 'Stock', desc: 'Articles, entrées, sorties, alertes' },
-  { id: 'frais', icon: '💳', label: 'Notes de frais', desc: 'Tickets, validation, remboursement' },
+  { id: 'pointage', icon: 'clock', label: 'Pointage', desc: 'Arrivées, départs et heures de l\'équipe' },
+  { id: 'conges', icon: 'leave', label: 'Congés', desc: 'Demandes d\'absence et validation' },
+  { id: 'planning', icon: 'calendar', label: 'Planning', desc: 'Horaires de la semaine' },
+  { id: 'interventions', icon: 'wrench', label: 'Interventions', desc: 'Bons d\'intervention, photos, signature' },
+  { id: 'factures', icon: 'invoice', label: 'Devis & factures', desc: 'Devis, factures, paiements' },
+  { id: 'clients', icon: 'users', label: 'Clients', desc: 'Carnet d\'adresses des clients' },
+  { id: 'stock', icon: 'box', label: 'Stock', desc: 'Articles, entrées, sorties, alertes' },
+  { id: 'frais', icon: 'card', label: 'Notes de frais', desc: 'Tickets, validation, remboursement' },
 ];
 
 export const STATUS = {

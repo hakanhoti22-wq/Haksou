@@ -21,10 +21,10 @@ export async function render(el, ctx) {
       <div class="mut small">${period(l)} · ${nb(l)}${l.reason && (ctx.admin || l.user_id === me.id) ? ' · ' + esc(l.reason) : ''}</div></div>${actions}</div>`;
 
   el.innerHTML = `
-    <div class="toolbar"><button class="primary" id="new">＋ Nouvelle demande</button></div>
+    <div class="toolbar"><button class="primary" id="new">Nouvelle demande</button></div>
     ${ctx.admin ? `
       <h2>À valider ${pending.length ? chip(pending.length, 'warn') : ''}</h2>
-      <div class="card list">${pending.length ? pending.map(l => row(l, `<div class="row"><button class="sm ok" data-ok="${l.id}">✓ Accepter</button><button class="sm danger" data-ko="${l.id}">✕ Refuser</button></div>`)).join('') : empty('Aucune demande en attente 🎉')}</div>` : ''}
+      <div class="card list">${pending.length ? pending.map(l => row(l, `<div class="row"><button class="sm ok" data-ok="${l.id}">Accepter</button><button class="sm danger" data-ko="${l.id}">Refuser</button></div>`)).join('') : empty('Aucune demande en attente')}</div>` : ''}
     <h2>Absences à venir (équipe)</h2>
     <div class="card list">${upcoming.length ? upcoming.map(l => row({ ...l, kind: (ctx.admin ? '' : memberName(l.user_id) + ' · ') + l.kind })).join('') : empty('Personne n\'est absent prochainement.')}</div>
     <h2>Mes demandes</h2>

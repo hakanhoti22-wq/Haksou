@@ -26,7 +26,7 @@ L'appli fonctionne **sans rien configurer**, en mode démo : les données resten
 - En ligne (une fois la branche fusionnée dans `main`) : **https://hakanhoti22-wq.github.io/Haksou/gestion/**
 - Sur ton ordinateur : `python3 -m http.server` à la racine du dépôt, puis ouvre http://localhost:8000/gestion/
 
-Choisis **Hakan (patron)** pour tout voir, **Léa** ou **Karim** pour voir l'appli côté employé, ou **🛰️ Hakan (propriétaire Haksou)** pour la console de supervision (avec une 2e entreprise cliente en essai).
+Choisis **Hakan (patron)** pour tout voir, **Léa** ou **Karim** pour voir l'appli côté employé, ou **Hakan (propriétaire Haksou)** pour la console de supervision (avec une 2e entreprise cliente en essai).
 
 > ⚠️ Il faut ouvrir l'appli par une adresse `http(s)://`, pas en double-cliquant sur `index.html`.
 
@@ -63,7 +63,7 @@ Tu es le **propriétaire** de Haksou Pro. Tu as une console qui supervise toutes
    ```sql
    insert into platform_admins (user_id) select id from auth.users where email = 'ton.email@exemple.ch';
    ```
-3. Recharge l'appli : le menu **🛰️ Console Haksou** apparaît.
+3. Recharge l'appli : le menu **Console Haksou** apparaît.
 4. Dans `js/config.js`, mets tes coordonnées dans `SUPPORT_CONTACT` (nom, e-mail, téléphone). Elles s'affichent aux clients.
 
 ### Ce que fait la console

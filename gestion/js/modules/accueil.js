@@ -1,5 +1,6 @@
 // Tableau de bord : résumé de tous les modules activés.
 import { db, session, memberName } from '../db.js';
+import { icon } from '../icons.js';
 import { MODULES } from '../meta.js';
 import { $, esc, fmtDate, isoDate, addDays, startOfWeek, startOfDay, fmtMin, fmtLongDay, money, toast } from '../utils.js';
 import { computeDays, isPresent } from './pointage.js';
@@ -30,41 +31,41 @@ export async function render(el, ctx) {
   const hour = now.getHours();
 
   const tiles = [];
-  const tile = (href, icon, label, value, sub = '', cls = '') => tiles.push(`<a class="card tile ${cls}" href="#/${href}"><span class="ti">${icon}</span><div><div class="mut">${label}</div><div class="num">${value}</div>${sub ? `<div class="mut small">${sub}</div>` : ''}</div></a>`);
+  const tile = (href, ic, label, value, sub = '', cls = '') => tiles.push(`<a class="card tile ${cls}" href="#/${href}"><span class="ti">${icon(ic)}</span><div><div class="mut">${label}</div><div class="num">${value}</div>${sub ? `<div class="mut small">${sub}</div>` : ''}</div></a>`);
 
   if (on('pointage')) {
-    if (ctx.admin) { const p = session.members.filter(m => isPresent(punches.filter(x => x.user_id === m.id))); tile('pointage', '⏱️', 'Présents maintenant', `${p.length} / ${session.members.length}`, p.map(m => esc(m.name.split(' ')[0])).join(', ')); }
-    else tile('pointage', '⏱️', 'Mes heures cette semaine', fmtMin(weekMin), `Aujourd'hui : ${fmtMin(todayMin)}`);
+    if (ctx.admin) { const p = session.members.filter(m => isPresent(punches.filter(x => x.user_id === m.id))); tile('pointage', 'clock', 'Présents maintenant', `${p.length} / ${session.members.length}`, p.map(m => esc(m.name.split(' ')[0])).join(', ')); }
+    else tile('pointage', 'clock', 'Mes heures cette semaine', fmtMin(weekMin), `Aujourd'hui : ${fmtMin(todayMin)}`);
   }
-  if (on('planning')) { const t = myShifts.find(s => s.date === today); tile('planning', '📅', 'Mon horaire aujourd\'hui', t ? `${t.start_time}–${t.end_time}` : 'Libre', t?.note ? esc(t.note) : `${myShifts.length} créneau(x) cette semaine`); }
+  if (on('planning')) { const t = myShifts.find(s => s.date === today); tile('planning', 'calendar', 'Mon horaire aujourd\'hui', t ? `${t.start_time}–${t.end_time}` : 'Libre', t?.note ? esc(t.note) : `${myShifts.length} créneau(x) cette semaine`); }
   if (on('conges')) {
-    if (ctx.admin) { const n = leaves.filter(l => l.status === 'en_attente').length; tile('conges', '🌴', 'Congés à valider', n, '', n ? 'warn' : ''); }
+    if (ctx.admin) { const n = leaves.filter(l => l.status === 'en_attente').length; tile('conges', 'leave', 'Congés à valider', n, '', n ? 'warn' : ''); }
     const absent = leaves.filter(l => l.status === 'approuve' && l.start_date <= today && l.end_date >= today);
-    tile('conges', '🏖', 'Absents aujourd\'hui', absent.length, absent.map(l => esc(memberName(l.user_id))).join(', '));
+    tile('conges', 'users', 'Absents aujourd\'hui', absent.length, absent.map(l => esc(memberName(l.user_id))).join(', '));
   }
-  if (on('interventions')) { const mine = ctx.admin ? inter : inter.filter(i => i.user_id === me.id); tile('interventions', '🔧', ctx.admin ? 'Interventions du jour' : 'Mes interventions du jour', mine.length, `${mine.filter(i => i.status === 'terminee').length} terminée(s)`); }
+  if (on('interventions')) { const mine = ctx.admin ? inter : inter.filter(i => i.user_id === me.id); tile('interventions', 'wrench', ctx.admin ? 'Interventions du jour' : 'Mes interventions du jour', mine.length, `${mine.filter(i => i.status === 'terminee').length} terminée(s)`); }
   if (outstanding) {
     const unpaid = docs.filter(d => d.kind === 'facture' && outstanding(docs, d) > 0), late = unpaid.filter(d => docStatus(d) === 'retard');
-    tile('factures', '🧾', 'Factures à encaisser', money(unpaid.reduce((s, d) => s + outstanding(docs, d), 0), cur), late.length ? `${late.length} en retard` : 'Aucune en retard', late.length ? 'bad' : '');
+    tile('factures', 'invoice', 'Factures à encaisser', money(unpaid.reduce((s, d) => s + outstanding(docs, d), 0), cur), late.length ? `${late.length} en retard` : 'Aucune en retard', late.length ? 'bad' : '');
   }
-  if (on('stock')) { const low = items.filter(i => +i.qty <= +i.min_qty); tile('stock', '📦', 'Articles en stock bas', low.length, low.slice(0, 3).map(i => esc(i.name)).join(', '), low.length ? 'warn' : ''); }
-  if (on('frais')) tile('frais', '💳', ctx.admin ? 'Frais à valider' : 'Mes frais en attente', money(expenses.reduce((s, e) => s + +e.amount, 0), cur), `${expenses.length} note(s)`, expenses.length && ctx.admin ? 'warn' : '');
+  if (on('stock')) { const low = items.filter(i => +i.qty <= +i.min_qty); tile('stock', 'box', 'Articles en stock bas', low.length, low.slice(0, 3).map(i => esc(i.name)).join(', '), low.length ? 'warn' : ''); }
+  if (on('frais')) tile('frais', 'card', ctx.admin ? 'Frais à valider' : 'Mes frais en attente', money(expenses.reduce((s, e) => s + +e.amount, 0), cur), `${expenses.length} note(s)`, expenses.length && ctx.admin ? 'warn' : '');
 
   el.innerHTML = `
-    <div class="hello"><h2 class="h-big">${hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir'} ${esc(me.name.split(' ')[0])} 👋</h2><p class="mut cap">${fmtLongDay(now)}</p></div>
-    ${ctx.admin && session.company.status === 'essai' && session.company.trial_ends_at ? `<div class="card notice info">🎁 <b>Période d'essai</b> jusqu'au ${fmtDate(session.company.trial_ends_at)}. Une question ? Bouton 🆘 Aide en haut à droite.</div>` : ''}
+    <div class="hello"><h2 class="h-big">${hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir'} ${esc(me.name.split(' ')[0])} </h2><p class="mut cap">${fmtLongDay(now)}</p></div>
+    ${ctx.admin && session.company.status === 'essai' && session.company.trial_ends_at ? `<div class="card notice info"><b>Période d'essai</b> jusqu'au ${fmtDate(session.company.trial_ends_at)}. Une question ? Bouton Aide en haut à droite.</div>` : ''}
     ${on('pointage') && !session.support ? `<div class="card hero row between"><div class="status"><span class="dot ${present ? 'in' : ''}"></span><div><b>${present ? 'Tu es pointé' : 'Tu n\'es pas pointé'}</b><div class="mut small">Aujourd'hui : ${fmtMin(todayMin)}</div></div></div>
-      <button class="${present ? 'out' : 'in'}" id="punch">${present ? '⏹ Départ' : '▶︎ Arrivée'}</button></div>` : ''}
+      <button class="${present ? 'out' : 'in'}" id="punch">${present ? 'Départ' : 'Arrivée'}</button></div>` : ''}
     <div class="dash">${tiles.join('')}</div>
     ${!session.company.modules.length ? '<div class="card">Aucun module activé. Va dans <a href="#/reglages">Réglages</a> pour en choisir.</div>' : ''}
     <h2>Raccourcis</h2>
-    <div class="quick">${MODULES.filter(m => on(m.id)).map(m => `<a href="#/${m.id}" class="q"><span>${m.icon}</span>${esc(m.label)}</a>`).join('')}</div>`;
+    <div class="quick">${MODULES.filter(m => on(m.id)).map(m => `<a href="#/${m.id}" class="q">${icon(m.icon, 22)}${esc(m.label)}</a>`).join('')}</div>`;
 
   $('#punch')?.addEventListener('click', async e => {
     e.target.disabled = true;
     try {
       const r = await punchNow(present ? 'out' : 'in');
-      toast((present ? 'Départ enregistré 👋' : 'Arrivée enregistrée ✅') + (r.queued ? ' · envoi dès le retour du réseau' : ''), r.queued ? 'info' : 'ok');
+      toast((present ? 'Départ enregistré' : 'Arrivée enregistrée') + (r.queued ? ' · envoi dès le retour du réseau' : ''), r.queued ? 'info' : 'ok');
     } catch (err) { toast(err.message, 'err'); }
     ctx.refresh();
   });

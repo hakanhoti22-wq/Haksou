@@ -18,10 +18,10 @@ export async function render(el, ctx) {
       <div class="card"><div class="mut">Valeur du stock</div><div class="num">${money(value, cur())}</div></div>
     </div>
     <div class="toolbar">
-      <input type="search" id="q" placeholder="🔍 Nom, référence, code-barres…" value="${esc(q)}">
-      <button id="scan">📷 Scanner</button><button class="primary" id="new">＋ Article</button>
+      <input type="search" id="q" placeholder="Nom, référence, code-barres…" value="${esc(q)}">
+      <button id="scan">Scanner</button><button class="primary" id="new">Nouvel article</button>
     </div>
-    <div class="row" style="margin-bottom:8px"><label class="check"><input type="checkbox" id="low" ${onlyLow ? 'checked' : ''}> Seulement le stock bas</label><span class="grow"></span><button class="sm ghost" id="csv">⬇︎ Inventaire CSV</button></div>
+    <div class="row" style="margin-bottom:8px"><label class="check"><input type="checkbox" id="low" ${onlyLow ? 'checked' : ''}> Seulement le stock bas</label><span class="grow"></span><button class="sm ghost" id="csv">Inventaire CSV</button></div>
     <div class="card list" id="list"></div>`;
 
   const draw = () => {
@@ -29,9 +29,9 @@ export async function render(el, ctx) {
     const list = items.filter(i => (!onlyLow || low(i)) && (!s || [i.name, i.ref, i.barcode].join(' ').toLowerCase().includes(s)));
     $('#list', el).innerHTML = list.length ? list.map(i => `<div class="item">
       <div class="grow click" data-edit="${i.id}"><b>${esc(i.name)}</b> ${low(i) ? chip('Stock bas', 'err') : ''}
-        <div class="mut small">${[i.ref, i.barcode && '▥ ' + i.barcode, money(i.price, cur()) + ' / ' + (i.unit || 'pce')].filter(Boolean).map(esc).join(' · ')}</div></div>
+        <div class="mut small">${[i.ref, i.barcode && 'EAN ' + i.barcode, money(i.price, cur()) + ' / ' + (i.unit || 'pce')].filter(Boolean).map(esc).join(' · ')}</div></div>
       <div class="qty ${low(i) ? 'bad' : ''}"><b>${+i.qty}</b><small>${esc(i.unit || 'pce')} · min ${+i.min_qty}</small></div>
-      <div class="row nowrap"><button class="sm icon" data-out="${i.id}" title="Sortie">−</button><button class="sm icon" data-in="${i.id}" title="Entrée">＋</button></div>
+      <div class="row nowrap"><button class="sm icon" data-out="${i.id}" title="Sortie">−</button><button class="sm icon" data-in="${i.id}" title="Entrée">+</button></div>
     </div>`).join('') : empty(items.length ? 'Aucun article trouvé.' : 'Aucun article. Ajoute ton premier article !');
     $$('[data-edit]', el).forEach(b => b.onclick = () => editItem(items.find(i => i.id === b.dataset.edit), ctx));
     $$('[data-in]', el).forEach(b => b.onclick = () => move(items.find(i => i.id === b.dataset.in), 1, ctx));
@@ -56,7 +56,7 @@ function move(it, sign, ctx, title) {
   modal({
     title: title || (sign > 0 ? `Entrée : ${it.name}` : `Sortie : ${it.name}`),
     body: `<p class="mut">En stock : <b>${+it.qty} ${esc(it.unit || 'pce')}</b></p>
-      <div class="seg" id="dir"><button type="button" data-s="-1" class="${sign < 0 ? 'on' : ''}">− Sortie</button><button type="button" data-s="1" class="${sign > 0 ? 'on' : ''}">＋ Entrée</button></div>
+      <div class="seg" id="dir"><button type="button" data-s="-1" class="${sign < 0 ? 'on' : ''}">− Sortie</button><button type="button" data-s="1" class="${sign > 0 ? 'on' : ''}">Entrée</button></div>
       <input type="hidden" name="sign" value="${sign}">
       <label>Quantité<input type="number" name="qty" min="0" step="any" value="1" required inputmode="decimal"></label>
       <label>Motif<input name="reason" placeholder="${sign > 0 ? 'Livraison fournisseur…' : 'Chantier, client, casse…'}"></label>`,
@@ -70,7 +70,7 @@ function move(it, sign, ctx, title) {
       if (qty < 0 && !confirm(`Le stock deviendra négatif (${qty}). Continuer ?`)) return false;
       await db.update('items', it.id, { qty });
       await db.insert('movements', { item_id: it.id, user_id: session.profile.id, delta, reason: f.reason, at: new Date().toISOString() });
-      toast(`${it.name} : ${qty} ${it.unit || 'pce'}${qty <= +it.min_qty ? ' ⚠️ stock bas' : ''}`, qty <= +it.min_qty ? 'info' : 'ok');
+      toast(`${it.name} : ${qty} ${it.unit || 'pce'}${qty <= +it.min_qty ? ' stock bas' : ''}`, qty <= +it.min_qty ? 'info' : 'ok');
       ctx.refresh();
     },
   });
@@ -83,7 +83,7 @@ async function editItem(it, ctx) {
     body: `
       <label>Nom *<input name="name" value="${esc(it?.name)}" required></label>
       <div class="grid2"><label>Référence<input name="ref" value="${esc(it?.ref)}"></label>
-      <label>Code-barres<div class="row nowrap"><input name="barcode" value="${esc(it?.barcode)}" class="grow"><button type="button" class="sm" id="scanB">📷</button></div></label>
+      <label>Code-barres<div class="row nowrap"><input name="barcode" value="${esc(it?.barcode)}" class="grow"><button type="button" class="sm" id="scanB"></button></div></label>
       ${it?.id ? '' : `<label>Quantité initiale<input type="number" step="any" name="qty" value="0"></label>`}
       <label>Stock minimum (alerte)<input type="number" step="any" name="min_qty" value="${it?.min_qty ?? 0}"></label>
       <label>Unité<input name="unit" value="${esc(it?.unit || 'pce')}" list="units"></label>

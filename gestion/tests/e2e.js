@@ -150,7 +150,7 @@ const check = (cond, m) => { if (!cond) throw new Error('ÉCHEC : ' + m); ok(m);
 
   console.log('\nPropriétaire de la plateforme');
   await login('propriétaire');
-  check((await text('#links')).trim().startsWith('🛰️') && (await text('.tiles')).includes('Entreprises'), 'console du propriétaire affichée');
+  check((await text('#links')).trim().startsWith('Console') && (await text('.tiles')).includes('Entreprises'), 'console du propriétaire affichée');
   check((await text('#tab')).includes('Démo Services') && (await text('#tab')).includes('Boulangerie Rossier'), 'toutes les entreprises clientes listées');
   await p.click('[data-t=erreurs]'); await p.waitForTimeout(300);
   check((await text('#tab')).includes('Bug de test volontaire'), 'erreur JavaScript remontée automatiquement dans la console');
