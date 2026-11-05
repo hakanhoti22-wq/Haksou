@@ -15,7 +15,7 @@
  *   edit   modifie un pointage (row=, at= nouvelle heure ISO, type=in|out|pro|back)
  *   add    ajoute un pointage oublié (type=, at=)
  *   config lit / enregistre la plage horaire (start=06:30&end=18:00)
- *   list   historique (JSON)          delete  supprime une ligne (row=)
+ *   list   historique (JSON)          delete  supprime des lignes (row= ou rows=2,5,9)
  * Ajoute fmt=text pour une réponse en texte simple (utilisé par l'app Raccourcis).
  */
 const TOKEN = 'change-moi-123';
@@ -75,10 +75,12 @@ function doGet(e) {
         if (st === 'in') { add('out'); return reply({ ok: true, state: 'out' }, 'DETIMBRE'); }
         return reply({ ok: true, skipped: true, state: st }, 'OK');
       }
-      case 'delete': {
-        const row = Number(p.row);
-        if (row >= 2 && row <= sh.getLastRow()) sh.deleteRow(row);
-        return reply({ ok: true });
+      case 'delete': { // row=5 ou rows=5,8,9 (suppression groupée)
+        const max = sh.getLastRow();
+        const list = String(p.rows || p.row || '').split(',').map(Number).filter(r => r >= 2 && r <= max);
+        const uniq = list.filter((r, i) => list.indexOf(r) === i).sort((a, b) => b - a); // du bas vers le haut
+        uniq.forEach(r => sh.deleteRow(r));
+        return reply({ ok: true, deleted: uniq.length });
       }
       case 'edit': {
         const row = Number(p.row);
