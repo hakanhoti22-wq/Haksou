@@ -27,7 +27,7 @@ const STATUT_CODE = {}; Object.keys(STATUTS).forEach(k => STATUT_CODE[STATUTS[k]
 const EDITABLE = ['date', 'debut', 'duree', 'prix', 'services', 'prestations', 'nom', 'tel', 'email', 'note', 'statut', 'notes', 'paye', 'modePaiement', 'debutReel', 'finReel'];
 
 const DEFAULT_CONFIG = {
-  nom: 'Mon Studio Ongles', slogan: 'Gel, semi-permanent & nail art 💅', adresse: '', telephone: '', instagram: '', devise: 'CHF', indicatif: '41',
+  nom: 'Mon Studio Ongles', slogan: 'Gel · Semi-permanent · Nail art', adresse: '', telephone: '', instagram: '', devise: 'CHF', indicatif: '41',
   message: "Merci de venir avec des ongles propres, sans vernis. Au-delà de 15 min de retard, le rendez-vous peut être annulé.",
   horaires: { 0: [], 1: [], 2: [['09:00', '12:00'], ['13:30', '18:30']], 3: [['09:00', '12:00'], ['13:30', '18:30']], 4: [['09:00', '12:00'], ['13:30', '18:30']], 5: [['09:00', '12:00'], ['13:30', '18:30']], 6: [['09:00', '15:00']] },
   fermetures: [], pas: 15, tampon: 10, delaiMin: 12, joursMax: 45, validation: 'auto', annulationH: 24

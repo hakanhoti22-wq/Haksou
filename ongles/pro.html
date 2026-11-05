@@ -7,66 +7,66 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Mon Studio">
-<meta name="theme-color" content="#fbf4f1">
+<meta name="theme-color" content="#f4eee5">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon.svg">
 <link rel="stylesheet" href="style.css">
-<title>Mon Studio 💅</title>
+<title>Mon Studio</title>
 <style>
 body{padding:calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 92px);max-width:640px;margin:0 auto}
-nav{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.96);backdrop-filter:blur(10px);border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:6px 4px calc(env(safe-area-inset-bottom) + 6px);z-index:100}
-nav button{background:none;color:var(--mut);flex:1;flex-direction:column;gap:1px;font-size:11px;padding:4px 0;min-height:50px;font-weight:600;position:relative}
-nav button span{font-size:22px;line-height:1.1;filter:grayscale(1);opacity:.6}
+nav{position:fixed;left:0;right:0;bottom:0;background:rgba(244,238,229,.94);backdrop-filter:blur(12px);border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:6px 4px calc(env(safe-area-inset-bottom) + 6px);z-index:100}
+nav button{background:none;border:0;color:var(--mut);flex:1;flex-direction:column;gap:3px;font-size:9.5px;letter-spacing:.12em;padding:6px 0 2px;min-height:52px;font-weight:600;position:relative}
+nav svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round}
 nav button.on{color:var(--pri2)}
-nav button.on span{filter:none;opacity:1}
-nav .badge{position:absolute;top:2px;left:55%;background:var(--ko);color:#fff;border-radius:99px;font-size:10px;padding:0 5px;line-height:16px}
-.stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px;text-align:center}
+nav button.on::after{content:"";position:absolute;bottom:-2px;width:4px;height:4px;border-radius:50%;background:var(--gold)}
+nav .badge{position:absolute;top:2px;left:56%;background:var(--gold);font-style:normal;letter-spacing:0;color:#fff;border-radius:99px;font-size:10px;padding:0 5px;line-height:16px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 8px;text-align:center}
 .stat .num{font-size:18px}
-.stat .mut{font-size:12px}
+.stat .mut{font-size:10px;text-transform:uppercase;letter-spacing:.12em;margin-top:2px}
 .tl{display:flex;gap:12px;align-items:stretch;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer}
 .tl:last-child{border:0}
-.tl .h{width:48px;flex:none;font-weight:700;font-variant-numeric:tabular-nums}
+.tl .h{width:48px;flex:none;font-weight:500;font-variant-numeric:tabular-nums}
 .tl .h small{display:block;font-weight:500;color:var(--mut)}
-.tl .b{width:4px;border-radius:9px;background:var(--info);flex:none}
+.tl .b{width:2px;border-radius:9px;background:var(--info);flex:none}
 .tl .b.attente{background:var(--warn)}.tl .b.encours{background:var(--pri)}.tl .b.termine{background:var(--ok)}.tl .b.absente{background:var(--ko)}
-.gap{font-size:13px;color:var(--ok);padding:6px 0 6px 60px;border-bottom:1px solid var(--line)}
-.now{border:2px solid var(--pri);background:linear-gradient(180deg,#fff,#fff7f9)}
-.prog{height:10px;border-radius:99px;background:var(--soft);overflow:hidden;margin:10px 0 6px}
+.gap{font-size:12px;color:var(--gold);letter-spacing:.04em;font-style:italic;padding:6px 0 6px 60px;border-bottom:1px solid var(--line)}
+.now{border:1px solid var(--pri);background:var(--card)}
+.prog{height:3px;border-radius:99px;background:var(--soft);overflow:hidden;margin:10px 0 6px}
 .prog i{display:block;height:100%;background:var(--pri);border-radius:99px;transition:width .5s}
-.prog.over i{background:var(--warn)}
-.big{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums}
+.prog.over i{background:var(--ko)}
+.big{font-size:32px;font-family:var(--serif);font-weight:400;font-variant-numeric:lining-nums tabular-nums}
 .task{display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}
 .task:last-child{border:0}
 .task.done .t{text-decoration:line-through;color:var(--mut)}
-.task .x{background:none;color:var(--mut);min-height:30px;padding:0 6px;font-size:18px}
-.menu .item{display:flex;align-items:center;gap:12px;padding:14px 4px;border-bottom:1px solid var(--line);cursor:pointer;font-weight:600}
+.task .x{background:none;border:0;letter-spacing:0;color:var(--mut);min-height:30px;padding:0 6px;font-size:18px}
+.menu .item{display:flex;align-items:center;gap:12px;padding:16px 2px;border-bottom:1px solid var(--line);cursor:pointer;font-weight:500;letter-spacing:.01em}
 .menu .item:last-child{border:0}
-.menu .item span:first-child{font-size:22px;width:30px;text-align:center}
-.menu .item::after{content:'›';margin-left:auto;color:var(--mut);font-size:22px}
-.fab{position:fixed;right:18px;bottom:calc(env(safe-area-inset-bottom) + 84px);width:58px;height:58px;border-radius:50%;font-size:30px;box-shadow:0 8px 22px rgba(194,87,122,.4);z-index:90;padding:0}
+.menu .item span:first-child{display:none}
+.menu .item::after{content:'›';margin-left:auto;color:var(--gold);font-size:20px}
+.fab{position:fixed;right:18px;bottom:calc(env(safe-area-inset-bottom) + 84px);width:54px;height:54px;border-radius:50%;font-size:26px;font-weight:300;letter-spacing:0;box-shadow:0 6px 18px rgba(43,33,26,.25);z-index:90;padding:0}
 .lrow{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px dashed var(--line)}
 .lrow:last-child{border:0}
-.hbar{height:8px;border-radius:9px;background:var(--pri);opacity:.75}
+.hbar{height:3px;border-radius:9px;background:var(--gold)}
 .dayrow{display:grid;grid-template-columns:76px 1fr;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
 .dayrow:last-child{border:0}
 .dayrow .hp{display:grid;grid-template-columns:1fr auto 1fr;gap:6px;align-items:center}
 .dayrow input[type=time]{padding:8px 6px;font-size:15px;min-width:0}
 .cli{display:flex;gap:12px;align-items:center;cursor:pointer}
-.av{width:42px;height:42px;border-radius:50%;background:var(--soft);color:var(--pri2);display:flex;align-items:center;justify-content:center;font-weight:800;flex:none}
+.av{width:42px;height:42px;border-radius:50%;border:1px solid var(--gold);color:var(--pri);display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:15px;letter-spacing:.06em;flex:none}
 #login{max-width:460px;margin:30px auto}
 </style>
 </head>
 <body>
-<div id="demo" class="banner hide">🧪 <b>Mode démo</b> : données fictives, enregistrées seulement sur ce téléphone. Connecte ta Google Sheet dans <b>Plus → Connexion</b>.</div>
-<div id="view"><div class="empty"><span class="e">💅</span>Chargement…</div></div>
+<div id="demo" class="banner hide"><b>Mode démo</b> : données fictives, enregistrées seulement sur ce téléphone. Connecte ta Google Sheet dans <b>Plus → Connexion</b>.</div>
+<div id="view"><div class="empty">Chargement…</div></div>
 <button class="fab hide" id="fab" aria-label="Nouveau rendez-vous">+</button>
 <nav id="nav">
-  <button data-t="jour" class="on"><span>☀️</span>Aujourd'hui</button>
-  <button data-t="agenda"><span>📅</span>Agenda</button>
-  <button data-t="clientes"><span>👩</span>Clientes</button>
-  <button data-t="taches"><span>✅</span>Tâches</button>
-  <button data-t="plus"><span>⚙️</span>Plus</button>
+  <button data-t="jour" class="on"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></svg>Aujourd'hui</button>
+  <button data-t="agenda"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="1.5"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/></svg>Agenda</button>
+  <button data-t="clientes"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5c1-4 4-6 7.5-6s6.5 2 7.5 6"/></svg>Clientes</button>
+  <button data-t="taches"><svg viewBox="0 0 24 24"><path d="M9 6.5h11M9 12h11M9 17.5h11"/><path d="M3.5 6.5l1.2 1.2L6.5 5.5M3.5 12l1.2 1.2L6.5 11M3.5 17.5l1.2 1.2 1.8-2.2"/></svg>Tâches</button>
+  <button data-t="plus"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Plus</button>
 </nav>
 
 <script src="config.js"></script>
@@ -87,8 +87,8 @@ const P = v => O.fmtPrix(v, cfg());
 const find = id => S.rdv.find(r => r.id === id);
 const pill = s => `<span class="pill ${s}">${O.STATUTS[s] || s}</span>`;
 const stat = (v, l) => `<div class="stat"><div class="num">${v}</div><div class="mut">${l}</div></div>`;
-const greet = () => { const h = new Date().getHours(); return h < 12 ? 'Bonjour ☀️' : h < 18 ? 'Bon après-midi 🌸' : 'Bonsoir 🌙'; };
-const safe = fn => async (...a) => { try { return await fn(...a); } catch (e) { O.toast('⚠️ ' + e.message, 4500); } };
+const greet = () => { const h = new Date().getHours(); return h < 12 ? 'Bonjour' : h < 18 ? 'Bon après-midi' : 'Bonsoir'; };
+const safe = fn => async (...a) => { try { return await fn(...a); } catch (e) { O.toast('' + e.message, 4500); } };
 const quand = d => d === O.today() ? "aujourd'hui" : d === O.addDays(O.today(), 1) ? 'demain' : 'le ' + O.fmtDate(d);
 
 const MSG = {
@@ -115,8 +115,8 @@ const saveRdv = async (r, msg) => {
   render(); if (msg) O.toast(msg);
   return n;
 };
-const saveCfg = async msg => { await api.call('saveConfig', { config: S.config }); O.toast(msg || 'Enregistré ✅'); render(); };
-const saveSrv = async () => { await api.call('saveServices', { services: S.services }); O.toast('Prestations enregistrées ✅'); };
+const saveCfg = async msg => { await api.call('saveConfig', { config: S.config }); O.toast(msg || 'Enregistré'); render(); };
+const saveSrv = async () => { await api.call('saveServices', { services: S.services }); O.toast('Prestations enregistrées'); };
 const saveTaches = async () => { await api.call('saveTaches', { taches: S.taches }); };
 const bookUrl = () => {
   const base = location.href.replace(/[^/]*([?#].*)?$/, '');
@@ -138,8 +138,8 @@ function notify(r, msg, titre) {
   if (!r.tel) return;
   sheet(`<h3>${titre}</h3><p class="mut">Prévenir ${E(prenom(r.nom))} :</p>
     <div class="card small">${E(msg)}</div>
-    <div class="grid2"><a class="btn green" target="_blank" href="${O.whatsapp(r.tel, msg, cfg().indicatif)}" onclick="closeSheet()">💬 WhatsApp</a>
-    <a class="btn ghost" href="${O.sms(r.tel, msg)}" onclick="closeSheet()">✉️ SMS</a></div>
+    <div class="grid2"><a class="btn green" target="_blank" href="${O.whatsapp(r.tel, msg, cfg().indicatif)}" onclick="closeSheet()">WhatsApp</a>
+    <a class="btn ghost" href="${O.sms(r.tel, msg)}" onclick="closeSheet()">SMS</a></div>
     <button class="light full" style="margin-top:10px" onclick="closeSheet()">Plus tard</button>`);
 }
 
@@ -149,13 +149,13 @@ const A = {
   start: safe(async id => {
     const enc = S.rdv.find(r => r.statut === 'encours' && r.id !== id);
     if (enc) await saveRdv(Object.assign({}, enc, { statut: 'termine', finReel: enc.finReel || nowHM() }));
-    await saveRdv(Object.assign({}, find(id), { statut: 'encours', debutReel: nowHM(), finReel: '' }), '⏱ Chrono lancé');
+    await saveRdv(Object.assign({}, find(id), { statut: 'encours', debutReel: nowHM(), finReel: '' }), 'Chrono lancé');
   }),
   finish: safe(async id => {
-    await saveRdv(Object.assign({}, find(id), { statut: 'termine', finReel: nowHM() }), 'Bravo ! 💅 Note le paiement');
+    await saveRdv(Object.assign({}, find(id), { statut: 'termine', finReel: nowHM() }), 'Bravo ! Note le paiement');
     openRdv(id);
   }),
-  confirm: safe(async id => { const r = await saveRdv(Object.assign({}, find(id), { statut: 'confirme' }), 'Rendez-vous confirmé ✅'); notify(r, MSG.conf(r), 'Confirmé ✅'); }),
+  confirm: safe(async id => { const r = await saveRdv(Object.assign({}, find(id), { statut: 'confirme' }), 'Rendez-vous confirmé'); notify(r, MSG.conf(r), 'Confirmé'); }),
   refuse: safe(async id => {
     if (!confirm('Refuser ce rendez-vous ?')) return;
     const r = await saveRdv(Object.assign({}, find(id), { statut: 'annule' }), 'Rendez-vous refusé'); notify(r, MSG.refus(r), 'Refusé');
@@ -185,51 +185,51 @@ function vJour() {
   const next = W.find(r => ['confirme', 'attente'].includes(r.statut) && O.toMin(r.fin) > now && r !== enc);
   let h = `<div class="between"><div><div class="mut">${greet()}</div><h1 class="brand">${O.cap(O.fmtDate(t))}</h1></div><button class="icon ghost" onclick="refresh()" aria-label="Actualiser">↻</button></div>
     <div class="grid3" style="margin-top:14px">${stat(W.length, 'rendez-vous')}${stat(P(W.reduce((a, r) => a + r.prix, 0)), 'prévu')}${stat(O.fmtDur(W.reduce((a, r) => a + r.duree, 0)), 'de travail')}</div>`;
-  if (att.length) h += `<h2>⏳ À valider (${att.length})</h2>` + att.map(r => `<div class="card">
+  if (att.length) h += `<h2>À valider (${att.length})</h2>` + att.map(r => `<div class="card">
       <div class="between"><b>${E(r.nom)}</b><span class="mut small">${O.cap(O.fmtDay(r.date))} · ${r.debut}</span></div>
-      <div class="mut">${E(r.prestations)} · ${P(r.prix)}</div>${r.note ? `<div class="small" style="margin-top:4px">💬 ${E(r.note)}</div>` : ''}
+      <div class="mut">${E(r.prestations)} · ${P(r.prix)}</div>${r.note ? `<div class="small" style="margin-top:4px">${E(r.note)}</div>` : ''}
       <div class="grid2" style="margin-top:10px"><button class="green sm" onclick="A.confirm('${r.id}')">✓ Accepter</button><button class="light sm" onclick="A.refuse('${r.id}')">Refuser</button></div></div>`).join('');
 
-  h += `<h2>${enc ? '⏱ En ce moment' : 'Prochaine cliente'}</h2>`;
+  h += `<h2>${enc ? 'En ce moment' : 'Prochaine cliente'}</h2>`;
   if (enc) {
     const deb = O.toMin(enc.debutReel || enc.debut), ecoule = Math.max(0, now - deb), pct = Math.min(100, ecoule / enc.duree * 100);
     const finPrev = deb + enc.duree, apres = W.find(r => r.date === t && O.toMin(r.debut) >= O.toMin(enc.debut) && r !== enc && r.statut !== 'termine');
     let info = `Fin prévue à <b>${O.toHM(finPrev)}</b>`;
-    if (ecoule > enc.duree) info = `⚠️ Tu dépasses de <b>${O.fmtDur(ecoule - enc.duree)}</b>`;
+    if (ecoule > enc.duree) info = `Tu dépasses de <b>${O.fmtDur(ecoule - enc.duree)}</b>`;
     if (apres) { const marge = O.toMin(apres.debut) - Math.max(finPrev, now); info += marge < 0 ? ` · <b style="color:var(--ko)">${E(prenom(apres.nom))} arrive à ${apres.debut}</b> (retard ${O.fmtDur(-marge)})` : ` · ${E(prenom(apres.nom))} à ${apres.debut}`; }
     h += `<div class="card now"><div class="between"><div><b>${E(enc.nom)}</b><div class="mut">${E(enc.prestations)}</div></div><div class="big">${O.fmtDur(ecoule)}</div></div>
       <div class="prog ${ecoule > enc.duree ? 'over' : ''}"><i style="width:${pct}%"></i></div>
       <div class="mut small">Commencé à ${enc.debutReel || enc.debut} · prévu ${O.fmtDur(enc.duree)}</div><div class="small" style="margin-top:4px">${info}</div>
-      <button class="green full" style="margin-top:12px" onclick="A.finish('${enc.id}')">✅ Terminer</button></div>`;
+      <button class="green full" style="margin-top:12px" onclick="A.finish('${enc.id}')">Terminer</button></div>`;
   } else if (next) {
     const d = O.toMin(next.debut) - now;
     const dans = d > 0 ? 'dans ' + O.fmtDur(d) : d > -5 ? 'maintenant' : 'en retard de ' + O.fmtDur(-d);
     h += `<div class="card now"><div class="between"><div><b>${E(next.nom)}</b> ${pill(next.statut)}<div class="mut">${E(next.prestations)} · ${O.fmtDur(next.duree)}</div></div>
       <div class="center"><div class="big">${next.debut}</div><div class="mut small">${dans}</div></div></div>
-      ${next.note ? `<div class="small" style="margin-top:6px">💬 ${E(next.note)}</div>` : ''}${notesCli(next)}
-      <div class="grid2" style="margin-top:12px"><button onclick="A.start('${next.id}')">▶️ Commencer</button>
-      <a class="btn ghost" target="_blank" href="${O.whatsapp(next.tel, MSG.rappel(next), cfg().indicatif)}">💬 Rappel</a></div></div>`;
+      ${next.note ? `<div class="small" style="margin-top:6px">${E(next.note)}</div>` : ''}${notesCli(next)}
+      <div class="grid2" style="margin-top:12px"><button onclick="A.start('${next.id}')">Commencer</button>
+      <a class="btn ghost" target="_blank" href="${O.whatsapp(next.tel, MSG.rappel(next), cfg().indicatif)}">Rappel</a></div></div>`;
   } else {
     const dem = S.rdv.filter(r => live(r) && r.date > t && ['confirme', 'attente'].includes(r.statut)).sort(byTime)[0];
-    h += `<div class="card empty"><span class="e">🎉</span>Plus de rendez-vous aujourd'hui.${dem ? `<br><span class="small">Prochain : ${E(dem.nom)}, ${O.fmtDay(dem.date).toLowerCase()} à ${dem.debut}</span>` : ''}</div>`;
+    h += `<div class="card empty"><span class="e"></span>Plus de rendez-vous aujourd'hui.${dem ? `<br><span class="small">Prochain : ${E(dem.nom)}, ${O.fmtDay(dem.date).toLowerCase()} à ${dem.debut}</span>` : ''}</div>`;
   }
 
   h += `<h2>Programme du jour</h2><div class="card">${timeline(L, t) || '<div class="empty">Aucun rendez-vous aujourd\'hui</div>'}</div>`;
   const T = S.taches.filter(x => !x.fait && x.date && x.date <= t);
-  h += `<h2>✅ À faire aujourd'hui</h2>` + (T.length ? `<div class="card">${T.map(taskRow).join('')}</div>` : `<div class="card mut">Rien de prévu ✨ <a href="#" onclick="go('taches');return false">Ajouter une tâche</a></div>`);
+  h += `<h2>À faire aujourd'hui</h2>` + (T.length ? `<div class="card">${T.map(taskRow).join('')}</div>` : `<div class="card mut">Rien de prévu <a href="#" onclick="go('taches');return false">Ajouter une tâche</a></div>`);
   const tom = dayRdv(O.addDays(t, 1)).filter(r => r.tel && ['confirme', 'attente'].includes(r.statut));
-  if (tom.length) h += `<h2>📲 Rappels pour demain</h2><div class="card">${tom.map(r => `<div class="between task"><div class="grow"><b>${r.debut}</b> ${E(r.nom)}</div><a class="btn sm ghost" target="_blank" href="${O.whatsapp(r.tel, MSG.rappel(r), cfg().indicatif)}">💬 Envoyer</a></div>`).join('')}</div>`;
+  if (tom.length) h += `<h2>Rappels pour demain</h2><div class="card">${tom.map(r => `<div class="between task"><div class="grow"><b>${r.debut}</b> ${E(r.nom)}</div><a class="btn sm ghost" target="_blank" href="${O.whatsapp(r.tel, MSG.rappel(r), cfg().indicatif)}">Envoyer</a></div>`).join('')}</div>`;
   return h;
 }
-function notesCli(r) { const n = (S.clientes[ckey(r.tel)] || {}).notes; return n ? `<div class="small" style="margin-top:6px;background:var(--soft);border-radius:10px;padding:8px">📝 ${E(n)}</div>` : ''; }
+function notesCli(r) { const n = (S.clientes[ckey(r.tel)] || {}).notes; return n ? `<div class="small" style="margin-top:6px;background:var(--soft);border-radius:10px;padding:8px">${E(n)}</div>` : ''; }
 function timeline(L, d) {
   const pl = (cfg().horaires[O.parse(d).getDay()] || []);
   let prev = pl.length ? O.toMin(pl[0][0]) : null, h = '';
   L.forEach(r => {
     const s = O.toMin(r.debut);
-    if (prev != null && s - prev >= 30) h += `<div class="gap">🌿 Libre ${O.fmtDur(s - prev)}</div>`;
+    if (prev != null && s - prev >= 30) h += `<div class="gap">Libre · ${O.fmtDur(s - prev)}</div>`;
     h += `<div class="tl" onclick="A.open('${r.id}')"><div class="h">${r.debut}<small>${r.fin}</small></div><div class="b ${r.statut}"></div>
-      <div class="grow"><div class="between"><b>${E(r.nom)}</b>${pill(r.statut)}</div><div class="mut small">${E(r.prestations)} · ${P(r.prix)}${r.paye ? ' · 💰 payé' : ''}</div></div></div>`;
+      <div class="grow"><div class="between"><b>${E(r.nom)}</b>${pill(r.statut)}</div><div class="mut small">${E(r.prestations)} · ${P(r.prix)}${r.paye ? ' · payé' : ''}</div></div></div>`;
     prev = Math.max(prev || 0, O.toMin(r.fin));
   });
   return h;
@@ -249,7 +249,7 @@ function vAgenda() {
     ${weekStart !== monday(O.today()) ? `<button class="ghost sm full" style="margin-bottom:12px" onclick="weekStart=null;render()">Revenir à cette semaine</button>` : ''}`;
   for (let i = 0; i < 7; i++) {
     const d = O.addDays(weekStart, i), L = dayRdv(d), pl = cfg().horaires[O.parse(d).getDay()] || [];
-    const ferme = O.isClosed(cfg(), d) ? '🏖 Fermé (congé)' : pl.length ? pl.map(p => p.join('–')).join(' · ') : 'Fermé';
+    const ferme = O.isClosed(cfg(), d) ? 'Fermé (congé)' : pl.length ? pl.map(p => p.join('–')).join(' · ') : 'Fermé';
     h += `<div class="card" ${d === O.today() ? 'style="border-color:var(--pri)"' : ''}>
       <div class="between"><div><b>${O.cap(O.fmtDate(d))}</b><div class="mut small">${ferme}</div></div><button class="ghost sm" onclick="openForm(null,'${d}')">+ RDV</button></div>
       ${L.length ? `<div style="margin-top:6px">${timeline(L, d)}</div>` : ''}</div>`;
@@ -260,43 +260,43 @@ function vAgenda() {
 /* ---------- Fiche RDV ---------- */
 function openRdv(id) {
   const r = find(id); if (!r) return;
-  const ind = cfg().indicatif, modes = [['especes', '💵 Espèces'], ['twint', '📱 TWINT'], ['carte', '💳 Carte'], ['virement', '🏦 Virement']];
+  const ind = cfg().indicatif, modes = [['especes', 'Espèces'], ['twint', 'TWINT'], ['carte', 'Carte'], ['virement', 'Virement']];
   const act = {
     attente: `<button class="green" onclick="A.confirm('${id}')">✓ Accepter</button><button class="light" onclick="A.refuse('${id}')">Refuser</button>`,
-    confirme: `<button onclick="closeSheet();A.start('${id}')">▶️ Commencer</button><button class="light" onclick="A.status('${id}','absente')">🚫 Absente</button>`,
-    encours: `<button class="green" onclick="A.finish('${id}')">✅ Terminer</button><button class="light" onclick="A.status('${id}','confirme')">Annuler le chrono</button>`,
+    confirme: `<button onclick="closeSheet();A.start('${id}')">Commencer</button><button class="light" onclick="A.status('${id}','absente')">Absente</button>`,
+    encours: `<button class="green" onclick="A.finish('${id}')">Terminer</button><button class="light" onclick="A.status('${id}','confirme')">Annuler le chrono</button>`,
     termine: '', absente: `<button class="light" onclick="A.status('${id}','confirme')">Remettre en confirmé</button>`, annule: `<button class="light" onclick="A.status('${id}','confirme')">Rétablir</button>`
   }[r.statut] || '';
   const reel = r.debutReel && r.finReel ? O.toMin(r.finReel) - O.toMin(r.debutReel) : 0;
   const m = sheet(`<div class="between"><h3>${E(r.nom)}</h3>${pill(r.statut)}</div>
-    <div class="mut">📅 ${O.cap(O.fmtDate(r.date))} · <b>${r.debut} – ${r.fin}</b></div>
+    <div class="mut">${O.cap(O.fmtDate(r.date))} · <b>${r.debut} – ${r.fin}</b></div>
     <div class="card" style="margin-top:12px"><div class="lrow"><span>${E(r.prestations)}</span><b>${P(r.prix)}</b></div>
       <div class="lrow"><span>Durée prévue</span><span>${O.fmtDur(r.duree)}</span></div>
       ${reel > 0 ? `<div class="lrow"><span>Durée réelle</span><b>${O.fmtDur(reel)}</b></div>` : ''}
       <div class="lrow"><span>Réservé</span><span class="mut">${r.source === 'manuel' ? 'par toi' : 'en ligne'}</span></div>
-      ${r.note ? `<div class="lrow"><span>💬 ${E(r.note)}</span></div>` : ''}</div>
+      ${r.note ? `<div class="lrow"><span>${E(r.note)}</span></div>` : ''}</div>
     ${notesCli(r)}
     <div class="grid3" style="margin:12px 0">
-      <a class="btn light sm" href="tel:${O.normTel(r.tel)}">📞 Appeler</a>
-      <a class="btn light sm" target="_blank" href="${O.whatsapp(r.tel, r.statut === 'termine' ? MSG.merci(r) : MSG.rappel(r), ind)}">💬 WhatsApp</a>
-      <a class="btn light sm" href="${O.sms(r.tel, MSG.rappel(r))}">✉️ SMS</a></div>
+      <a class="btn light sm" href="tel:${O.normTel(r.tel)}">Appeler</a>
+      <a class="btn light sm" target="_blank" href="${O.whatsapp(r.tel, r.statut === 'termine' ? MSG.merci(r) : MSG.rappel(r), ind)}">WhatsApp</a>
+      <a class="btn light sm" href="${O.sms(r.tel, MSG.rappel(r))}">SMS</a></div>
     ${act ? `<div class="grid2">${act}</div>` : ''}
-    <h2>💰 Paiement</h2>
+    <h2>Paiement</h2>
     <div class="card"><label class="check"><input type="checkbox" id="rPaye" ${r.paye ? 'checked' : ''}> Payé</label>
       <div class="chips" id="rModes">${modes.map(([k, l]) => `<button class="chip ${r.modePaiement === k ? 'on' : ''}" data-k="${k}">${l}</button>`).join('')}</div>
       <label for="rPrix">Montant (${cfg().devise})</label><input id="rPrix" type="number" inputmode="decimal" value="${r.prix}"></div>
-    <h2>⏱ Chrono</h2>
+    <h2>Chrono</h2>
     <div class="card grid2"><div><label for="rDR" style="margin-top:0">Début réel</label><input id="rDR" type="time" value="${r.debutReel || ''}"></div>
       <div><label for="rFR" style="margin-top:0">Fin réelle</label><input id="rFR" type="time" value="${r.finReel || ''}"></div></div>
-    <h2>📝 Notes (toi seule)</h2>
+    <h2>Notes (toi seule)</h2>
     <textarea id="rNotes" placeholder="Couleur utilisée, forme, remarques…">${E(r.notes || '')}</textarea>
     <button class="full" style="margin-top:12px" id="rSave">Enregistrer</button>
-    <div class="grid2" style="margin-top:10px"><button class="light" onclick="openForm('${id}')">✏️ Modifier</button>
-      ${r.statut !== 'annule' ? `<button class="light" style="color:var(--ko)" onclick="A.status('${id}','annule')">Annuler le RDV</button>` : `<button class="light" style="color:var(--ko)" id="rDel">🗑 Supprimer</button>`}</div>`);
+    <div class="grid2" style="margin-top:10px"><button class="light" onclick="openForm('${id}')">Modifier</button>
+      ${r.statut !== 'annule' ? `<button class="light" style="color:var(--ko)" onclick="A.status('${id}','annule')">Annuler le RDV</button>` : `<button class="light" style="color:var(--ko)" id="rDel">Supprimer</button>`}</div>`);
   let mode = r.modePaiement || '';
   m.querySelectorAll('#rModes .chip').forEach(b => b.onclick = () => { mode = mode === b.dataset.k ? '' : b.dataset.k; m.querySelectorAll('#rModes .chip').forEach(x => x.classList.toggle('on', x.dataset.k === mode)); if (mode) $('rPaye').checked = true; });
   $('rSave').onclick = safe(async () => {
-    await saveRdv(Object.assign({}, r, { paye: $('rPaye').checked, modePaiement: mode, prix: Number($('rPrix').value) || 0, debutReel: $('rDR').value, finReel: $('rFR').value, notes: $('rNotes').value }), 'Enregistré ✅');
+    await saveRdv(Object.assign({}, r, { paye: $('rPaye').checked, modePaiement: mode, prix: Number($('rPrix').value) || 0, debutReel: $('rDR').value, finReel: $('rFR').value, notes: $('rNotes').value }), 'Enregistré');
     closeSheet();
   });
   const del = $('rDel');
@@ -334,7 +334,7 @@ function openForm(id, date, cli) {
     let w = '';
     if (hh && dur) {
       const s = O.toMin(hh), e = s + dur, c = others.find(x => x.date === d && s < O.toMin(x.fin) && O.toMin(x.debut) < e);
-      if (c) w = `⚠️ Chevauche le RDV de ${E(c.nom)} (${c.debut}–${c.fin})`;
+      if (c) w = `Chevauche le RDV de ${E(c.nom)} (${c.debut}–${c.fin})`;
     }
     $('fWarn').innerHTML = w;
   };
@@ -348,7 +348,7 @@ function openForm(id, date, cli) {
     if (!n.nom) return O.toast('Indique le nom de la cliente');
     if (!n.date || !n.debut || !n.duree) return O.toast('Date, heure et durée obligatoires');
     if ($('fWarn').textContent && !confirm('Ce créneau chevauche un autre rendez-vous. Continuer ?')) return;
-    await saveRdv(n, id ? 'Modifié ✅' : 'Rendez-vous ajouté ✅'); closeSheet();
+    await saveRdv(n, id ? 'Modifié' : 'Rendez-vous ajouté'); closeSheet();
   });
 }
 
@@ -375,45 +375,45 @@ function vClientes() {
   const all = clients(), L = all.filter(c => !q || (c.nom + ' ' + c.tel).toLowerCase().includes(q.toLowerCase()));
   const old = all.filter(c => !c.next && c.last && O.diffDays(c.last, O.today()) > 35);
   return `<h1 class="brand">Clientes</h1><p class="mut">${all.length} cliente${all.length > 1 ? 's' : ''}</p>
-    <input id="q" placeholder="🔍 Rechercher" value="${E(q)}" style="margin:8px 0 14px">
-    ${old.length && !q ? `<div class="card" style="background:var(--warnbg);border-color:#f3dfb3"><b>💡 À relancer</b><div class="small">${old.length} cliente${old.length > 1 ? 's' : ''} sans RDV depuis plus de 5 semaines (remplissage à prévoir) : ${old.slice(0, 5).map(c => E(prenom(c.nom))).join(', ')}${old.length > 5 ? '…' : ''}</div></div>` : ''}
+    <input id="q" placeholder="Rechercher" value="${E(q)}" style="margin:8px 0 14px">
+    ${old.length && !q ? `<div class="card" style="border-color:var(--gold)"><b>À relancer</b><div class="small">${old.length} cliente${old.length > 1 ? 's' : ''} sans RDV depuis plus de 5 semaines (remplissage à prévoir) : ${old.slice(0, 5).map(c => E(prenom(c.nom))).join(', ')}${old.length > 5 ? '…' : ''}</div></div>` : ''}
     ${L.map(c => `<div class="card cli" onclick="openClient('${E(c.key)}')"><div class="av">${E(initiales(c.nom))}</div>
       <div class="grow"><div class="between"><b>${E(c.nom)}</b>${c.next ? `<span class="pill confirme">${O.fmtDay(c.next.date)}</span>` : ''}</div>
-      <div class="mut small">${c.visites} visite${c.visites > 1 ? 's' : ''}${c.last ? ' · dernière ' + O.fmtDate(c.last) : ''}${c.abs ? ' · ⚠️ ' + c.abs + ' absence' + (c.abs > 1 ? 's' : '') : ''}</div></div></div>`).join('') || '<div class="empty"><span class="e">👩</span>Aucune cliente pour le moment</div>'}`;
+      <div class="mut small">${c.visites} visite${c.visites > 1 ? 's' : ''}${c.last ? ' · dernière ' + O.fmtDate(c.last) : ''}${c.abs ? ' · ' + c.abs + ' absence' + (c.abs > 1 ? 's' : '') : ''}</div></div></div>`).join('') || '<div class="empty"><span class="e"></span>Aucune cliente pour le moment</div>'}`;
 }
 function openClient(key) {
   const c = clients().find(x => x.key === key); if (!c) return;
   const notes = (S.clientes[key] || {}).notes || '', ind = cfg().indicatif;
   sheet(`<div class="cli"><div class="av">${E(initiales(c.nom))}</div><div><h3 style="margin:0">${E(c.nom)}</h3><div class="mut small">${E(c.tel)}${c.email ? ' · ' + E(c.email) : ''}</div></div></div>
     <div class="grid3" style="margin:14px 0">${stat(c.visites, 'visites')}${stat(P(c.total), 'dépensé')}${stat(c.abs, 'absences')}</div>
-    <div class="grid3"><a class="btn light sm" href="tel:${O.normTel(c.tel)}">📞 Appeler</a><a class="btn light sm" target="_blank" href="${O.whatsapp(c.tel, 'Coucou ' + prenom(c.nom) + ' 💅 ', ind)}">💬 WhatsApp</a>
+    <div class="grid3"><a class="btn light sm" href="tel:${O.normTel(c.tel)}">Appeler</a><a class="btn light sm" target="_blank" href="${O.whatsapp(c.tel, 'Coucou ' + prenom(c.nom) + ' ', ind)}">WhatsApp</a>
       <button class="sm" id="cNew">+ RDV</button></div>
-    <h2>📝 Fiche</h2><textarea id="cNotes" placeholder="Allergies, forme préférée (amande, carrée…), longueur, couleurs aimées, anniversaire…">${E(notes)}</textarea>
+    <h2>Fiche</h2><textarea id="cNotes" placeholder="Allergies, forme préférée (amande, carrée…), longueur, couleurs aimées, anniversaire…">${E(notes)}</textarea>
     <button class="ghost full" style="margin-top:8px" id="cSave">Enregistrer la fiche</button>
-    <h2>Historique</h2><div class="card">${c.rdv.slice().reverse().map(r => `<div class="tl" onclick="A.open('${r.id}')"><div class="h">${O.parse(r.date).getDate()}<small>${O.MOIS_C[O.parse(r.date).getMonth()]}</small></div><div class="b ${r.statut}"></div><div class="grow"><div class="between"><span>${E(r.prestations)}</span>${pill(r.statut)}</div><div class="mut small">${O.parse(r.date).getFullYear()} · ${r.debut} · ${P(r.prix)}${r.notes ? ' · 📝 ' + E(r.notes) : ''}</div></div></div>`).join('')}</div>`);
+    <h2>Historique</h2><div class="card">${c.rdv.slice().reverse().map(r => `<div class="tl" onclick="A.open('${r.id}')"><div class="h">${O.parse(r.date).getDate()}<small>${O.MOIS_C[O.parse(r.date).getMonth()]}</small></div><div class="b ${r.statut}"></div><div class="grow"><div class="between"><span>${E(r.prestations)}</span>${pill(r.statut)}</div><div class="mut small">${O.parse(r.date).getFullYear()} · ${r.debut} · ${P(r.prix)}${r.notes ? ' · ' + E(r.notes) : ''}</div></div></div>`).join('')}</div>`);
   $('cNew').onclick = () => openForm(null, null, { nom: c.nom, tel: c.tel, email: c.email });
-  $('cSave').onclick = safe(async () => { S.clientes[key] = Object.assign({}, S.clientes[key], { notes: $('cNotes').value }); await api.call('saveClientes', { clientes: S.clientes }); O.toast('Fiche enregistrée ✅'); });
+  $('cSave').onclick = safe(async () => { S.clientes[key] = Object.assign({}, S.clientes[key], { notes: $('cNotes').value }); await api.call('saveClientes', { clientes: S.clientes }); O.toast('Fiche enregistrée'); });
 }
 
 /* ---------- Tâches ---------- */
-const SUGG = ['🧼 Désinfecter les outils', '🛒 Commander du gel', '📸 Photographier mes poses', '📱 Publier sur Instagram', '🧾 Faire la compta du mois', '🧴 Vérifier le stock de vernis', '🎓 M\'entraîner sur une nouvelle déco'];
+const SUGG = ['Désinfecter les outils', 'Commander du gel', 'Photographier mes poses', 'Publier sur Instagram', 'Faire la compta du mois', 'Vérifier le stock de vernis', 'M\'entraîner sur une nouvelle déco'];
 const REP = { '': 'Une fois', day: 'Chaque jour', week: 'Chaque semaine', month: 'Chaque mois' };
 function taskRow(t) {
   const late = !t.fait && t.date && t.date < O.today();
   return `<div class="task ${t.fait ? 'done' : ''}"><input type="checkbox" ${t.fait ? 'checked' : ''} onchange="A.task('${t.id}')" aria-label="Fait">
-    <div class="grow"><div class="t">${E(t.texte)}</div>${t.date || t.repeat ? `<div class="small ${late ? '' : 'mut'}" ${late ? 'style="color:var(--ko)"' : ''}>${t.date ? O.cap(O.fmtDay(t.date)) : ''}${t.repeat ? ' · 🔁 ' + REP[t.repeat].toLowerCase() : ''}</div>` : ''}</div>
+    <div class="grow"><div class="t">${E(t.texte)}</div>${t.date || t.repeat ? `<div class="small ${late ? '' : 'mut'}" ${late ? 'style="color:var(--ko)"' : ''}>${t.date ? O.cap(O.fmtDay(t.date)) : ''}${t.repeat ? ' · ' + REP[t.repeat].toLowerCase() : ''}</div>` : ''}</div>
     <button class="x" onclick="A.delTask('${t.id}')" aria-label="Supprimer">×</button></div>`;
 }
 function vTaches() {
   const t = O.today(), T = S.taches, open = T.filter(x => !x.fait);
-  const grp = [['🔥 En retard', open.filter(x => x.date && x.date < t)], ["Aujourd'hui", open.filter(x => x.date === t)], ['À venir', open.filter(x => x.date > t).sort((a, b) => a.date.localeCompare(b.date))], ['Quand j\'ai le temps', open.filter(x => !x.date)]];
+  const grp = [['En retard', open.filter(x => x.date && x.date < t)], ["Aujourd'hui", open.filter(x => x.date === t)], ['À venir', open.filter(x => x.date > t).sort((a, b) => a.date.localeCompare(b.date))], ['Quand j\'ai le temps', open.filter(x => !x.date)]];
   const done = T.filter(x => x.fait).slice(-15).reverse();
   return `<h1 class="brand">Tâches</h1>
     <div class="card"><input id="tTxt" placeholder="Nouvelle tâche…">
       <div class="grid2" style="margin-top:8px"><input id="tDate" type="date" value="${t}"><select id="tRep">${Object.entries(REP).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
       <button class="full" style="margin-top:8px" id="tAdd">Ajouter</button>
       <div class="chips" style="margin-top:10px">${SUGG.map(s => `<button class="chip small" data-s="${E(s)}">${E(s)}</button>`).join('')}</div></div>
-    ${grp.filter(g => g[1].length).map(([n, l]) => `<h2>${n}</h2><div class="card">${l.map(taskRow).join('')}</div>`).join('') || '<div class="empty"><span class="e">✨</span>Tout est fait !</div>'}
+    ${grp.filter(g => g[1].length).map(([n, l]) => `<h2>${n}</h2><div class="card">${l.map(taskRow).join('')}</div>`).join('') || '<div class="empty"><span class="e"></span>Tout est fait !</div>'}
     ${done.length ? `<h2>Faites</h2><div class="card">${done.map(taskRow).join('')}</div>` : ''}`;
 }
 function bindTaches() {
@@ -427,7 +427,7 @@ function bindTaches() {
 }
 
 /* ---------- Plus ---------- */
-const SUBS = { lien: ['🔗', 'Mon lien de réservation'], stats: ['📊', 'Statistiques'], presta: ['💅', 'Prestations & prix'], horaires: ['🕐', 'Horaires & congés'], salon: ['🏠', 'Mon salon'], resa: ['📝', 'Règles de réservation'], connexion: ['🔌', 'Connexion Google Sheet'] };
+const SUBS = { lien: ['', 'Mon lien de réservation'], stats: ['', 'Statistiques'], presta: ['', 'Prestations & prix'], horaires: ['', 'Horaires & congés'], salon: ['', 'Mon salon'], resa: ['', 'Règles de réservation'], connexion: ['', 'Connexion Google Sheet'] };
 function vPlus() {
   if (sub) return `<button class="light sm" onclick="sub=null;render()">‹ Retour</button><h1 class="brand" style="margin-top:12px">${SUBS[sub][1]}</h1>` + ({ lien: vLien, stats: vStats, presta: vPresta, horaires: vHoraires, salon: vSalon, resa: vResa, connexion: vConnexion })[sub]();
   return `<h1 class="brand">Plus</h1><div class="card menu">${Object.entries(SUBS).map(([k, [i, l]]) => `<div class="item" onclick="sub='${k}';render();scrollTo(0,0)"><span>${i}</span><span>${l}</span></div>`).join('')}</div>
@@ -437,7 +437,7 @@ function vLien() {
   const u = bookUrl(), long = u.includes('?api=');
   return `<div class="card"><p>Partage ce lien à tes clientes (bio Instagram, WhatsApp, story…) : elles choisissent leurs prestations et réservent seules.</p>
     <input readonly value="${E(u)}" id="lUrl" onclick="this.select()">
-    <div class="grid3" style="margin-top:10px"><button class="sm" onclick="navigator.clipboard.writeText('${E(u)}').then(()=>O.toast('Lien copié ✅'))">Copier</button>
+    <div class="grid3" style="margin-top:10px"><button class="sm" onclick="navigator.clipboard.writeText('${E(u)}').then(()=>O.toast('Lien copié'))">Copier</button>
     <button class="sm ghost" onclick="navigator.share?navigator.share({title:cfg().nom,text:'Prends rendez-vous 💅',url:'${E(u)}'}):O.toast('Partage non disponible')">Partager</button>
     <a class="btn sm light" href="${E(u)}" target="_blank">Ouvrir</a></div></div>
     ${api.demo ? '<div class="banner">Tu es en mode démo : ce lien ne fonctionnera pour tes clientes qu\'après la connexion à la Google Sheet.</div>' : ''}
@@ -458,12 +458,12 @@ function vStats() {
   const dur = {}; S.rdv.filter(r => r.statut === 'termine' && r.debutReel && r.finReel).forEach(r => { const d = O.toMin(r.finReel) - O.toMin(r.debutReel); if (d <= 0) return; const k = r.prestations; (dur[k] = dur[k] || { n: 0, s: 0, p: r.duree }).n++; dur[k].s += d; });
   const prev = O.ymd(new Date(y, m - 2, 1)).slice(0, 7), nxt = O.ymd(new Date(y, m, 1)).slice(0, 7);
   return `<div class="between" style="margin:12px 0"><button class="light icon" onclick="statMonth='${prev}';render()">‹</button><b>${O.cap(O.MOIS[m - 1])} ${y}</b><button class="light icon" onclick="statMonth='${nxt}';render()">›</button></div>
-    <div class="grid2">${stat(P(enc), '💰 encaissé')}${stat(P(real), '💅 réalisé')}${stat(ok.length, 'RDV terminés')}${stat(P(prevu.reduce((a, r) => a + r.prix, 0)), '📅 encore prévu')}
-      ${stat(ok.length ? P(Math.round(real / ok.length)) : '–', 'panier moyen')}${stat(nouv, '🌸 nouvelles clientes')}
-      ${stat(abs.length, '🚫 absences')}${stat(ann.length, 'annulations')}</div>
+    <div class="grid2">${stat(P(enc), 'encaissé')}${stat(P(real), 'réalisé')}${stat(ok.length, 'RDV terminés')}${stat(P(prevu.reduce((a, r) => a + r.prix, 0)), 'encore prévu')}
+      ${stat(ok.length ? P(Math.round(real / ok.length)) : '–', 'panier moyen')}${stat(nouv, 'nouvelles clientes')}
+      ${stat(abs.length, 'absences')}${stat(ann.length, 'annulations')}</div>
     <h2>Prestations les plus demandées</h2><div class="card">${topL.map(([n, c]) => `<div style="margin:6px 0"><div class="between small"><span>${E(n)}</span><b>${c}</b></div><div class="hbar" style="width:${c / mx * 100}%"></div></div>`).join('') || '<div class="mut">Pas encore de données</div>'}</div>
-    <h2>Moyens de paiement</h2><div class="card">${Object.entries(modes).map(([k, v]) => `<div class="lrow"><span>${({ especes: '💵 Espèces', twint: '📱 TWINT', carte: '💳 Carte', virement: '🏦 Virement' })[k] || 'Autre'}</span><b>${P(v)}</b></div>`).join('') || '<div class="mut">Aucun paiement noté</div>'}</div>
-    <h2>⏱ Durée réelle vs prévue</h2><div class="card">${Object.entries(dur).map(([k, v]) => { const moy = Math.round(v.s / v.n), d = moy - v.p; return `<div class="lrow"><div><div>${E(k)}</div><div class="mut small">prévu ${O.fmtDur(v.p)} · ${v.n} fois</div></div><div style="text-align:right"><b>${O.fmtDur(moy)}</b><div class="small" style="color:${d > 10 ? 'var(--ko)' : 'var(--ok)'}">${d > 10 ? '+' + O.fmtDur(d) + ' : rallonge la durée' : d < -10 ? 'plus rapide 🎉' : 'parfait ✓'}</div></div></div>`; }).join('') || '<div class="mut small">Utilise ▶️ Commencer / ✅ Terminer pendant tes poses : l\'app calcule ton vrai temps et te dit s\'il faut rallonger tes créneaux.</div>'}</div>
+    <h2>Moyens de paiement</h2><div class="card">${Object.entries(modes).map(([k, v]) => `<div class="lrow"><span>${({ especes: 'Espèces', twint: 'TWINT', carte: 'Carte', virement: 'Virement' })[k] || 'Autre'}</span><b>${P(v)}</b></div>`).join('') || '<div class="mut">Aucun paiement noté</div>'}</div>
+    <h2>Durée réelle vs prévue</h2><div class="card">${Object.entries(dur).map(([k, v]) => { const moy = Math.round(v.s / v.n), d = moy - v.p; return `<div class="lrow"><div><div>${E(k)}</div><div class="mut small">prévu ${O.fmtDur(v.p)} · ${v.n} fois</div></div><div style="text-align:right"><b>${O.fmtDur(moy)}</b><div class="small" style="color:${d > 10 ? 'var(--ko)' : 'var(--ok)'}">${d > 10 ? '+' + O.fmtDur(d) + ' : rallonge la durée' : d < -10 ? 'plus rapide' : 'parfait ✓'}</div></div></div>`; }).join('') || '<div class="mut small">Utilise Commencer / Terminer pendant tes poses : l\'app calcule ton vrai temps et te dit s\'il faut rallonger tes créneaux.</div>'}</div>
     <button class="light full" onclick="csv('${mo}')">⬇️ Exporter le mois (Excel / CSV)</button>`;
 }
 function csv(mo) {
@@ -512,7 +512,7 @@ function vHoraires() {
         <div class="mut small">2e ligne = après la pause (laisser vide si pas de pause)</div></div>
       <div class="mut hF ${p.length ? 'hide' : ''}">Fermé</div></div>`; }).join('')}
     <button class="full" id="hSave" style="margin-top:12px">Enregistrer les horaires</button></div>
-    <h2>🏖 Congés & jours fermés</h2>
+    <h2>Congés & jours fermés</h2>
     <div class="card">${F.map(f => `<div class="between task"><div>${O.cap(O.fmtDate(f.du))}${f.au && f.au !== f.du ? ' → ' + O.fmtDate(f.au) : ''}<div class="mut small">${E(f.motif || '')}</div></div><button class="x" onclick="delFerm('${f.du}','${f.au || ''}')">×</button></div>`).join('') || '<div class="mut">Aucun congé prévu</div>'}
       <div class="grid2" style="margin-top:10px"><div><label for="fDu">Du</label><input type="date" id="fDu"></div><div><label for="fAu">Au</label><input type="date" id="fAu"></div></div>
       <input id="fMot" placeholder="Motif (vacances, formation…)" style="margin-top:8px"><button class="ghost full" style="margin-top:8px" id="fAdd">+ Ajouter</button></div>`;
@@ -526,17 +526,17 @@ function bindHoraires() {
       if (r.querySelector('.hOn').checked) {
         if (v('.h1') && v('.h2')) p.push([v('.h1'), v('.h2')]);
         if (v('.h3') && v('.h4')) p.push([v('.h3'), v('.h4')]);
-        if (p.some(([a, b]) => a >= b)) return O.toast('⚠️ ' + O.cap(O.JOURS[d]) + ' : l\'heure de fin doit être après le début');
+        if (p.some(([a, b]) => a >= b)) return O.toast('' + O.cap(O.JOURS[d]) + ' : l\'heure de fin doit être après le début');
       }
       H[d] = p;
     }
-    S.config.horaires = H; await saveCfg('Horaires enregistrés ✅');
+    S.config.horaires = H; await saveCfg('Horaires enregistrés');
   });
   $('fAdd').onclick = safe(async () => {
     const du = $('fDu').value, au = $('fAu').value || du;
     if (!du) return O.toast('Choisis au moins la date de début');
     S.config.fermetures = (S.config.fermetures || []).concat([{ du, au: au < du ? du : au, motif: $('fMot').value.trim() }]).sort((a, b) => a.du.localeCompare(b.du));
-    await saveCfg('Congé ajouté ✅');
+    await saveCfg('Congé ajouté');
   });
 }
 const delFerm = safe(async (du, au) => { S.config.fermetures = S.config.fermetures.filter(f => !(f.du === du && (f.au || '') === au)); await saveCfg('Supprimé'); });
@@ -585,7 +585,7 @@ function bindPlus() {
     const test = new O.Api(u, t);
     if (u) { await test.call('ping'); }
     localStorage.setItem('ongles-url', u); localStorage.setItem('ongles-token', t);
-    initApi(); await load(); O.toast(u ? 'Connexion OK ✅' : 'Mode démo'); sub = null; go('jour');
+    initApi(); await load(); O.toast(u ? 'Connexion OK' : 'Mode démo'); sub = null; go('jour');
   });
   b('kReset', async () => { if (!confirm('Effacer les données de démo ?')) return; O.Demo.reset(); await load(); O.toast('Démo réinitialisée'); go('jour'); });
   b('kDemo', async () => { if (!confirm('Revenir au mode démo ? (tes vraies données restent dans la Google Sheet)')) return; localStorage.removeItem('ongles-url'); initApi(); await load(); go('jour'); });
@@ -606,7 +606,7 @@ function render() {
   if (tab === 'clientes') { const i = $('q'); i.oninput = () => { q = i.value; const p = i.selectionStart; render(); const n = $('q'); n.focus(); n.setSelectionRange(p, p); }; }
 }
 function go(t) { tab = t; if (t !== 'plus') sub = null; render(); scrollTo(0, 0); }
-const refresh = safe(async silent => { await load(); render(); if (silent !== true) O.toast('À jour ✅', 1200); });
+const refresh = safe(async silent => { await load(); render(); if (silent !== true) O.toast('À jour', 1200); });
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => go(b.dataset.t));
 $('fab').onclick = () => openForm(null, tab === 'agenda' && weekStart && weekStart > O.today() ? weekStart : O.today());
 
@@ -617,7 +617,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 (async () => {
   initApi();
   try { await load(); render(); }
-  catch (e) { $('view').innerHTML = `<div class="card">😕 ${E(e.message)}</div><button class="full" onclick="localStorage.removeItem('ongles-url');location.reload()">Passer en mode démo</button>`; }
+  catch (e) { $('view').innerHTML = `<div class="card">${E(e.message)}</div><button class="full" onclick="localStorage.removeItem('ongles-url');location.reload()">Passer en mode démo</button>`; }
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
 })();
 </script>

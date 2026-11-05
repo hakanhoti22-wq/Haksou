@@ -3,51 +3,51 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#fbf4f1">
-<title>Prendre rendez-vous 💅</title>
+<meta name="theme-color" content="#f4eee5">
+<title>Prendre rendez-vous</title>
 <link rel="icon" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="stylesheet" href="style.css">
 <style>
 body{padding:calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 110px);max-width:620px;margin:0 auto}
 header{text-align:center;padding:14px 0 6px}
-header .logo{width:64px;height:64px;border-radius:20px;display:block;margin:0 auto 10px;box-shadow:var(--sh)}
-header h1{font-size:28px}
+header .logo{width:56px;height:56px;border-radius:50%;display:block;margin:0 auto 14px}
+header h1{font-size:32px}
 .infos{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:14px}
-.infos a{text-decoration:none;font-weight:600}
+.infos a{text-decoration:none;color:var(--mut);letter-spacing:.02em}
 .steps{display:flex;gap:6px;margin:18px 0 8px}
-.steps div{flex:1;text-align:center;font-size:12px;font-weight:700;color:var(--mut);padding-bottom:6px;border-bottom:3px solid var(--line)}
-.steps div.on{color:var(--pri2);border-color:var(--pri)}
+.steps div{flex:1;text-align:center;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.14em;color:var(--mut);padding-bottom:8px;border-bottom:1px solid var(--line)}
+.steps div.on{color:var(--pri2);border-color:var(--pri);border-bottom-width:2px}
 .srv{display:flex;gap:12px;align-items:flex-start;cursor:pointer;transition:border-color .15s,background .15s}
-.srv.on{border-color:var(--pri);background:#fff7f9;box-shadow:0 0 0 2px var(--soft)}
-.srv .tick{width:26px;height:26px;border-radius:50%;border:2px solid var(--line);flex:none;display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;margin-top:2px}
+.srv.on{border-color:var(--pri);background:#fffdf9}
+.srv .tick{width:22px;height:22px;border-radius:50%;border:1px solid var(--mut);flex:none;display:flex;align-items:center;justify-content:center;color:#f7f1e8;font-size:12px;margin-top:3px}
 .srv.on .tick{background:var(--pri);border-color:var(--pri)}
-.srv .prix{font-weight:700;white-space:nowrap}
-.bar{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(env(safe-area-inset-bottom) + 12px);background:rgba(251,244,241,.96);backdrop-filter:blur(8px);border-top:1px solid var(--line);z-index:50}
+.srv .prix{font-family:var(--serif);font-size:17px;white-space:nowrap}
+.bar{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(env(safe-area-inset-bottom) + 12px);background:rgba(244,238,229,.95);backdrop-filter:blur(10px);border-top:1px solid var(--line);z-index:50}
 .bar .in{max-width:620px;margin:0 auto;display:flex;gap:12px;align-items:center}
-.day{display:flex;flex-direction:column;align-items:center;width:62px;padding:8px 0}
-.day small{font-size:11px;text-transform:uppercase;letter-spacing:.04em;opacity:.8}
-.day b{font-size:20px}
+.day{display:flex;flex-direction:column;align-items:center;width:60px;padding:10px 0;border-radius:var(--r)}
+.day small{font-size:10px;text-transform:uppercase;letter-spacing:.12em;opacity:.75}
+.day b{font-size:22px;font-family:var(--serif);font-weight:400}
 .day:disabled{opacity:.35}
 .slots{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-.slot{background:#fff;color:var(--txt);border:1px solid var(--line);min-height:44px;padding:8px 0}
-.slot.on{background:var(--pri);color:#fff;border-color:var(--pri)}
+.slot{background:transparent;color:var(--txt);border:1px solid var(--line);min-height:44px;padding:8px 0;font-size:15px;letter-spacing:.04em;font-weight:500}
+.slot.on{background:var(--pri);color:#f7f1e8;border-color:var(--pri)}
 .recap div{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px dashed var(--line)}
 .recap div:last-child{border:0}
-.big-ok{font-size:52px;text-align:center;margin:6px 0}
+.big-ok{font-size:34px;text-align:center;margin:6px 0;color:var(--gold)}
 </style>
 </head>
 <body>
-<div id="demo" class="banner hide">🧪 <b>Mode démo</b> : les réservations sont enregistrées seulement dans ce navigateur.</div>
+<div id="demo" class="banner hide"><b>Mode démo</b> : les réservations sont enregistrées seulement dans ce navigateur.</div>
 
 <header>
   <img class="logo" src="icon.svg" alt="">
   <h1 class="brand" id="nom">…</h1>
-  <div class="mut" id="slogan"></div>
+  <div class="rule"></div><div class="mut" id="slogan"></div>
   <div class="infos" id="infos"></div>
 </header>
 
-<div id="loading" class="empty"><span class="e">💅</span>Chargement…</div>
+<div id="loading" class="empty">Chargement…</div>
 <div id="err" class="card hide" style="border-color:var(--ko)"></div>
 
 <main id="app" class="hide">
@@ -109,9 +109,9 @@ function header() {
   $('nom').textContent = c.nom; $('slogan').textContent = c.slogan || '';
   const ig = String(c.instagram || '').replace(/^@/, '');
   $('infos').innerHTML = [
-    c.adresse && `<a href="https://maps.google.com/?q=${encodeURIComponent(c.adresse)}" target="_blank">📍 ${O.esc(c.adresse)}</a>`,
-    ig && `<a href="https://instagram.com/${encodeURIComponent(ig)}" target="_blank">📸 @${O.esc(ig)}</a>`,
-    c.telephone && `<a href="tel:${O.normTel(c.telephone)}">📞 ${O.esc(c.telephone)}</a>`
+    c.adresse && `<a href="https://maps.google.com/?q=${encodeURIComponent(c.adresse)}" target="_blank">${O.esc(c.adresse)}</a>`,
+    ig && `<a href="https://instagram.com/${encodeURIComponent(ig)}" target="_blank">@${O.esc(ig)}</a>`,
+    c.telephone && `<a href="tel:${O.normTel(c.telephone)}">${O.esc(c.telephone)}</a>`
   ].filter(Boolean).join('');
 }
 
@@ -123,7 +123,7 @@ function renderServices() {
       <div class="tick">${sel.includes(s.id) ? '✓' : ''}</div>
       <div class="grow">
         <div class="between"><b>${O.esc(s.nom)}</b><span class="prix">${O.fmtPrix(s.prix, cfg())}</span></div>
-        <div class="mut">⏱ ${O.fmtDur(s.duree)}${s.description ? ' · ' + O.esc(s.description) : ''}</div>
+        <div class="mut">${O.fmtDur(s.duree)}${s.description ? ' · ' + O.esc(s.description) : ''}</div>
       </div>
     </div>`).join('')).join('') || '<div class="empty">Aucune prestation pour le moment.</div>';
   document.querySelectorAll('.srv').forEach(el => el.onclick = () => {
@@ -152,7 +152,7 @@ function renderDays() {
 }
 
 function renderSlots() {
-  if (!date) { $('slotBox').innerHTML = '<div class="card empty"><span class="e">😔</span>Plus aucun créneau disponible pour cette durée. Contacte-moi directement !</div>'; return; }
+  if (!date) { $('slotBox').innerHTML = '<div class="card empty"><span class="e"></span>Plus aucun créneau disponible pour cette durée. Contacte-moi directement !</div>'; return; }
   const s = slotsFor(date);
   const grp = [['Matin', s.filter(t => t < '12:00')], ['Après-midi', s.filter(t => t >= '12:00' && t < '18:00')], ['Soir', s.filter(t => t >= '18:00')]].filter(g => g[1].length);
   $('slotBox').innerHTML = `<h2>${O.cap(O.fmtDate(date))}</h2>` + grp.map(([n, l]) => `<div class="mut small" style="margin:10px 0 6px">${n}</div><div class="slots">${l.map(t => `<button class="slot ${t === heure ? 'on' : ''}" data-t="${t}">${t}</button>`).join('')}</div>`).join('');
@@ -162,7 +162,7 @@ function renderSlots() {
 function recap() {
   const c = cfg();
   $('recap').innerHTML = `<h3>Ton rendez-vous</h3>
-    <div><span>📅 ${O.cap(O.fmtDate(date))}</span><b>${heure} – ${O.toHM(O.toMin(heure) + duree())}</b></div>
+    <div><span>${O.cap(O.fmtDate(date))}</span><b>${heure} – ${O.toHM(O.toMin(heure) + duree())}</b></div>
     ${chosen().map(s => `<div><span>${O.esc(s.nom)}</span><span>${O.fmtPrix(s.prix, c)}</span></div>`).join('')}
     <div><span>Total · ${O.fmtDur(duree())}</span><b>${O.fmtPrix(prix(), c)}</b></div>`;
   $('msgBox').innerHTML = c.message ? 'ℹ️ ' + O.esc(c.message) : '';
@@ -175,7 +175,7 @@ function bar() {
   $('back').classList.toggle('hide', step === 1);
   if (step === 1) {
     $('barTxt').textContent = n + ' prestation' + (n > 1 ? 's' : '') + ' · ' + O.fmtPrix(prix(), cfg());
-    $('barSub').textContent = '⏱ ' + O.fmtDur(duree());
+    $('barSub').textContent = '' + O.fmtDur(duree());
     $('next').textContent = 'Choisir la date'; $('next').disabled = !n;
   } else if (step === 2) {
     $('barTxt').textContent = heure ? O.cap(O.fmtDay(date)) + ' à ' + heure : 'Choisis un horaire';
@@ -184,7 +184,7 @@ function bar() {
   } else {
     $('barTxt').textContent = O.fmtPrix(prix(), cfg());
     $('barSub').textContent = 'Paiement sur place';
-    $('next').textContent = 'Réserver ✨'; $('next').disabled = false;
+    $('next').textContent = 'Réserver'; $('next').disabled = false;
   }
 }
 
@@ -201,7 +201,7 @@ $('back').onclick = () => go(step - 1);
 $('next').onclick = async () => {
   if (step < 3) return go(step + 1);
   const nom = $('fNom').value.trim(), tel = $('fTel').value.trim();
-  if (!nom) return O.toast('Indique ton prénom et ton nom 🙂');
+  if (!nom) return O.toast('Indique ton prénom et ton nom');
   if (O.normTel(tel).length < 8) return O.toast('Indique un numéro de téléphone valide');
   if (cfg().message && !$('fOk').checked) return O.toast('Coche la case « J\'ai lu les informations »');
   $('next').disabled = true; $('next').textContent = 'Envoi…';
@@ -222,17 +222,17 @@ function done(r) {
   const att = r.statut === 'attente', c = cfg();
   $('done').classList.remove('hide');
   $('done').innerHTML = `<div class="card center">
-      <div class="big-ok">${att ? '⏳' : '🎉'}</div>
+      <div class="big-ok">${att ? '◷' : '✦'}</div>
       <h3>${att ? 'Demande envoyée !' : 'Rendez-vous confirmé !'}</h3>
-      <p class="mut">${att ? 'Je te confirme ton rendez-vous très vite.' : 'Merci ' + O.esc(r.nom.split(' ')[0]) + ', à bientôt 💕'}</p>
+      <p class="mut">${att ? 'Je te confirme ton rendez-vous très vite.' : 'Merci ' + O.esc(r.nom.split(' ')[0]) + ', à bientôt'}</p>
     </div>
     <div class="card recap">
-      <div><span>📅 ${O.cap(O.fmtDate(r.date))}</span><b>${r.debut} – ${r.fin}</b></div>
+      <div><span>${O.cap(O.fmtDate(r.date))}</span><b>${r.debut} – ${r.fin}</b></div>
       <div><span>${O.esc(r.prestations)}</span><b>${O.fmtPrix(r.prix, c)}</b></div>
-      ${c.adresse ? `<div><span>📍 ${O.esc(c.adresse)}</span></div>` : ''}
+      ${c.adresse ? `<div><span>${O.esc(c.adresse)}</span></div>` : ''}
       <div><span>Code de réservation</span><b style="letter-spacing:.1em">${r.code}</b></div>
     </div>
-    <button class="full" id="ics">📆 Ajouter à mon agenda</button>
+    <button class="full" id="ics">Ajouter à mon agenda</button>
     <p class="mut small center" style="margin-top:14px">Pour annuler : <a href="?code=${r.code}">${O.esc(location.host + location.pathname)}?code=${r.code}</a></p>
     <button class="light full" style="margin-top:8px" onclick="location.href=location.pathname">Prendre un autre rendez-vous</button>`;
   $('ics').onclick = () => O.download('rendez-vous-ongles.ics', O.ics(r, c));
@@ -247,7 +247,7 @@ async function manage(code) {
     D = { config: O.withDefaults(j.config) }; header();
     const r = j.rdv, c = cfg(), ann = r.statut === 'annule';
     m.innerHTML = `<h2>Mon rendez-vous</h2><div class="card recap">
-        <div><span>📅 ${O.cap(O.fmtDate(r.date))}</span><b>${r.debut} – ${r.fin}</b></div>
+        <div><span>${O.cap(O.fmtDate(r.date))}</span><b>${r.debut} – ${r.fin}</b></div>
         <div><span>${O.esc(r.prestations)}</span><b>${O.fmtPrix(r.prix, c)}</b></div>
         <div><span>Statut</span><span class="pill ${r.statut}">${O.STATUTS[r.statut] || r.statut}</span></div>
       </div>
@@ -260,7 +260,7 @@ async function manage(code) {
       b.disabled = true;
       try { await api.call('cancel', { code }); O.toast('Rendez-vous annulé'); manage(code); } catch (e) { O.toast(e.message, 4000); b.disabled = false; }
     };
-  } catch (e) { m.innerHTML = `<div class="card">😕 ${O.esc(e.message)}</div><button class="full" onclick="location.href=location.pathname">Prendre un rendez-vous</button>`; }
+  } catch (e) { m.innerHTML = `<div class="card">${O.esc(e.message)}</div><button class="full" onclick="location.href=location.pathname">Prendre un rendez-vous</button>`; }
 }
 
 async function load() {
@@ -277,7 +277,7 @@ async function load() {
     $('loading').classList.add('hide'); $('app').classList.remove('hide'); go(1);
   } catch (e) {
     $('loading').classList.add('hide');
-    $('err').classList.remove('hide'); $('err').innerHTML = '😕 Impossible de charger les disponibilités.<br><span class="mut">' + O.esc(e.message) + '</span>';
+    $('err').classList.remove('hide'); $('err').innerHTML = 'Impossible de charger les disponibilités.<br><span class="mut">' + O.esc(e.message) + '</span>';
   }
 })();
 </script>
