@@ -32,7 +32,7 @@ button{font:inherit;border:0;border-radius:12px;padding:14px;font-weight:600;col
 button.in{background:var(--ok);color:#06240f}
 button.out{background:var(--ko);color:#2a1100}
 button.pro{background:var(--pro);color:#1d1240}
-button.sm{padding:8px 12px;width:auto;font-size:14px}
+button.sm{padding:8px 12px;width:auto;font-size:14px;min-height:36px}
 button.on{outline:2px solid var(--acc)}
 button:disabled{opacity:.4}
 input{font:inherit;width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:#0e1626;color:var(--txt)}
@@ -60,6 +60,26 @@ select{font:inherit;width:100%;padding:12px;border-radius:10px;border:1px solid 
 #monthNav .t{text-align:center;flex:1}
 #monthNav .t b{display:block;text-transform:capitalize}
 #printArea{display:none}
+.seg{display:flex;background:#0e1626;border:1px solid var(--line);border-radius:12px;padding:3px;margin:10px 0 4px}
+.seg button{background:none;padding:9px;font-size:15px;color:var(--mut)}
+.seg button.on{background:#24324d;color:var(--txt)}
+.abs{color:var(--acc)}
+.chk{display:flex;align-items:center;gap:10px;margin-top:12px;color:var(--txt);font-size:15px}
+.chk input{width:22px;height:22px;accent-color:var(--acc)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.tiles .card{margin:0}
+.tiles .num{font-size:22px}
+#chart{width:100%;height:auto;display:block;margin-top:6px;touch-action:pan-y}
+#chart .bar{cursor:pointer}
+#chartRead{min-height:20px;font-size:14px;margin-top:6px;font-variant-numeric:tabular-nums}
+.absList{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.absList span{background:#0e1626;border:1px solid var(--line);border-radius:99px;padding:5px 11px;font-size:14px}
+#ptr{position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 6px);transform:translate(-50%,-60px);background:#1e293b;border:1px solid var(--line);border-radius:99px;padding:7px 14px;font-size:14px;z-index:1002;transition:transform .2s;pointer-events:none}
+#ptr.show{transform:translate(-50%,0)}
+.spin{display:inline-block;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.sync{font-size:12px;color:var(--mut);margin-top:6px}
+.x{min-width:36px;min-height:32px}
 @media print{
   @page{margin:14mm}
   body{background:#fff!important;color:#000!important;padding:0!important}
@@ -109,6 +129,7 @@ ol{padding-left:20px;margin:6px 0}li{margin:5px 0}
 
   <div class="card">
     <div class="status"><div class="dot" id="dot"></div><div><div class="big" id="stTxt">…</div><div class="mut" id="stSub"></div></div></div>
+    <div class="sync" id="syncTxt"></div>
   </div>
   <div class="grid">
     <div class="card"><div class="mut">Aujourd’hui</div><div class="num" id="today">–</div></div>
@@ -135,6 +156,27 @@ ol{padding-left:20px;margin:6px 0}li{margin:5px 0}
   <div id="monthNav"><button class="sm" id="mPrev">‹</button><div class="t"><b id="mTitle"></b><span class="mut" id="mTotal"></span></div><button class="sm" id="mNext">›</button></div>
   <div class="card" id="hist" style="margin-top:10px"></div>
   <div id="selBar" hidden><button class="sm" id="bSelAll" style="flex:1">Tout</button><button class="out" id="bSelDel" style="flex:2;padding:10px">Supprimer (0)</button><button class="sm" id="bSelCancel" style="flex:1">Annuler</button></div>
+</section>
+
+<!-- ============ STATISTIQUES ============ -->
+<section id="t-stats" hidden>
+  <h2 style="margin-top:4px">30 derniers jours</h2>
+  <div class="tiles">
+    <div class="card"><div class="mut">Moyenne par jour travaillé</div><div class="num" id="sAvg">–</div></div>
+    <div class="card"><div class="mut">Jours travaillés</div><div class="num" id="sDays">–</div></div>
+    <div class="card"><div class="mut">Arrivée moyenne</div><div class="num" id="sIn">–</div></div>
+    <div class="card"><div class="mut">Départ moyen</div><div class="num" id="sOut">–</div></div>
+    <div class="card"><div class="mut">Sorties pro</div><div class="num" id="sPro">–</div></div>
+    <div class="card"><div class="mut">Plus longue journée</div><div class="num" id="sMax">–</div></div>
+  </div>
+  <h2>Heures par semaine</h2>
+  <div class="card">
+    <div class="mut" id="chartSub"></div>
+    <svg id="chart" viewBox="0 0 340 190" role="img" aria-label="Heures travaillées par semaine, 10 dernières semaines"></svg>
+    <div id="chartRead" class="mut">Touche une barre pour voir le détail.</div>
+  </div>
+  <h2>Absences cette année</h2>
+  <div class="card"><div class="absList" id="sAbs"></div></div>
 </section>
 
 <!-- ============ RÉGLAGES ============ -->
@@ -224,12 +266,27 @@ ol{padding-left:20px;margin:6px 0}li{margin:5px 0}
 <div id="editBox" hidden>
   <div class="card">
     <div class="big" id="edTitle" style="font-size:20px">Modifier le pointage</div>
-    <div class="grid">
-      <div><label>Date</label><input type="date" id="edDate"></div>
-      <div><label>Heure</label><input type="time" id="edTime"></div>
+    <div class="seg" id="edMode"><button data-m="p" class="on">Pointage</button><button data-m="a">Absence</button></div>
+    <div id="edP">
+      <div class="grid">
+        <div><label>Date</label><input type="date" id="edDate"></div>
+        <div><label>Heure</label><input type="time" id="edTime"></div>
+      </div>
+      <label>Type</label>
+      <select id="edType"><option value="in">Arrivée</option><option value="out">Départ</option><option value="pro">Sortie pro</option><option value="back">Retour</option></select>
     </div>
-    <label>Type</label>
-    <select id="edType"><option value="in">Arrivée</option><option value="out">Départ</option><option value="pro">Sortie pro</option><option value="back">Retour</option></select>
+    <div id="edA" hidden>
+      <label>Motif</label>
+      <select id="abType"><option value="conge">🏖 Congé</option><option value="maladie">🤒 Maladie</option><option value="ferie">🎉 Férié</option><option value="formation">🎓 Formation</option></select>
+      <div class="grid">
+        <div><label id="abFromL">Du</label><input type="date" id="abFrom"></div>
+        <div id="abToW"><label>Au</label><input type="date" id="abTo"></div>
+      </div>
+      <label>Durée par jour</label>
+      <select id="abDur"><option value="1">Journée entière</option><option value="0.5">Demi-journée</option><option value="x">Autre…</option></select>
+      <input type="number" id="abHours" min="0.25" max="24" step="0.25" inputmode="decimal" placeholder="Heures, ex. 2.5" style="margin-top:8px" hidden>
+      <label class="chk" id="abWeW"><input type="checkbox" id="abWe" checked> Ignorer les samedis et dimanches</label>
+    </div>
     <div class="grid" style="margin-top:14px"><button id="edCancel">Annuler</button><button class="in" id="edSave">Enregistrer</button></div>
     <button class="x" id="edDel" style="width:100%;margin-top:12px;color:var(--ko)">Supprimer ce pointage</button>
   </div>
@@ -240,9 +297,11 @@ ol{padding-left:20px;margin:6px 0}li{margin:5px 0}
 <nav>
   <button data-tab="home" class="cur">Pointage</button>
   <button data-tab="hist">Historique</button>
+  <button data-tab="stats">Stats</button>
   <button data-tab="set">Réglages</button>
 </nav>
 <div class="toast" id="toast"></div>
+<div id="ptr">↓ Tire pour actualiser</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
@@ -306,15 +365,21 @@ function apiUrl(params) {
   return u.toString();
 }
 async function api(params) {
-  if (!cfg.url) throw new Error('URL non configurée');
-  const r = await fetch(apiUrl(params), { redirect: 'follow' });
-  const j = await r.json();
-  if (!j.ok) throw new Error(j.error || 'Erreur serveur');
+  if (!cfg.url) throw new Error('Google Sheet pas encore configurée (onglet Réglages)');
+  let r, j;
+  try { r = await fetch(apiUrl(params), { redirect: 'follow' }); }
+  catch { throw new Error(navigator.onLine === false ? 'Pas de connexion internet' : 'Google ne répond pas, réessaie dans un instant'); }
+  try { j = await r.json(); }
+  catch { throw new Error('Adresse du script incorrecte, ou script pas déployé avec l’accès « Tout le monde »'); }
+  if (!j.ok) throw new Error(j.error === 'Token invalide' ? 'Mot de passe incorrect : il doit être identique dans Réglages et dans le script' : (j.error || 'Erreur du script'));
   return j;
 }
 
 /* ---------- état et sessions ---------- */
-const lastEv = () => events[events.length - 1];
+const isAbs = e => e.a === 'abs';
+const ABSL = { conge: ['Congé', '🏖'], maladie: ['Maladie', '🤒'], ferie: ['Férié', '🎉'], formation: ['Formation', '🎓'] };
+const dayH = () => (+cfg.weekH || 42) / 5; // une journée = objectif hebdo / 5
+const lastEv = () => { const lim = Date.now() + 12e4; for (let i = events.length - 1; i >= 0; i--) { const e = events[i]; if (!isAbs(e) && new Date(e.t) <= lim) return e; } };
 function status() { // out | in | pro | pending
   const l = lastEv();
   if (!l || l.a === 'out') return 'out';
@@ -323,6 +388,7 @@ function status() { // out | in | pro | pending
 function sessions() { // temps de travail : arrivée → départ (les sorties pro comptent)
   const out = []; let open = null;
   for (const e of events) {
+    if (isAbs(e)) continue;
     const t = new Date(e.t);
     if ((e.a === 'in' || e.a === 'back') && !open) open = t;
     else if (e.a === 'out' && open) { out.push({ s: open, e: t }); open = null; }
@@ -331,6 +397,15 @@ function sessions() { // temps de travail : arrivée → départ (les sorties pr
   }
   if (open) out.push({ s: open, e: null });
   return out;
+}
+
+// Par jour : pointages + absences, temps travaillé (ms), absences (ms), total.
+function dayMap() {
+  const by = {}, get = k => by[k] = by[k] || { ev: [], ms: 0, absMs: 0 };
+  for (const e of events) { const d = get(dayKey(new Date(e.t))); d.ev.push(e); if (isAbs(e)) d.absMs += (e.hours || 0) * 36e5; }
+  for (const s of sessions()) get(dayKey(s.s)).ms += (s.e || new Date()) - s.s;
+  for (const k in by) by[k].tot = by[k].ms + by[k].absMs;
+  return by;
 }
 
 /* ---------- rendu ---------- */
@@ -349,28 +424,28 @@ function render() {
 
   const today = dayKey(now), monday = new Date(now);
   monday.setHours(0, 0, 0, 0); monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
-  let tT = 0, wT = 0;
-  for (const s of ss) { const ms = (s.e || now) - s.s; if (dayKey(s.s) === today) tT += ms; if (s.s >= monday) wT += ms; }
+  let tT = 0, wT = 0; const by = dayMap(), mk = dayKey(monday);
+  for (const k in by) { if (k === today) tT = by[k].tot; if (k >= mk && k <= today) wT += by[k].tot; }
   $('#today').textContent = dur(tT); $('#week').textContent = dur(wT);
   const goal = (+cfg.weekH || 42) * 36e5, pct = Math.min(100, wT / goal * 100);
   $('#weekBar').firstChild.style.width = pct + '%'; $('#weekBar').classList.toggle('over', wT >= goal);
   $('#weekGoal').textContent = wT >= goal ? `objectif ${cfg.weekH || 42} h atteint · +${dur(wT - goal)}` : `sur ${cfg.weekH || 42} h · reste ${dur(goal - wT)}`;
   $('#hoursTxt').textContent = `Plage horaire : ${cfg.start} – ${cfg.end}. Une sortie pendant cette plage demande si le trajet est professionnel.`;
   $('#pending').textContent = queue.length ? `${queue.length} action(s) en attente d’envoi (hors-ligne)` : '';
-  renderHist(); renderUrls();
+  const ls = LS.get('pm_sync', 0);
+  $('#syncTxt').textContent = !cfg.url ? '' : syncErr ? '⚠️ ' + syncErr : ls ? 'Synchronisé ' + whenTxt(new Date(ls)).replace(/^(\d\d:\d\d)$/, 'à $1') : '';
+  renderHist(); renderUrls(); if (!$('#t-stats').hidden) renderStats();
 }
 const whenTxt = d => (dayKey(d) === dayKey(new Date()) ? '' : d.toLocaleDateString('fr-CH') + ' ') + hm(d);
 
 const EVL = { in: ['Arrivée', '#22c55e'], back: ['Retour', '#22c55e'], out: ['Départ', '#f97316'], pro: ['Sortie pro', '#a78bfa'], leave: ['Sortie à confirmer', '#f97316'] };
 function renderHist() {
-  const by = {};
-  for (const e of events) { const k = dayKey(new Date(e.t)); (by[k] = by[k] || { ev: [], ms: 0 }).ev.push(e); }
-  for (const s of sessions()) { const k = dayKey(s.s); by[k] && (by[k].ms += (s.e || new Date()) - s.s); }
+  const by = dayMap();
   const [my, mm] = curMonth.split('-').map(Number), now = new Date();
   const keys = Object.keys(by).filter(k => k.startsWith(curMonth)).sort().reverse();
   $('#mTitle').textContent = new Date(my, mm - 1, 15).toLocaleDateString('fr-CH', { month: 'long', year: 'numeric' });
-  $('#mTotal').textContent = keys.length ? `${dur(keys.reduce((a, k) => a + by[k].ms, 0))} · ${keys.length} jour(s)` : '';
-  $('#mNext').disabled = curMonth >= monthKey(now);
+  $('#mTotal').textContent = keys.length ? `${dur(keys.reduce((a, k) => a + by[k].tot, 0))} · ${keys.length} jour(s)` : '';
+  $('#mNext').disabled = curMonth >= maxMonth();
   if (!keys.length) { $('#hist').innerHTML = '<div class="mut">Aucun pointage ce mois-ci.</div>'; return; }
   $('#hist').innerHTML = keys.map(k => {
     const d = new Date(k + 'T12:00');
@@ -379,9 +454,10 @@ function renderHist() {
     const title = d.toLocaleDateString('fr-CH', { weekday: 'long', day: 'numeric', month: 'long' });
     return `<div class="day"><div class="h">` +
       (selMode ? `<label><input type="checkbox" class="ck" data-day="${rows.join(',')}" ${all ? 'checked' : ''}>${title}</label>` : `<span>${title}</span>`) +
-      `<span>${dur(by[k].ms)}</span></div>` +
+      `<span>${dur(by[k].tot)}</span></div>` +
       by[k].ev.map(e => {
-        const txt = `<b>${hm(new Date(e.t))}</b>&nbsp;<span style="color:${EVL[e.a][1]}">${EVL[e.a][0]}</span>${e.src && e.src !== 'manuel' ? `<span class="tag">${e.src}</span>` : ''}`;
+        const txt = isAbs(e) ? `<span class="abs">${ABSL[e.kind][1]} <b class="abs">${ABSL[e.kind][0]}</b> · ${dur(e.hours * 36e5)}</span>`
+          : `<b>${hm(new Date(e.t))}</b>&nbsp;<span style="color:${EVL[e.a][1]}">${EVL[e.a][0]}</span>${e.src && e.src !== 'manuel' ? `<span class="tag">${e.src}</span>` : ''}`;
         if (selMode) return `<div class="ev">${e.row ? `<label><input type="checkbox" class="ck" data-row="${e.row}" ${sel.has(e.row) ? 'checked' : ''}>${txt}</label>` : `<span>${txt}</span>`}</div>`;
         return `<div class="ev"><span class="evt" ${e.row ? `data-edit="${e.row}"` : ''}>${txt}</span>` + (e.row ? `<button class="x" data-edit="${e.row}" title="Modifier">✏️</button><button class="x" data-del="${e.row}" title="Supprimer">✕</button>` : '') + '</div>';
       }).join('') + '</div>';
@@ -396,16 +472,21 @@ function renderUrls() {
 }
 
 /* ---------- actions ---------- */
+let syncErr = '';
 async function refresh(silent) {
   if (!cfg.url) return render();
+  $('#bRef').innerHTML = '<span class="spin">↻</span>';
+  try { return await refreshInner(silent); } finally { $('#bRef').textContent = '↻'; }
+}
+async function refreshInner(silent) {
   try {
     await flush();
     if (cfg.hoursDirty) { await api({ action: 'config', start: cfg.start, end: cfg.end }); cfg.hoursDirty = false; saveCfg(); }
     const j = await api({ action: 'list', days: 400 });
-    events = j.events; LS.set('pm_events', events);
+    events = j.events; LS.set('pm_events', events); LS.set('pm_sync', Date.now()); syncErr = '';
     if (j.hours) { cfg.start = j.hours.start; cfg.end = j.hours.end; saveCfg(); fillHours(); }
-    render(); if (!silent) toast('À jour');
-  } catch (e) { render(); if (!silent) toast('Hors-ligne : ' + e.message); }
+    render(); if (!silent) toast('À jour ✅');
+  } catch (e) { syncErr = e.message; render(); if (!silent) toast(e.message); }
 }
 async function send(action, src) {
   queue.push({ action, src, at: new Date().toISOString() }); LS.set('pm_queue', queue);
@@ -465,10 +546,91 @@ $('#hist').onclick = async e => {
   await deleteRows([r]);
 };
 
+/* ---------- tirer vers le bas pour actualiser ---------- */
+(() => {
+  let y0 = null, pulled = false;
+  addEventListener('touchstart', e => { y0 = scrollY <= 0 && $('#editBox').hidden ? e.touches[0].clientY : null; pulled = false; }, { passive: true });
+  addEventListener('touchmove', e => {
+    if (y0 === null) return;
+    const dy = e.touches[0].clientY - y0;
+    pulled = dy > 80; $('#ptr').classList.toggle('show', dy > 25);
+    $('#ptr').textContent = pulled ? '↻ Relâche pour actualiser' : '↓ Tire pour actualiser';
+  }, { passive: true });
+  addEventListener('touchend', async () => {
+    if (y0 === null) return; y0 = null;
+    if (!pulled) return $('#ptr').classList.remove('show');
+    $('#ptr').innerHTML = '<span class="spin">↻</span> Actualisation…';
+    await refresh(); $('#ptr').classList.remove('show');
+  });
+})();
+
+/* ---------- statistiques ---------- */
+const minToHm = m => pad(Math.floor(m / 60)) + ':' + pad(Math.round(m % 60));
+function renderStats() {
+  const by = dayMap(), now = new Date(), today = dayKey(now), since = dayKey(new Date(now - 29 * 864e5));
+  const recent = Object.keys(by).filter(k => k >= since && k <= today && by[k].ms > 0);
+  const ins = [], outs = []; let pros = 0, max = null;
+  for (const k of recent) {
+    const ev = by[k].ev, f = ev.find(e => e.a === 'in' || e.a === 'back'), l = [...ev].reverse().find(e => e.a === 'out');
+    if (f) { const d = new Date(f.t); ins.push(d.getHours() * 60 + d.getMinutes()); }
+    if (l) { const d = new Date(l.t); outs.push(d.getHours() * 60 + d.getMinutes()); }
+    pros += ev.filter(e => e.a === 'pro').length;
+    if (!max || by[k].ms > by[max].ms) max = k;
+  }
+  const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
+  $('#sAvg').textContent = recent.length ? dur(recent.reduce((a, k) => a + by[k].ms, 0) / recent.length) : '–';
+  $('#sDays').textContent = recent.length;
+  $('#sIn').textContent = ins.length ? minToHm(avg(ins)) : '–';
+  $('#sOut').textContent = outs.length ? minToHm(avg(outs)) : '–';
+  $('#sPro').textContent = pros;
+  $('#sMax').textContent = max ? dur(by[max].ms) : '–';
+  if (max) $('#sMax').title = new Date(max + 'T12:00').toLocaleDateString('fr-CH');
+
+  // absences de l'année
+  const yr = String(now.getFullYear()), cnt = {};
+  for (const e of events) if (isAbs(e) && e.t.slice(0, 4) === yr) cnt[e.kind] = (cnt[e.kind] || 0) + e.hours / dayH();
+  $('#sAbs').innerHTML = Object.keys(ABSL).map(k => `<span>${ABSL[k][1]} ${ABSL[k][0]} : <b>${+(cnt[k] || 0).toFixed(1)}</b> j</span>`).join('');
+
+  drawChart(by);
+}
+function drawChart(by) {
+  const W = 340, H = 190, L = 30, R = 8, T = 14, B = 26, N = 10, goal = +cfg.weekH || 42;
+  const mon = new Date(); mon.setHours(0, 0, 0, 0); mon.setDate(mon.getDate() - (mon.getDay() + 6) % 7);
+  const weeks = [];
+  for (let i = N - 1; i >= 0; i--) {
+    const s = new Date(mon); s.setDate(s.getDate() - 7 * i); const e = new Date(s); e.setDate(e.getDate() + 6);
+    const a = dayKey(s), b = dayKey(e); let ms = 0;
+    for (const k in by) if (k >= a && k <= b) ms += by[k].tot;
+    const t = new Date(s); t.setDate(t.getDate() + 3); const w1 = new Date(t.getFullYear(), 0, 4);
+    weeks.push({ s, e, h: ms / 36e5, no: 1 + Math.round(((t - w1) / 864e5 - 3 + (w1.getDay() + 6) % 7) / 7), cur: i === 0 });
+  }
+  const top = Math.max(goal * 1.15, ...weeks.map(w => w.h * 1.08), 10), y = h => T + (H - T - B) * (1 - h / top);
+  const step = (W - L - R) / N, bw = Math.min(18, step * .55);
+  const ticks = [0, 10, 20, 30, 40, 50, 60, 70].filter(v => v <= top);
+  let svg = ticks.map(v => `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="#22304a" stroke-width="1"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" font-size="10" fill="#8a9bb5">${v}</text>`).join('');
+  svg += weeks.map((w, i) => {
+    const x = L + step * i + (step - bw) / 2, yy = y(w.h), hh = Math.max(0, y(0) - yy), r = Math.min(4, hh / 2);
+    const path = hh > 0 ? `M${x},${y(0)} V${yy + r} Q${x},${yy} ${x + r},${yy} H${x + bw - r} Q${x + bw},${yy} ${x + bw},${yy + r} V${y(0)} Z` : '';
+    return `<g class="bar" data-i="${i}"><rect x="${L + step * i}" y="${T}" width="${step}" height="${H - T - B + 20}" fill="transparent"/>` +
+      (path ? `<path d="${path}" fill="${w.cur ? '#38bdf8' : '#22c55e'}" opacity="${w.cur ? 1 : .9}"/>` : '') +
+      `<text x="${L + step * i + step / 2}" y="${H - 8}" text-anchor="middle" font-size="10" fill="${w.cur ? '#e2e8f0' : '#8a9bb5'}">S${w.no}</text></g>`;
+  }).join('');
+  svg += `<line x1="${L}" x2="${W - R}" y1="${y(goal)}" y2="${y(goal)}" stroke="#e2e8f0" stroke-width="1.5" stroke-dasharray="4 4" opacity=".7"/>`;
+  const c = $('#chart'); c.innerHTML = svg;
+  const okW = weeks.filter(w => !w.cur && w.h >= goal).length;
+  $('#chartSub').textContent = `Pointillés = objectif ${goal} h · atteint ${okW} fois sur les ${N - 1} dernières semaines · semaine en cours en bleu`;
+  const fmtD = d => d.toLocaleDateString('fr-CH', { day: 'numeric', month: 'short' });
+  const show = i => { const w = weeks[i]; $('#chartRead').innerHTML = `<b>Semaine ${w.no}</b> (${fmtD(w.s)} – ${fmtD(w.e)}) : <b>${dur(w.h * 36e5)}</b> · ${w.h >= goal ? '+' + dur((w.h - goal) * 36e5) + ' sur l’objectif' : 'manque ' + dur((goal - w.h) * 36e5)}`;
+    c.querySelectorAll('.bar path').forEach(p => p.setAttribute('opacity', '.35')); const p = c.querySelector(`.bar[data-i="${i}"] path`); p && p.setAttribute('opacity', '1'); };
+  c.querySelectorAll('.bar').forEach(g => { g.onclick = () => show(+g.dataset.i); g.onmouseenter = () => show(+g.dataset.i); });
+  c.onmouseleave = () => c.querySelectorAll('.bar').forEach(g => { const p = g.querySelector('path'); p && p.setAttribute('opacity', weeks[+g.dataset.i].cur ? '1' : '.9'); });
+}
+
 /* ---------- mois affiché ---------- */
+function maxMonth() { const l = events[events.length - 1], now = monthKey(new Date()); return l && monthKey(new Date(l.t)) > now ? monthKey(new Date(l.t)) : now; }
 function shiftMonth(n) {
   const [y, m] = curMonth.split('-').map(Number), d = new Date(y, m - 1 + n, 1);
-  if (monthKey(d) > monthKey(new Date())) return;
+  if (monthKey(d) > maxMonth()) return;
   curMonth = monthKey(d); if (selMode) setSel(false); else renderHist();
 }
 $('#mPrev').onclick = () => shiftMonth(-1);
@@ -477,9 +639,8 @@ $('#mNext').onclick = () => shiftMonth(1);
 /* ---------- export PDF (impression) du mois affiché ---------- */
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 function monthReport() {
-  const days = {};
-  for (const e of events) { const k = dayKey(new Date(e.t)); if (k.startsWith(curMonth)) (days[k] = days[k] || { ev: [], ms: 0 }).ev.push(e); }
-  for (const s of sessions()) { const k = dayKey(s.s); days[k] && (days[k].ms += (s.e || new Date()) - s.s); }
+  const all = dayMap(), days = {};
+  for (const k in all) if (k.startsWith(curMonth)) days[k] = all[k];
   let rows = '', total = 0, wk = 0, wkNo = null;
   const weekNo = d => { const t = new Date(d); t.setHours(0, 0, 0, 0); t.setDate(t.getDate() + 3 - (t.getDay() + 6) % 7); const w1 = new Date(t.getFullYear(), 0, 4); return 1 + Math.round(((t - w1) / 864e5 - 3 + (w1.getDay() + 6) % 7) / 7); };
   const flushWeek = () => { if (wkNo !== null) rows += `<tr class="wk"><td colspan="4">Total semaine ${wkNo}</td><td class="n">${dur(wk)}</td></tr>`; wk = 0; };
@@ -487,17 +648,18 @@ function monthReport() {
     const d = new Date(k + 'T12:00'), ev = days[k].ev, n = weekNo(d);
     if (n !== wkNo) { flushWeek(); wkNo = n; }
     const first = ev.find(e => e.a === 'in' || e.a === 'back'), last = [...ev].reverse().find(e => e.a === 'out');
+    const absTxt = ev.filter(isAbs).map(e => ABSL[e.kind][0] + (Math.abs(e.hours - dayH()) > .01 ? ' (' + dur(e.hours * 36e5) + ')' : ''));
     const pros = []; let o = null;
     for (const e of ev) { if (e.a === 'pro' || e.a === 'leave') o = e; else if (e.a === 'back' && o) { pros.push(hm(new Date(o.t)) + '–' + hm(new Date(e.t))); o = null; } }
     if (o) pros.push(hm(new Date(o.t)) + (o.a === 'leave' ? ' (à confirmer)' : '–…'));
-    rows += `<tr><td>${esc(d.toLocaleDateString('fr-CH', { weekday: 'short', day: '2-digit', month: '2-digit' }))}</td><td class="n">${first ? hm(new Date(first.t)) : '–'}</td><td class="n">${last ? hm(new Date(last.t)) : '–'}</td><td>${pros.join('<br>') || ''}</td><td class="n">${dur(days[k].ms)}</td></tr>`;
-    total += days[k].ms; wk += days[k].ms;
+    rows += `<tr><td>${esc(d.toLocaleDateString('fr-CH', { weekday: 'short', day: '2-digit', month: '2-digit' }))}</td><td class="n">${first ? hm(new Date(first.t)) : '–'}</td><td class="n">${last ? hm(new Date(last.t)) : '–'}</td><td>${[...absTxt, ...pros.map(x => 'Sortie pro ' + x)].join('<br>')}</td><td class="n">${dur(days[k].tot)}</td></tr>`;
+    total += days[k].tot; wk += days[k].tot;
   }
   flushWeek();
   const [y, m] = curMonth.split('-').map(Number), title = new Date(y, m - 1, 15).toLocaleDateString('fr-CH', { month: 'long', year: 'numeric' });
   return `<h1>Relevé d’heures — ${esc(title)}</h1>
     <div class="sub">${cfg.name ? esc(cfg.name) + ' · ' : ''}Marly Innovation Center · imprimé le ${new Date().toLocaleDateString('fr-CH')}</div>
-    <table><thead><tr><th>Jour</th><th class="n">Arrivée</th><th class="n">Départ</th><th>Sorties pro</th><th class="n">Total</th></tr></thead>
+    <table><thead><tr><th>Jour</th><th class="n">Arrivée</th><th class="n">Départ</th><th>Remarques</th><th class="n">Total</th></tr></thead>
     <tbody>${rows || '<tr><td colspan="5">Aucun pointage ce mois-ci.</td></tr>'}</tbody>
     <tfoot><tr><td colspan="4">Total du mois · ${Object.keys(days).length} jour(s)</td><td class="n">${dur(total)}</td></tr></tfoot></table>
     <div class="sign"><span>Signature collaborateur : ____________________</span><span>Visa : ____________________</span></div>`;
@@ -509,38 +671,73 @@ $('#bPdf').onclick = () => {
 };
 
 /* ---------- modifier / ajouter un pointage ---------- */
-let edRow = null;
+let edRow = null, edMode = 'p';
+function setEdMode(m) {
+  edMode = m;
+  document.querySelectorAll('#edMode button').forEach(b => b.classList.toggle('on', b.dataset.m === m));
+  $('#edP').hidden = m !== 'p'; $('#edA').hidden = m !== 'a';
+  $('#edTitle').textContent = (edRow ? 'Modifier ' : 'Ajouter ') + (m === 'a' ? 'une absence' : 'un pointage');
+}
+function setDurOptions(h) {
+  const d = dayH();
+  $('#abDur').options[0].text = `Journée entière (${dur(d * 36e5)})`; $('#abDur').options[1].text = `Demi-journée (${dur(d / 2 * 36e5)})`;
+  $('#abDur').value = h == null || Math.abs(h - d) < .01 ? '1' : Math.abs(h - d / 2) < .01 ? '0.5' : 'x';
+  $('#abHours').hidden = $('#abDur').value !== 'x'; $('#abHours').value = h != null ? h : '';
+}
 function openEdit(row) {
   const ev = row ? events.find(e => e.row === row) : null;
   if (row && !ev) return;
   edRow = row || null;
   const d = ev ? new Date(ev.t) : new Date();
-  $('#edTitle').textContent = row ? 'Modifier le pointage' : 'Ajouter un pointage';
   $('#edDate').value = dayKey(d); $('#edTime').value = hm(d);
-  $('#edType').value = ev ? (ev.a === 'leave' ? 'pro' : ev.a) : (status() === 'out' ? 'in' : 'out');
-  $('#edDel').hidden = !row;
+  $('#edType').value = ev && !isAbs(ev) ? (ev.a === 'leave' ? 'pro' : ev.a) : (status() === 'out' ? 'in' : 'out');
+  $('#abFrom').value = $('#abTo').value = dayKey(d);
+  $('#abType').value = ev && isAbs(ev) ? ev.kind : 'conge';
+  setDurOptions(ev && isAbs(ev) ? ev.hours : null);
+  $('#edMode').hidden = !!row;            // en modification, on garde le type de ligne
+  $('#abToW').hidden = $('#abWeW').hidden = !!row; $('#abFromL').textContent = row ? 'Date' : 'Du';
+  setEdMode(ev && isAbs(ev) ? 'a' : 'p');
+  $('#edDel').hidden = !row; $('#edDel').textContent = ev && isAbs(ev) ? 'Supprimer cette absence' : 'Supprimer ce pointage';
   $('#editBox').hidden = false;
 }
+document.querySelectorAll('#edMode button').forEach(b => b.onclick = () => setEdMode(b.dataset.m));
+$('#abDur').onchange = () => { $('#abHours').hidden = $('#abDur').value !== 'x'; if ($('#abDur').value === 'x') $('#abHours').focus(); };
+$('#abFrom').onchange = () => { if ($('#abTo').value < $('#abFrom').value) $('#abTo').value = $('#abFrom').value; };
 const closeEdit = () => { $('#editBox').hidden = true; edRow = null; };
 $('#bAdd').onclick = () => { if (!cfg.url) return toast('Configure d’abord la Google Sheet'); openEdit(null); };
 $('#edCancel').onclick = closeEdit;
 $('#editBox').onclick = e => { if (e.target.id === 'editBox') closeEdit(); };
-$('#edDel').onclick = async () => { const r = edRow; if (!confirm('Supprimer ce pointage ?')) return; closeEdit(); await deleteRows([r]); };
+$('#edDel').onclick = async () => { const r = edRow; if (!confirm($('#edDel').textContent + ' ?')) return; closeEdit(); await deleteRows([r]); };
+const OLD_SCRIPT = 'Mets à jour le script Google (Déployer → Gérer les déploiements → ✏️ → Nouvelle version)';
 $('#edSave').onclick = async () => {
-  const [y, mo, da] = $('#edDate').value.split('-').map(Number), [h, mi] = $('#edTime').value.split(':').map(Number);
-  if (!y || isNaN(h)) return toast('Date ou heure invalide');
-  const at = new Date(y, mo - 1, da, h, mi).toISOString(), type = $('#edType').value, row = edRow;
+  const row = edRow; let req, msg;
+  if (edMode === 'a') {
+    const from = $('#abFrom').value, to = row ? from : ($('#abTo').value || from), v = $('#abDur').value;
+    const hours = v === 'x' ? +$('#abHours').value : +(dayH() * +v).toFixed(2);
+    if (!from || to < from) return toast('Dates invalides');
+    if (!(hours > 0 && hours <= 24)) return toast('Durée invalide');
+    const [y, mo, da] = from.split('-').map(Number), at = new Date(y, mo - 1, da, 12, 0).toISOString();
+    req = row ? { action: 'edit', row, at, type: $('#abType').value, hours } : { action: 'absence', type: $('#abType').value, from, to, hours, skipWe: $('#abWe').checked ? '1' : '0' };
+    msg = row ? 'Absence modifiée ✅' : null;
+  } else {
+    const [y, mo, da] = $('#edDate').value.split('-').map(Number), [h, mi] = $('#edTime').value.split(':').map(Number);
+    if (!y || isNaN(h)) return toast('Date ou heure invalide');
+    const at = new Date(y, mo - 1, da, h, mi).toISOString(), type = $('#edType').value;
+    req = row ? { action: 'edit', row, at, type } : { action: 'add', at, type };
+    msg = row ? 'Pointage modifié ✅' : 'Pointage ajouté ✅';
+  }
   $('#edSave').disabled = true;
   try {
-    const j = await api(row ? { action: 'edit', row, at, type } : { action: 'add', at, type });
-    if (!j.edited && !j.added) throw new Error('Mets à jour le script Google : Déployer → Gérer les déploiements → ✏️ → Nouvelle version');
-    closeEdit(); toast(row ? 'Pointage modifié ✅' : 'Pointage ajouté ✅'); await refresh(true);
+    const j = await api(req);
+    if (!j.edited && j.added === undefined) throw new Error(OLD_SCRIPT);
+    if (req.action === 'absence' && j.added === 0) throw new Error('Aucun jour ajouté (que des week-ends ?)');
+    closeEdit(); toast(msg || `${j.added} jour(s) d’absence ajouté(s) ✅`); await refresh(true);
   } catch (err) { toast(err.message); }
   finally { $('#edSave').disabled = false; }
 };
 $('#bCsv').onclick = () => {
   const rows = [['Date', 'Heure', 'Événement', 'Source']];
-  for (const e of events) { const d = new Date(e.t); rows.push([dayKey(d), hm(d), EVL[e.a][0], e.src || '']); }
+  for (const e of events) { const d = new Date(e.t); rows.push(isAbs(e) ? [dayKey(d), '', ABSL[e.kind][0] + ' (' + e.hours + ' h)', 'absence'] : [dayKey(d), hm(d), EVL[e.a][0], e.src || '']); }
   rows.push([], ['Date', 'Début', 'Fin', 'Durée (h)']);
   for (const s of sessions()) rows.push([dayKey(s.s), hm(s.s), s.e ? hm(s.e) : '', s.e ? ((s.e - s.s) / 36e5).toFixed(2) : '']);
   const blob = new Blob(['﻿' + rows.map(r => r.join(';')).join('\n')], { type: 'text/csv' });
@@ -669,12 +866,15 @@ function importShared() {
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
   document.querySelectorAll('nav button').forEach(x => x.classList.toggle('cur', x === b));
   if (selMode && b.dataset.tab !== 'hist') setSel(false);
-  ['home', 'hist', 'set'].forEach(t => $('#t-' + t).hidden = t !== b.dataset.tab);
+  ['home', 'hist', 'stats', 'set'].forEach(t => $('#t-' + t).hidden = t !== b.dataset.tab);
+  LS.set('pm_tab', b.dataset.tab); window.scrollTo(0, 0);
+  if (b.dataset.tab === 'stats') renderStats();
   if (b.dataset.tab === 'set') setTimeout(initMap, 50);
   if (b.dataset.tab === 'hist') refresh(true);
 });
 
 importShared(); render(); refresh(true);
+{ const t = LS.get('pm_tab', 'home'); if (t !== 'home' && t !== 'set') document.querySelector(`nav button[data-tab="${t}"]`)?.click(); }
 setInterval(render, 30000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(true); });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');

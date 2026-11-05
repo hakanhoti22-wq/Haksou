@@ -74,6 +74,11 @@ Dans l'onglet **Historique** :
 - **‹ ›** passe d'un mois à l'autre, avec le total du mois.
 - **PDF** imprime ou enregistre le relevé du mois affiché (Partager → Enregistrer dans Fichiers).
 
+- **＋ → Absence** : congé, maladie, férié ou formation, sur un ou plusieurs jours (journée, demi-journée ou durée libre). Une journée = objectif hebdo ÷ 5.
+
+L'onglet **Stats** montre la moyenne par jour, les heures d'arrivée et de départ moyennes, un graphique des 10 dernières semaines et le compte des absences de l'année.
+La Google Sheet contient un onglet **Résumé**, mis à jour automatiquement (totaux par jour, semaine et mois).
+
 Sur l'accueil, la barre **Cette semaine** montre ta progression vers ton objectif (42 h par défaut, modifiable dans Réglages).
 
-> Modifier, ajouter et la suppression groupée demandent la version du script du 5 novembre 2026 ou plus récente. Recolle `apps-script.gs` (en gardant ton TOKEN), puis Déployer → Gérer les déploiements → ✏️ → **Nouvelle version**.
+> Modifier, ajouter, les absences, le Résumé et la suppression groupée demandent la dernière version du script. Recolle `apps-script.gs` (en gardant ton TOKEN), puis Déployer → Gérer les déploiements → ✏️ → **Nouvelle version**.

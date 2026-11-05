@@ -1,28 +1,35 @@
 /**
  * Pointage MIC — backend Google Apps Script (gratuit).
  * 1. Crée une Google Sheet vide → Extensions → Apps Script → colle ce fichier.
- * 2. Change TOKEN ci-dessous (un mot de passe à toi).
+ * 2. Change TOKEN ci-dessous (un mot de passe à toi : lettres et chiffres).
  * 3. Déployer → Nouveau déploiement → Type « Application Web »
  *    Exécuter en tant que : Moi · Accès : Tout le monde → Déployer → copie l'URL (…/exec).
- *    (Après une modification du code : Déployer → Gérer les déploiements → Modifier → Nouvelle version.)
+ *    (Après une modification du code : Déployer → Gérer les déploiements → ✏️ → Nouvelle version.)
  *
  * Actions (paramètre action=) :
- *   in     arrivée sur le site (ou retour d'une sortie pro)
- *   leave  sortie du site : pendant la plage horaire → « Sortie (à confirmer) » + réponse QUESTION,
- *          hors plage → Départ + réponse DETIMBRE
- *   pro    la sortie à confirmer était professionnelle → le timbrage continue
- *   out    départ (ou la sortie à confirmer n'était PAS pro → départ à l'heure de la sortie)
- *   edit   modifie un pointage (row=, at= nouvelle heure ISO, type=in|out|pro|back)
- *   add    ajoute un pointage oublié (type=, at=)
- *   config lit / enregistre la plage horaire (start=06:30&end=18:00)
- *   list   historique (JSON)          delete  supprime des lignes (row= ou rows=2,5,9)
+ *   in       arrivée sur le site (ou retour d'une sortie pro)
+ *   leave    sortie du site : pendant la plage horaire → « Sortie (à confirmer) » + réponse QUESTION,
+ *            hors plage → Départ + réponse DETIMBRE
+ *   pro      la sortie à confirmer était professionnelle → le timbrage continue
+ *   out      départ (ou la sortie à confirmer n'était PAS pro → départ à l'heure de la sortie)
+ *   edit     modifie une ligne (row=, at=, type=, hours= pour une absence)
+ *   add      ajoute un pointage oublié (type=in|out|pro|back, at=)
+ *   absence  ajoute des jours d'absence (type=conge|maladie|ferie|formation, from=, to=, hours=, skipWe=1)
+ *   delete   supprime des lignes (row= ou rows=2,5,9)
+ *   config   lit / enregistre la plage horaire (start=06:30&end=18:00)
+ *   summary  reconstruit l'onglet « Résumé »
+ *   list     historique (JSON)
  * Ajoute fmt=text pour une réponse en texte simple (utilisé par l'app Raccourcis).
  */
 const TOKEN = 'change-moi-123';
 const SHEET = 'Pointages';
+const SUMMARY = 'Résumé';
 const TZ = 'Europe/Zurich';
 const LABEL = { in: 'Arrivée', out: 'Départ', leave: 'Sortie (à confirmer)', pro: 'Sortie pro', back: 'Retour' };
+const ABS = { conge: 'Congé', maladie: 'Maladie', ferie: 'Férié', formation: 'Formation' };
 const CODE = {}; Object.keys(LABEL).forEach(k => CODE[LABEL[k]] = k);
+const ACODE = {}; Object.keys(ABS).forEach(k => ACODE[ABS[k]] = k);
+const COLS = 6; // Horodatage · Type · Source · Date · Heure · Durée absence (h)
 
 function doGet(e) {
   const p = (e && e.parameter) || {};
@@ -37,13 +44,14 @@ function doGet(e) {
     const sh = sheet_();
     const now = p.at ? new Date(p.at) : new Date();
     const hours = hours_();
-    const last = last_(sh);
+    const last = last_(sh, now);
     const st = state_(last);
     const add = (code, src, at) => {
       const t = at || now;
-      sh.appendRow([t, LABEL[code], src || p.src || 'manuel', day_(t), Utilities.formatDate(t, TZ, 'HH:mm')]);
+      sh.appendRow([t, LABEL[code], src || p.src || 'manuel', day_(t), Utilities.formatDate(t, TZ, 'HH:mm'), '']);
     };
     const setLast = code => sh.getRange(last.row, 2).setValue(LABEL[code]);
+    const done = (o, txt) => { summary_(sh); return reply(o, txt); }; // après chaque écriture : Résumé à jour
 
     switch (p.action) {
       case 'in': {
@@ -52,27 +60,27 @@ function doGet(e) {
           if (st === 'pending') setLast('out');
           else add('out', 'auto-fin-journee', endOfDay_(last.t, hours));
           add('in');
-          return reply({ ok: true, state: 'in' }, 'ARRIVEE');
+          return done({ ok: true, state: 'in' }, 'ARRIVEE');
         }
-        if (st === 'out') { add('in'); return reply({ ok: true, state: 'in' }, 'ARRIVEE'); }
-        if (st === 'pending') { setLast('pro'); add('back'); return reply({ ok: true, state: 'in' }, 'RETOUR'); }
-        if (last.a === 'pro') { add('back'); return reply({ ok: true, state: 'in' }, 'RETOUR'); }
+        if (st === 'out') { add('in'); return done({ ok: true, state: 'in' }, 'ARRIVEE'); }
+        if (st === 'pending') { setLast('pro'); add('back'); return done({ ok: true, state: 'in' }, 'RETOUR'); }
+        if (last.a === 'pro') { add('back'); return done({ ok: true, state: 'in' }, 'RETOUR'); }
         return reply({ ok: true, skipped: true, state: 'in' }, 'DEJA');
       }
       case 'leave': {
         if (st !== 'in' || last.a === 'pro') return reply({ ok: true, skipped: true, state: st }, 'OK');
-        if (inHours_(now, hours)) { add('leave'); return reply({ ok: true, ask: true, state: 'pending' }, 'QUESTION'); }
+        if (inHours_(now, hours)) { add('leave'); return done({ ok: true, ask: true, state: 'pending' }, 'QUESTION'); }
         add('out');
-        return reply({ ok: true, state: 'out' }, 'DETIMBRE');
+        return done({ ok: true, state: 'out' }, 'DETIMBRE');
       }
       case 'pro': {
         if (st !== 'pending') return reply({ ok: true, skipped: true, state: st }, 'OK');
         setLast('pro');
-        return reply({ ok: true, state: 'in' }, 'PRO');
+        return done({ ok: true, state: 'in' }, 'PRO');
       }
       case 'out': {
-        if (st === 'pending') { setLast('out'); return reply({ ok: true, state: 'out' }, 'DETIMBRE'); }
-        if (st === 'in') { add('out'); return reply({ ok: true, state: 'out' }, 'DETIMBRE'); }
+        if (st === 'pending') { setLast('out'); return done({ ok: true, state: 'out' }, 'DETIMBRE'); }
+        if (st === 'in') { add('out'); return done({ ok: true, state: 'out' }, 'DETIMBRE'); }
         return reply({ ok: true, skipped: true, state: st }, 'OK');
       }
       case 'delete': { // row=5 ou rows=5,8,9 (suppression groupée)
@@ -80,45 +88,67 @@ function doGet(e) {
         const list = String(p.rows || p.row || '').split(',').map(Number).filter(r => r >= 2 && r <= max);
         const uniq = list.filter((r, i) => list.indexOf(r) === i).sort((a, b) => b - a); // du bas vers le haut
         uniq.forEach(r => sh.deleteRow(r));
-        return reply({ ok: true, deleted: uniq.length });
+        return done({ ok: true, deleted: uniq.length });
       }
       case 'edit': {
         const row = Number(p.row);
         if (!(row >= 2 && row <= sh.getLastRow())) return reply({ ok: false, error: 'Ligne introuvable' });
+        const isAbs = !!ACODE[sh.getRange(row, 2).getValue()];
         if (p.at) {
           const t = new Date(p.at);
           if (isNaN(t)) return reply({ ok: false, error: 'Heure invalide' });
           sh.getRange(row, 1).setValue(t);
-          sh.getRange(row, 4, 1, 2).setValues([[day_(t), Utilities.formatDate(t, TZ, 'HH:mm')]]);
+          sh.getRange(row, 4, 1, 2).setValues([[day_(t), isAbs ? '' : Utilities.formatDate(t, TZ, 'HH:mm')]]);
         }
-        if (LABEL[p.type]) sh.getRange(row, 2).setValue(LABEL[p.type]);
+        if (isAbs) {
+          if (ABS[p.type]) sh.getRange(row, 2).setValue(ABS[p.type]);
+          if (Number(p.hours) > 0) sh.getRange(row, 6).setValue(Number(p.hours));
+        } else if (LABEL[p.type]) sh.getRange(row, 2).setValue(LABEL[p.type]);
         sort_(sh);
-        return reply({ ok: true, edited: true });
+        return done({ ok: true, edited: true });
       }
       case 'add': {
         const t = new Date(p.at);
         if (!LABEL[p.type] || isNaN(t)) return reply({ ok: false, error: 'Type ou heure invalide' });
         add(p.type, 'ajout manuel', t);
         sort_(sh);
-        return reply({ ok: true, added: true });
+        return done({ ok: true, added: 1 });
+      }
+      case 'absence': {
+        const kind = ABS[p.type], h = Number(p.hours), re = /^\d{4}-\d\d-\d\d$/;
+        const from = p.from, to = p.to || p.from;
+        if (!kind || !(h > 0 && h <= 24)) return reply({ ok: false, error: 'Type ou durée invalide' });
+        if (!re.test(from) || !re.test(to) || to < from) return reply({ ok: false, error: 'Dates invalides' });
+        let d = new Date(from + 'T12:00:00Z'), n = 0;
+        const end = new Date(to + 'T12:00:00Z');
+        for (let i = 0; d <= end && i < 93; i++, d = new Date(d.getTime() + 864e5)) {
+          const wd = d.getUTCDay(), key = d.toISOString().slice(0, 10);
+          if (p.skipWe === '1' && (wd === 0 || wd === 6)) continue;
+          sh.appendRow([Utilities.parseDate(key + ' 12:00', TZ, 'yyyy-MM-dd HH:mm'), kind, 'absence', key, '', h]);
+          n++;
+        }
+        sort_(sh);
+        return done({ ok: true, added: n });
       }
       case 'config': {
         const ok = s => /^\d\d:\d\d$/.test(s || '');
         if (ok(p.start) && ok(p.end)) PropertiesService.getScriptProperties().setProperties({ start: p.start, end: p.end });
         return reply({ ok: true, hours: hours_() });
       }
+      case 'summary': return done({ ok: true, summary: true });
       default: { // list
         const since = Date.now() - Number(p.days || 120) * 864e5;
         const n = sh.getLastRow() - 1;
-        const rows = n > 0 ? sh.getRange(2, 1, n, 3).getValues() : [];
+        const rows = n > 0 ? sh.getRange(2, 1, n, COLS).getValues() : [];
         const events = [];
         rows.forEach((r, i) => {
           const t = new Date(r[0]);
-          if (isNaN(t) || t.getTime() < since || !CODE[r[1]]) return;
-          events.push({ row: i + 2, t: t.toISOString(), a: CODE[r[1]], src: r[2] });
+          if (isNaN(t) || t.getTime() < since) return;
+          if (CODE[r[1]]) events.push({ row: i + 2, t: t.toISOString(), a: CODE[r[1]], src: r[2] });
+          else if (ACODE[r[1]]) events.push({ row: i + 2, t: t.toISOString(), a: 'abs', kind: ACODE[r[1]], hours: Number(r[5]) || 0, src: 'absence' });
         });
         events.sort((x, y) => x.t < y.t ? -1 : 1);
-        return reply({ ok: true, events, hours });
+        return reply({ ok: true, events, hours, v: 3 });
       }
     }
   } finally {
@@ -131,21 +161,27 @@ function sheet_() {
   let sh = ss.getSheetByName(SHEET);
   if (!sh) {
     sh = ss.insertSheet(SHEET);
-    sh.appendRow(['Horodatage', 'Type', 'Source', 'Date', 'Heure']);
+    sh.appendRow(['Horodatage', 'Type', 'Source', 'Date', 'Heure', 'Durée absence (h)']);
     sh.setFrozenRows(1);
-  }
+  } else if (!sh.getRange(1, 6).getValue()) sh.getRange(1, 6).setValue('Durée absence (h)');
   return sh;
 }
-// Garde la feuille dans l'ordre chronologique (le dernier pointage = la dernière ligne).
+// Garde la feuille dans l'ordre chronologique.
 function sort_(sh) {
   const n = sh.getLastRow() - 1;
-  if (n > 1) sh.getRange(2, 1, n, 5).sort({ column: 1, ascending: true });
+  if (n > 1) sh.getRange(2, 1, n, COLS).sort({ column: 1, ascending: true });
 }
-function last_(sh) {
+// Dernier pointage réel (on ignore les absences et ce qui est dans le futur).
+function last_(sh, now) {
   const n = sh.getLastRow();
   if (n < 2) return null;
-  const r = sh.getRange(n, 1, 1, 2).getValues()[0];
-  return { row: n, t: new Date(r[0]), a: CODE[r[1]] || 'out' };
+  const k = Math.min(n - 1, 80), first = n - k + 1, vals = sh.getRange(first, 1, k, 2).getValues();
+  const lim = Math.max(Date.now(), now.getTime()) + 120000;
+  for (let i = k - 1; i >= 0; i--) {
+    const t = new Date(vals[i][0]), a = CODE[vals[i][1]];
+    if (a && !isNaN(t) && t.getTime() <= lim) return { row: first + i, t, a };
+  }
+  return null;
 }
 // out = pas au travail · in = au travail (y c. sortie pro) · pending = sortie à confirmer
 function state_(last) {
@@ -161,7 +197,68 @@ function inHours_(t, h) {
   return hm >= h.start && hm < h.end;
 }
 function day_(t) { return Utilities.formatDate(t, TZ, 'yyyy-MM-dd'); }
+function hm_(t) { return Utilities.formatDate(t, TZ, 'HH:mm'); }
 function endOfDay_(t, h) {
   const end = Utilities.parseDate(day_(t) + ' ' + h.end, TZ, 'yyyy-MM-dd HH:mm');
   return end > t ? end : new Date(t.getTime() + 60000);
+}
+
+/* ---------- onglet « Résumé » : un tableau lisible, mis à jour automatiquement ---------- */
+function summary_(sh) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const rs = ss.getSheetByName(SUMMARY) || ss.insertSheet(SUMMARY);
+    const n = sh.getLastRow() - 1;
+    const rows = n > 0 ? sh.getRange(2, 1, n, COLS).getValues() : [];
+    const today = day_(new Date());
+    const days = {}, get = k => days[k] = days[k] || { first: null, last: null, work: 0, abs: 0, notes: [] };
+    let open = null, pro = null;
+    rows.forEach(r => {
+      const t = new Date(r[0]);
+      if (isNaN(t)) return;
+      const k = day_(t);
+      if (ACODE[r[1]]) { const d = get(k); d.abs += (Number(r[5]) || 0) * 36e5; d.notes.push(r[1]); return; }
+      const a = CODE[r[1]];
+      if (!a) return;
+      const d = get(k);
+      if ((a === 'in' || a === 'back') && !open) { open = t; if (!d.first) d.first = t; }
+      if (a === 'pro' || a === 'leave') pro = t;
+      if (a === 'back' && pro) { d.notes.push('Sortie pro ' + hm_(pro) + '–' + hm_(t)); pro = null; }
+      if (a === 'out' || (a === 'leave' && k !== today)) { // sortie jamais confirmée d'un jour passé = départ
+        if (open) { get(day_(open)).work += t - open; open = null; }
+        d.last = t; pro = null;
+      }
+    });
+    if (open && day_(open) === today) get(today).work += Date.now() - open;
+
+    const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+    const JOURS = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
+    const hmD = ms => { const m = Math.round(ms / 6e4); return Math.floor(m / 60) + ':' + ('0' + m % 60).slice(-2); };
+    const dec = ms => Math.round(ms / 36e3) / 100;
+    const isoWeek = key => { const d = new Date(key + 'T12:00:00Z'), wd = (d.getUTCDay() + 6) % 7; d.setUTCDate(d.getUTCDate() - wd + 3); const y = new Date(Date.UTC(d.getUTCFullYear(), 0, 4)); return 1 + Math.round((d - y) / 6048e5); };
+
+    const out = [['Date', 'Jour', 'Arrivée', 'Départ', 'Remarques', 'Travail', 'Absence', 'Total', 'Total (h)']];
+    const weekRows = [], monthRows = [];
+    let wk = null, wT = [0, 0], mo = null, mT = [0, 0];
+    const flushW = () => { if (wk !== null) { out.push(['', 'Semaine ' + wk, '', '', '', hmD(wT[0]), hmD(wT[1]), hmD(wT[0] + wT[1]), dec(wT[0] + wT[1])]); weekRows.push(out.length); } wT = [0, 0]; };
+    const flushM = () => { if (mo !== null) { const [y, m] = mo.split('-').map(Number); out.push(['', 'Total ' + MOIS[m - 1] + ' ' + y, '', '', '', hmD(mT[0]), hmD(mT[1]), hmD(mT[0] + mT[1]), dec(mT[0] + mT[1])]); monthRows.push(out.length); out.push(['', '', '', '', '', '', '', '', '']); } mT = [0, 0]; };
+    Object.keys(days).sort().forEach(k => {
+      const d = days[k], w = isoWeek(k), m = k.slice(0, 7);
+      if (m !== mo) { flushW(); flushM(); mo = m; wk = w; }
+      else if (w !== wk) { flushW(); wk = w; }
+      const [y, mm, dd] = k.split('-');
+      out.push([dd + '.' + mm + '.' + y, JOURS[new Date(k + 'T12:00:00Z').getUTCDay()], d.first ? hm_(d.first) : '', d.last ? hm_(d.last) : '',
+        d.notes.join(' · '), hmD(d.work), d.abs ? hmD(d.abs) : '', hmD(d.work + d.abs), dec(d.work + d.abs)]);
+      wT[0] += d.work; wT[1] += d.abs; mT[0] += d.work; mT[1] += d.abs;
+    });
+    flushW(); flushM();
+
+    rs.clear();
+    rs.getRange(1, 1, out.length, 8).setNumberFormat('@'); // texte : « 8:24 » reste lisible
+    rs.getRange(1, 1, out.length, 9).setValues(out);
+    rs.getRange(1, 1, 1, 9).setFontWeight('bold').setBackground('#1e293b').setFontColor('#ffffff');
+    weekRows.forEach(r => rs.getRange(r, 1, 1, 9).setFontWeight('bold').setBackground('#f1f5f9'));
+    monthRows.forEach(r => rs.getRange(r, 1, 1, 9).setFontWeight('bold').setBackground('#dbeafe'));
+    rs.setFrozenRows(1);
+  } catch (err) { console.error('Résumé : ' + err); } // le pointage n'est jamais bloqué par le résumé
 }
