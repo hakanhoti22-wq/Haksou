@@ -5,7 +5,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 PSQL=${PSQL:-psql}
-for t in 1-isolation-et-droits.sql 2-factures-et-pointages.sql; do
+for t in 1-isolation-et-droits.sql 2-factures-et-pointages.sql 3-proprietaire-et-support.sql; do
   db="haksou_test_$$"
   echo "════ $t"
   $PSQL -X -q -d postgres -c "create database $db"

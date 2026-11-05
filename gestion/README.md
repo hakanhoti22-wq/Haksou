@@ -26,7 +26,7 @@ L'appli fonctionne **sans rien configurer**, en mode démo : les données resten
 - En ligne (une fois la branche fusionnée dans `main`) : **https://hakanhoti22-wq.github.io/Haksou/gestion/**
 - Sur ton ordinateur : `python3 -m http.server` à la racine du dépôt, puis ouvre http://localhost:8000/gestion/
 
-Choisis **Hakan (patron)** pour tout voir, ou **Léa** / **Karim** pour voir l'appli côté employé.
+Choisis **Hakan (patron)** pour tout voir, **Léa** ou **Karim** pour voir l'appli côté employé, ou **🛰️ Hakan (propriétaire Haksou)** pour la console de supervision (avec une 2e entreprise cliente en essai).
 
 > ⚠️ Il faut ouvrir l'appli par une adresse `http(s)://`, pas en double-cliquant sur `index.html`.
 
@@ -54,6 +54,43 @@ Le mode démo est fait pour tester. Pour une vraie équipe, avec plusieurs tél�
 
 > Par défaut, Supabase demande de confirmer son e-mail à l'inscription. Pour tester plus vite, tu peux désactiver *Confirm email* dans **Authentication → Providers → Email**.
 
+## 🛰️ 3. Devenir le propriétaire de la plateforme (ta console)
+
+Tu es le **propriétaire** de Haksou Pro. Tu as une console qui supervise toutes tes entreprises clientes.
+
+1. Ouvre l'appli et **crée ton compte** (ton e-mail à toi). Ne crée pas d'entreprise.
+2. Dans Supabase → **SQL Editor**, exécute **une seule fois** (avec ton e-mail) :
+   ```sql
+   insert into platform_admins (user_id) select id from auth.users where email = 'ton.email@exemple.ch';
+   ```
+3. Recharge l'appli : le menu **🛰️ Console Haksou** apparaît.
+4. Dans `js/config.js`, mets tes coordonnées dans `SUPPORT_CONTACT` (nom, e-mail, téléphone). Elles s'affichent aux clients.
+
+### Ce que fait la console
+| | |
+|---|---|
+| **Entreprises** | Toutes tes entreprises clientes, avec leur statut (essai, actif, suspendu), les jours d'essai restants, le nombre d'utilisateurs, l'activité de la semaine, les demandes d'aide et les erreurs. Tes **notes internes** ne sont jamais visibles par le client. |
+| **＋ Nouvelle entreprise cliente** | Crée l'entreprise et te donne un **message d'accueil prêt à envoyer** au patron, avec un **code responsable à usage unique**. |
+| **⚙️ Gérer** | Change le statut ou la fin de l'essai. **Suspendu** bloque tout l'accès de l'entreprise (par exemple en cas d'impayé). Ses données sont conservées et elle retrouve tout dès que tu la réactives. |
+| **🛟 Accéder** (support à distance) | Quand un client t'appelle, tu ouvres **son appli avec les droits de son responsable** pour voir et corriger. C'est limité à **2 heures**, avec un **motif obligatoire**, et un **bandeau orange** reste affiché. Le client voit chaque accès (date, motif) dans ses Réglages, et il peut **refuser** l'accès du support. |
+| **Demandes d'aide** | Ce que tes utilisateurs envoient avec le bouton **🆘 Aide** (avec l'écran et l'appareil utilisés). Tu réponds dans la console, et ils voient ta réponse dans l'appli. |
+| **Erreurs** | Chaque **bug** rencontré par un utilisateur remonte **automatiquement**, regroupé par problème, avec l'entreprise, l'écran, l'appareil et les détails techniques. Les messages normaux (champ manquant, pas de réseau…) ne sont pas comptés. |
+
+> 🔐 **Sécurité et protection des données** : sans session de support ouverte, même toi tu ne vois **aucune** donnée de tes clients. Tout passe par l'accès support tracé. C'est ce qu'il faut pour respecter la loi suisse sur la protection des données (nLPD) et inspirer confiance. Mentionne-le dans ton contrat.
+
+## 📶 Pointage fiable, même sans réseau
+- Un pointage arrive en base en **moins d'une seconde** (mesuré à environ 70 ms dans les tests, contre plusieurs secondes avec Google Sheets).
+- **Sans réseau** (sous-sol, chantier), le pointage est **gardé sur le téléphone** et envoyé **automatiquement** dès le retour de la connexion. Il est marqué 📶 « hors ligne » et ne peut jamais être enregistré en double.
+- L'heure d'un pointage normal est fixée **par le serveur**. Un pointage hors ligne vieux de plus de 48 h est refusé : il faut alors passer par « Pointage oublié », avec un motif.
+
+## 💼 Avant de vendre : la liste à cocher
+- [ ] Projet Supabase en région **Zurich** (ou Francfort), et passage au **plan Pro** (≈ 25 $/mois) dès le premier client payant. Le plan gratuit met le projet en pause après une semaine sans activité et n'a pas de sauvegardes quotidiennes.
+- [ ] Un **deuxième projet Supabase « test »**, pour essayer tes changements sans toucher aux données des clients.
+- [ ] Les **tests automatiques** passent (`gestion/tests/README.md`) avant chaque mise en ligne.
+- [ ] `SUPPORT_CONTACT` rempli dans `js/config.js`.
+- [ ] Un **contrat simple** et une **politique de confidentialité** : qui héberge les données, combien de temps, l'accès support tracé, la résiliation et l'export des données. Fais-les relire par un juriste ou une fiduciaire.
+- [ ] Une **adresse web à ton nom** (ex. `app.haksou.ch`) plutôt que github.io, pour faire plus professionnel.
+
 ## 📱 Installer sur le téléphone
 - **iPhone** : Safari → Partager → **Sur l'écran d'accueil**
 - **Android** : Chrome → menu ⋮ → **Installer l'application**
@@ -72,11 +109,15 @@ gestion/
 │   ├── meta.js            liste des modules et des statuts
 │   ├── utils.js           dates, argent, fenêtres, photos, signature
 │   ├── pdf.js             création des PDF, téléchargement et partage
+│   ├── punch.js           pointage fiable (file d'attente hors ligne, sans doublon)
+│   ├── monitor.js         remontée automatique des erreurs vers la console
+│   ├── help.js            bouton 🆘 Aide
 │   └── modules/           un fichier par module
 │       ├── accueil.js  pointage.js  conges.js  planning.js
 │       ├── interventions.js  factures.js  clients.js
-│       └── stock.js  frais.js  equipe.js  reglages.js
-├── vendor/jspdf…          générateur PDF (licence MIT), inclus pour marcher hors ligne
+│       ├── stock.js  frais.js  equipe.js  reglages.js
+│       └── console.js     console du propriétaire (supervision, support)
+├── vendor/                jsPDF et supabase-js (licence MIT), inclus pour ne dépendre d'aucun site externe
 ├── supabase/schema.sql    tables + règles de sécurité + fonctions
 ├── tests/                 tests automatiques (navigateur + base de données)
 ├── manifest.webmanifest   installation sur l'écran d'accueil
@@ -100,7 +141,7 @@ Chaque document a un bouton **📄 PDF**, qui télécharge un vrai fichier. Sur 
 - sur **ordinateur**, il télécharge le PDF et ouvre un e-mail prérempli, dans lequel il suffit de glisser le fichier.
 
 ## 🧪 Tests
-- **Automatiques** : voir [`tests/README.md`](tests/README.md). Il y a 39 vérifications dans le navigateur, plus les tests des règles de sécurité de la base.
+- **Automatiques** : voir [`tests/README.md`](tests/README.md). Il y a 57 vérifications en mode démo, 44 en vrai mode Supabase (trois navigateurs : propriétaire, patron, employé), plus les tests des règles de sécurité de la base.
 - **Avec de vrais utilisateurs** : voir le guide [`TESTS-UTILISATEURS.md`](TESTS-UTILISATEURS.md).
 
 ## 🔄 Mettre à jour une base Supabase existante

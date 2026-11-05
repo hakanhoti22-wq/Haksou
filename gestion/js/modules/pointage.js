@@ -1,6 +1,7 @@
 // Module 1 — Pointage multi-employés.
 import { db, session, team, memberName } from '../db.js';
 import { createPDF, downloadFile } from '../pdf.js';
+import { punchNow, pending, flush, cacheMine, cachedMine, isOffline, fetchOrFail } from '../punch.js';
 import { $, $$, esc, isoDate, addDays, startOfWeek, startOfDay, startOfMonth, fmtTime, fmtMin, fmtDay, fmtMonth, timeInput, modal, toast, downloadCSV, empty, chip, parseDate } from '../utils.js';
 
 /** Regroupe des pointages (d'un employé) par jour et calcule les minutes travaillées. */
@@ -29,7 +30,12 @@ export async function render(el, ctx) {
   clearInterval(timer);
   const me = session.profile, now = new Date();
   const since = addDays(startOfWeek(now), -21).toISOString();
-  const mine = await db.list('punches', { eq: { user_id: me.id }, gte: { at: since }, order: 'at' });
+  await flush();
+  const waiting = pending();
+  let fromServer, offline = false;
+  try { fromServer = await fetchOrFail(db.list('punches', { eq: { user_id: me.id }, gte: { at: since }, order: 'at' })); cacheMine(fromServer); }
+  catch (e) { if (!isOffline(e)) throw e; fromServer = cachedMine(); offline = true; }
+  const mine = [...fromServer, ...waiting];
   const days = computeDays(mine, now);
   const today = days[isoDate(now)] || { min: 0, list: [] };
   const present = isPresent(mine);
@@ -40,13 +46,16 @@ export async function render(el, ctx) {
   const canEdit = ctx.admin || session.company.punch_self_edit !== false;
 
   el.innerHTML = `
-    <div class="card hero">
+    ${session.support ? '<div class="card notice">🛟 Mode support : tu vois ici les heures de l\'équipe et le journal. Ton propre pointage n\'est pas proposé.</div>' : ''}
+    <div class="card hero" ${session.support ? 'hidden' : ''}>
       <div class="status"><span class="dot ${present ? 'in' : ''}"></span><div>
         <div class="big">${present ? 'Au travail' : 'Absent'}</div>
         <div class="mut">${last ? `Dernier pointage : ${last.type === 'in' ? 'arrivée' : 'départ'} ${isoDate(last.at) === isoDate(now) ? 'à' : 'le ' + fmtDay(last.at) + ' à'} ${fmtTime(last.at)}` : 'Aucun pointage pour l\'instant'}</div>
       </div></div>
       <button class="${present ? 'out' : 'in'} huge" id="punch">${present ? '⏹ Pointer mon départ' : '▶︎ Pointer mon arrivée'}</button>
     </div>
+    ${offline ? '<div class="card notice">📶 <b>Pas de connexion</b> : tu peux quand même pointer, l\'envoi se fera automatiquement.</div>' : ''}
+    ${waiting.length ? `<div class="card notice">⏳ <b>${waiting.length} pointage${waiting.length > 1 ? 's' : ''} en attente d'envoi</b> (pas de réseau). ${waiting.length > 1 ? 'Ils partiront' : 'Il partira'} automatiquement dès le retour de la connexion : tu peux fermer l'appli.</div>` : ''}
     <div class="tiles">
       <div class="card"><div class="mut">Aujourd'hui</div><div class="num" id="todayMin">${fmtMin(today.min)}</div></div>
       <div class="card"><div class="mut">Cette semaine</div><div class="num">${fmtMin(weekMin)}</div>
@@ -60,8 +69,8 @@ export async function render(el, ctx) {
   $('#punch').onclick = async () => {
     $('#punch').disabled = true;
     try {
-      await db.insert('punches', { user_id: me.id, type: present ? 'out' : 'in' }); // heure fixée par le serveur
-      toast(present ? 'Départ enregistré 👋' : 'Arrivée enregistrée ✅');
+      const r = await punchNow(present ? 'out' : 'in');
+      toast((present ? 'Départ enregistré 👋' : 'Arrivée enregistrée ✅') + (r.queued ? ' · pas de réseau : envoi automatique dès le retour de la connexion' : ''), r.queued ? 'info' : 'ok');
       ctx.refresh();
     } catch (e) { toast(e.message, 'err'); $('#punch').disabled = false; }
   };
@@ -69,7 +78,7 @@ export async function render(el, ctx) {
   if (canEdit) $$('[data-punch]', el).forEach(b => b.onclick = () => editPunch(mine.find(p => p.id === b.dataset.punch), ctx));
   if (present) timer = setInterval(() => { if (!ctx.alive()) return clearInterval(timer); $('#todayMin').textContent = fmtMin(computeDays(mine)[isoDate(new Date())]?.min); }, 30000);
 
-  if (ctx.admin) await renderTeam($('#team'), ctx);
+  if (ctx.admin && !offline) await renderTeam($('#team'), ctx).catch(e => { if (!isOffline(e)) throw e; });
 }
 
 function histHTML(days) {
@@ -77,7 +86,7 @@ function histHTML(days) {
   if (!list.length) return empty('Aucun pointage ces dernières semaines.');
   return list.map(([date, d]) => `<div class="day">
     <div class="between"><b>${fmtDay(date)}</b><span>${d.missing ? chip('Départ oublié', 'err') : ''} <b>${fmtMin(d.min)}</b></span></div>
-    <div class="punches">${d.list.map(p => `<button class="pill p-${p.type}" data-punch="${p.id}" title="${p.manual || p.edited ? esc('Corrigé' + (p.note ? ' : ' + p.note : '')) : ''}">${p.type === 'in' ? '▶︎' : '⏹'} ${fmtTime(p.at)}${p.manual || p.edited ? ' ✎' : ''}</button>`).join('')}</div>
+    <div class="punches">${d.list.map(p => `<button class="pill p-${p.type}" ${p.pending ? 'disabled title="En attente d\'envoi"' : `data-punch="${p.id}"`} title="${p.manual || p.edited ? esc('Corrigé' + (p.note ? ' : ' + p.note : '')) : p.offline ? 'Pointé hors ligne' : ''}">${p.type === 'in' ? '▶︎' : '⏹'} ${fmtTime(p.at)}${p.manual || p.edited ? ' ✎' : ''}${p.pending ? ' ⏳' : p.offline ? ' 📶' : ''}</button>`).join('')}</div>
   </div>`).join('');
 }
 

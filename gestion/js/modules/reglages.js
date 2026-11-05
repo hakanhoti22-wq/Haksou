@@ -1,10 +1,12 @@
 // Réglages : profil, entreprise, modules, mode démo.
-import { DEMO, auth, session, team } from '../db.js';
+import { DEMO, auth, session, team, help } from '../db.js';
 import { MODULES } from '../meta.js';
-import { $, esc, toast } from '../utils.js';
+import { $, esc, toast, fmtDate, fmtTime, empty } from '../utils.js';
+import { openHelp } from '../help.js';
 
 export async function render(el, ctx) {
   const c = session.company, me = session.profile;
+  const history = ctx.admin ? await help.supportHistory().catch(() => []) : [];
   el.innerHTML = `
     <form class="card" id="profile"><h3>👤 Mon profil</h3>
       <label>Mon nom<input name="name" value="${esc(me.name)}" required></label>
@@ -29,7 +31,19 @@ export async function render(el, ctx) {
     <form class="card" id="mods"><h3>🧩 Modules activés</h3>
       <p class="mut small">Active seulement ce dont ton entreprise a besoin : le menu s'adapte pour toute l'équipe.</p>
       <div class="mods">${MODULES.map(m => `<label class="mod"><input type="checkbox" name="${m.id}" ${c.modules.includes(m.id) ? 'checked' : ''}><span>${m.icon}</span><div><b>${m.label}</b><small>${m.desc}</small></div></label>`).join('')}</div>
-      <button type="submit" class="primary">Enregistrer les modules</button></form>` : ''}
+      <button type="submit" class="primary">Enregistrer les modules</button></form>
+
+    <div class="card"><h3>🛟 Accès du support Haksou</h3>
+      <p class="mut small">Quand tu appelles le support, il peut ouvrir ton appli pour t'aider ou corriger un problème : pendant 2 heures maximum, avec un motif, et chacune de ses actions est enregistrée ci-dessous.</p>
+      <label class="check"><input type="checkbox" id="supportAllowed" ${c.support_allowed !== false ? 'checked' : ''}> Autoriser le support à accéder à notre appli</label>
+      <h4>Derniers accès du support</h4>
+      <div class="list compact">${history.length ? history.slice(0, 10).map(h => `<div class="item small"><span class="grow">${fmtDate(h.started_at)} ${fmtTime(h.started_at)} · « ${esc(h.reason)} »</span>
+        <span class="mut">${h.ended_at ? 'terminé à ' + fmtTime(h.ended_at) : new Date(h.expires_at) > new Date() ? '<b class="warn-t">en cours</b>' : 'expiré à ' + fmtTime(h.expires_at)}</span></div>`).join('') : empty('Le support n\'a jamais accédé à ton appli.')}</div>
+    </div>` : ''}
+
+    <div class="card"><h3>🆘 Besoin d'aide ?</h3>
+      <p class="mut small">Une question, un problème ? Écris au support depuis l'appli : il voit ta demande et te répond ici.</p>
+      <button id="help">Demander de l'aide</button></div>
 
     <div class="card"><h3>📱 Installer l'appli</h3>
       <p class="mut small"><b>iPhone</b> : ouvre cette page dans Safari → bouton Partager → « Sur l'écran d'accueil ».<br>
@@ -42,6 +56,11 @@ export async function render(el, ctx) {
     </div>
     <p class="mut small center">Haksou Pro · v1.0</p>`;
 
+  $('#help')?.addEventListener('click', () => openHelp());
+  $('#supportAllowed')?.addEventListener('change', async e => {
+    try { await team.updateCompany({ support_allowed: e.target.checked }); toast(e.target.checked ? 'Accès du support autorisé' : 'Accès du support désactivé'); }
+    catch (err) { toast(err.message, 'err'); e.target.checked = !e.target.checked; }
+  });
   $('#profile').onsubmit = async e => { e.preventDefault(); await team.setMyName(e.target.name.value.trim()); toast('Profil enregistré'); ctx.reloadMenu(); };
   $('#company')?.addEventListener('submit', async e => {
     e.preventDefault();

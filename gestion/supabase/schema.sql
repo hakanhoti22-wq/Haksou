@@ -486,3 +486,306 @@ begin
   return num;
 end $$;
 grant execute on function public.issue_document(uuid) to authenticated;
+
+-- ═══════════════════════════════════════════════════════════════
+--  v3 — Console du propriétaire, accès support, supervision
+-- ═══════════════════════════════════════════════════════════════
+
+-- Propriétaire(s) de la plateforme : à ajouter une seule fois, à la main (voir README)
+create table if not exists public.platform_admins (
+  user_id uuid primary key references auth.users on delete cascade,
+  created_at timestamptz not null default now()
+);
+alter table public.platform_admins enable row level security;
+drop policy if exists "lecture soi" on public.platform_admins;
+create policy "lecture soi" on public.platform_admins for select using (user_id = auth.uid());
+
+create or replace function public.is_platform_admin() returns boolean
+language sql stable security definer set search_path = public as
+$$ select exists (select 1 from platform_admins where user_id = auth.uid()) $$;
+
+-- Statut commercial et accès support de chaque entreprise
+alter table public.companies add column if not exists status text not null default 'actif';
+alter table public.companies drop constraint if exists companies_status_check;
+alter table public.companies add constraint companies_status_check check (status in ('essai', 'actif', 'suspendu'));
+alter table public.companies add column if not exists trial_ends_at date;
+alter table public.companies add column if not exists support_allowed boolean not null default true;
+alter table public.companies add column if not exists admin_code text unique;   -- code à usage unique pour le 1er responsable
+
+-- Notes internes du propriétaire (jamais visibles par l'entreprise)
+create table if not exists public.platform_notes (
+  company_id uuid primary key references public.companies on delete cascade,
+  notes text not null default '',
+  updated_at timestamptz not null default now()
+);
+alter table public.platform_notes enable row level security;
+drop policy if exists "proprietaire" on public.platform_notes;
+create policy "proprietaire" on public.platform_notes for all using (public.is_platform_admin()) with check (public.is_platform_admin());
+
+-- Sessions d'accès support : limitées dans le temps, avec motif, visibles par l'entreprise
+create table if not exists public.support_sessions (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users on delete cascade,
+  company_id uuid not null references public.companies on delete cascade,
+  reason text not null,
+  started_at timestamptz not null default now(),
+  expires_at timestamptz not null default now() + interval '2 hours',
+  ended_at timestamptz
+);
+create index if not exists support_sessions_owner on public.support_sessions (owner_id, started_at desc);
+alter table public.support_sessions enable row level security;
+
+create or replace function public.support_company() returns uuid
+language sql stable security definer set search_path = public as $$
+  select s.company_id from support_sessions s join companies c on c.id = s.company_id
+  where s.owner_id = auth.uid() and s.ended_at is null and s.expires_at > now() and c.support_allowed
+    and exists (select 1 from platform_admins where user_id = auth.uid())
+  order by s.started_at desc limit 1
+$$;
+
+-- En mode support, le propriétaire agit dans l'entreprise avec les droits d'un responsable.
+-- Une entreprise suspendue n'a plus accès à ses données (sauf via le support).
+create or replace function public.my_company() returns uuid
+language sql stable security definer set search_path = public as $$
+  select coalesce(public.support_company(),
+    (select p.company_id from profiles p join companies c on c.id = p.company_id where p.id = auth.uid() and c.status <> 'suspendu'))
+$$;
+
+create or replace function public.is_admin() returns boolean
+language sql stable security definer set search_path = public as $$
+  select public.support_company() is not null
+    or coalesce((select role = 'admin' from profiles where id = auth.uid() and company_id = public.my_company()), false)
+$$;
+
+drop policy if exists "historique support" on public.support_sessions;
+create policy "historique support" on public.support_sessions for select
+  using (owner_id = auth.uid() or (company_id = public.my_company() and public.is_admin()));
+
+alter table public.audit_log add column if not exists via_support boolean not null default false;
+create or replace function public.log_action(p_company uuid, p_table text, p_row uuid, p_action text, p_details jsonb)
+returns void language sql security definer set search_path = public as $$
+  insert into audit_log (company_id, actor_id, table_name, row_id, action, details, via_support)
+  values (p_company, auth.uid(), p_table, p_row, p_action, p_details, public.support_company() is not null)
+$$;
+revoke execute on function public.log_action(uuid, text, uuid, text, jsonb) from public, anon, authenticated;
+
+create or replace function public.my_company_status() returns text
+language sql stable security definer set search_path = public as
+$$ select c.status from profiles p join companies c on c.id = p.company_id where p.id = auth.uid() $$;
+
+-- L'entreprise ne peut pas changer elle-même son statut, sa période d'essai ou le code responsable
+create or replace function public.guard_company() returns trigger
+language plpgsql set search_path = public as $$
+begin
+  if current_user = 'authenticated' and not public.is_platform_admin()
+     and (new.status, new.trial_ends_at, new.admin_code) is distinct from (old.status, old.trial_ends_at, old.admin_code) then
+    raise exception 'Réservé au propriétaire de la plateforme.';
+  end if;
+  return new;
+end $$;
+drop trigger if exists guard_company on public.companies;
+create trigger guard_company before update on public.companies for each row execute function public.guard_company();
+
+-- Démarrer / terminer un accès support
+create or replace function public.start_support(p_company uuid, p_reason text) returns uuid
+language plpgsql security definer set search_path = public as $$
+declare sid uuid;
+begin
+  if not public.is_platform_admin() then raise exception 'Réservé au propriétaire de la plateforme.'; end if;
+  if coalesce(trim(p_reason), '') = '' then raise exception 'Indique le motif de l''accès (ex. appel du client pour…).'; end if;
+  if not exists (select 1 from companies where id = p_company and support_allowed) then
+    raise exception 'Cette entreprise a désactivé l''accès du support. Demande-lui de le réactiver dans Réglages.';
+  end if;
+  insert into profiles (id, name, email, role) values (auth.uid(), 'Support Haksou', (select email from auth.users where id = auth.uid()), 'employe')
+    on conflict (id) do nothing;
+  update support_sessions set ended_at = now() where owner_id = auth.uid() and ended_at is null;
+  insert into support_sessions (owner_id, company_id, reason) values (auth.uid(), p_company, trim(p_reason)) returning id into sid;
+  perform log_action(p_company, 'support', sid, 'debut', jsonb_build_object('reason', trim(p_reason)));
+  return sid;
+end $$;
+
+create or replace function public.end_support() returns void
+language plpgsql security definer set search_path = public as $$
+declare s support_sessions;
+begin
+  for s in update support_sessions set ended_at = now() where owner_id = auth.uid() and ended_at is null returning * loop
+    insert into audit_log (company_id, actor_id, table_name, row_id, action, details, via_support)
+    values (s.company_id, auth.uid(), 'support', s.id, 'fin', '{}', true);
+  end loop;
+end $$;
+
+-- Vue d'ensemble pour la console du propriétaire
+create or replace function public.platform_overview()
+returns table (id uuid, name text, status text, trial_ends_at date, support_allowed boolean, created_at timestamptz,
+  members int, admins int, punches_7d int, documents_30d int, last_activity timestamptz, open_tickets int, errors_7d int, admin_code text, notes text)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_platform_admin() then raise exception 'Réservé au propriétaire de la plateforme.'; end if;
+  return query
+  select c.id, c.name, c.status, c.trial_ends_at, c.support_allowed, c.created_at,
+    (select count(*)::int from profiles p where p.company_id = c.id),
+    (select count(*)::int from profiles p where p.company_id = c.id and p.role = 'admin'),
+    (select count(*)::int from punches x where x.company_id = c.id and x.at > now() - interval '7 days'),
+    (select count(*)::int from documents x where x.company_id = c.id and x.created_at > now() - interval '30 days'),
+    greatest((select max(x.at) from punches x where x.company_id = c.id), (select max(x.at) from audit_log x where x.company_id = c.id and not x.via_support),
+      (select max(x.created_at) from documents x where x.company_id = c.id)),
+    (select count(*)::int from support_tickets t where t.company_id = c.id and t.status = 'ouvert'),
+    (select count(*)::int from error_reports e where e.company_id = c.id and e.at > now() - interval '7 days'),
+    c.admin_code, coalesce((select n.notes from platform_notes n where n.company_id = c.id), '')
+  from companies c order by c.created_at desc;
+end $$;
+
+create or replace function public.platform_create_company(p_name text, p_trial_days int default 30) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare c companies;
+begin
+  if not public.is_platform_admin() then raise exception 'Réservé au propriétaire de la plateforme.'; end if;
+  if coalesce(trim(p_name), '') = '' then raise exception 'Indique le nom de l''entreprise.'; end if;
+  insert into companies (name, status, trial_ends_at, admin_code)
+  values (trim(p_name), case when p_trial_days > 0 then 'essai' else 'actif' end,
+          case when p_trial_days > 0 then current_date + p_trial_days end, upper(substr(md5(random()::text), 1, 8)))
+  returning * into c;
+  return jsonb_build_object('id', c.id, 'admin_code', c.admin_code, 'join_code', c.join_code);
+end $$;
+
+create or replace function public.platform_set_company(p_id uuid, p_status text, p_trial_ends_at date, p_notes text) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_platform_admin() then raise exception 'Réservé au propriétaire de la plateforme.'; end if;
+  update companies set status = p_status, trial_ends_at = p_trial_ends_at where id = p_id;
+  insert into platform_notes (company_id, notes, updated_at) values (p_id, coalesce(p_notes, ''), now())
+    on conflict (company_id) do update set notes = excluded.notes, updated_at = now();
+end $$;
+
+-- Rejoindre : le code responsable (à usage unique) donne le rôle de responsable
+create or replace function public.join_company(p_code text, p_user_name text) returns uuid
+language plpgsql security definer set search_path = public as $$
+declare cid uuid; as_admin boolean; code text := upper(trim(p_code));
+begin
+  if auth.uid() is null then raise exception 'Non connecté'; end if;
+  if exists (select 1 from profiles where id = auth.uid() and company_id is not null) then
+    raise exception 'Tu fais déjà partie d''une entreprise.';
+  end if;
+  select id, admin_code = code into cid, as_admin from companies where join_code = code or admin_code = code;
+  if cid is null then raise exception 'Code d''entreprise inconnu. Vérifie-le auprès de ton responsable.'; end if;
+  insert into profiles (id, company_id, name, email, role)
+  values (auth.uid(), cid, trim(p_user_name), (select email from auth.users where id = auth.uid()), case when as_admin then 'admin' else 'employe' end)
+  on conflict (id) do update set company_id = cid, name = excluded.name, role = excluded.role;
+  if as_admin then update companies set admin_code = null where id = cid; end if;
+  return cid;
+end $$;
+
+-- Remontée automatique des erreurs de l'appli
+create table if not exists public.error_reports (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid default public.my_company() references public.companies on delete cascade,
+  user_id uuid default auth.uid() references auth.users on delete set null,
+  message text not null check (length(message) <= 2000),
+  stack text check (length(stack) <= 8000),
+  url text check (length(url) <= 500),
+  user_agent text check (length(user_agent) <= 500),
+  app_version text,
+  resolved boolean not null default false,
+  at timestamptz not null default now()
+);
+create index if not exists error_reports_at on public.error_reports (at desc);
+alter table public.error_reports enable row level security;
+drop policy if exists "envoi" on public.error_reports;
+drop policy if exists "proprietaire" on public.error_reports;
+create policy "envoi" on public.error_reports for insert with check (user_id = auth.uid() and (company_id is null or company_id = public.my_company()));
+create policy "proprietaire" on public.error_reports for all using (public.is_platform_admin()) with check (public.is_platform_admin());
+
+-- Demandes d'aide des utilisateurs
+create table if not exists public.support_tickets (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid not null default public.my_company() references public.companies on delete cascade,
+  user_id uuid default auth.uid() references public.profiles on delete set null,
+  message text not null check (length(message) between 1 and 4000),
+  context text default '',
+  status text not null default 'ouvert' check (status in ('ouvert', 'resolu')),
+  reply text default '',
+  replied_at timestamptz,
+  created_at timestamptz not null default now()
+);
+alter table public.support_tickets enable row level security;
+drop policy if exists "envoi" on public.support_tickets;
+drop policy if exists "lecture" on public.support_tickets;
+drop policy if exists "reponse" on public.support_tickets;
+create policy "envoi" on public.support_tickets for insert with check (company_id = public.my_company() and user_id = auth.uid() and status = 'ouvert');
+create policy "lecture" on public.support_tickets for select using (public.is_platform_admin() or (company_id = public.my_company() and (user_id = auth.uid() or public.is_admin())));
+create policy "reponse" on public.support_tickets for update using (public.is_platform_admin()) with check (public.is_platform_admin());
+
+-- Pointages hors ligne : envoyés plus tard avec l'heure du téléphone, signalés comme tels
+alter table public.punches add column if not exists offline boolean not null default false;
+create or replace function public.punch_guard() returns trigger
+language plpgsql set search_path = public as $$
+declare can_edit boolean := public.is_admin()
+  or coalesce((select punch_self_edit from companies where id = coalesce(new.company_id, old.company_id)), true);
+begin
+  if tg_op = 'INSERT' then
+    new.deleted := false; new.edited := false;
+    if new.offline then
+      if new.at < now() - interval '48 hours' or new.at > now() + interval '5 minutes' then
+        raise exception 'Pointage hors ligne trop ancien : ajoute-le comme pointage oublié.';
+      end if;
+      new.manual := false;
+      return new;
+    end if;
+    new.manual := abs(extract(epoch from (new.at - now()))) > 300;
+    if new.manual and not can_edit then raise exception 'Ton responsable a désactivé les corrections de pointage.'; end if;
+    if new.manual and coalesce(trim(new.note), '') = '' then raise exception 'Indique le motif de ce pointage oublié.'; end if;
+    return new;
+  end if;
+  if not can_edit then raise exception 'Ton responsable a désactivé les corrections de pointage.'; end if;
+  if old.deleted and not public.is_admin() then raise exception 'Ce pointage a été supprimé.'; end if;
+  if (new.at, new.type, new.deleted) is distinct from (old.at, old.type, old.deleted) and coalesce(trim(new.note), '') = '' then
+    raise exception 'Indique le motif de la correction.';
+  end if;
+  new.user_id := old.user_id; new.company_id := old.company_id; new.manual := old.manual; new.offline := old.offline;
+  new.edited := old.edited or (new.at, new.type) is distinct from (old.at, old.type);
+  return new;
+end $$;
+
+create or replace function public.punch_audit() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if tg_op = 'INSERT' then
+    if new.manual then
+      perform log_action(new.company_id, 'punches', new.id, 'ajout', jsonb_build_object('user_id', new.user_id, 'type', new.type, 'at', new.at, 'note', new.note));
+    elsif new.offline and abs(extract(epoch from (new.at - now()))) > 300 then
+      perform log_action(new.company_id, 'punches', new.id, 'hors_ligne', jsonb_build_object('user_id', new.user_id, 'type', new.type, 'at', new.at, 'recu', now()));
+    end if;
+  elsif (new.at, new.type, new.deleted) is distinct from (old.at, old.type, old.deleted) then
+    perform log_action(new.company_id, 'punches', new.id, case when new.deleted and not old.deleted then 'suppression' else 'modification' end,
+      jsonb_build_object('user_id', new.user_id, 'type_avant', old.type, 'type', new.type, 'at_avant', old.at, 'at', new.at, 'note', new.note));
+  end if;
+  return null;
+end $$;
+
+-- Demandes d'aide et erreurs de toutes les entreprises, pour la console
+create or replace function public.platform_tickets()
+returns table (id uuid, company_id uuid, company_name text, user_id uuid, user_name text, user_email text, message text, context text,
+  status text, reply text, replied_at timestamptz, created_at timestamptz)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_platform_admin() then raise exception 'Réservé au propriétaire de la plateforme.'; end if;
+  return query select t.id, t.company_id, c.name, t.user_id, p.name, p.email, t.message, t.context, t.status, t.reply, t.replied_at, t.created_at
+    from support_tickets t join companies c on c.id = t.company_id left join profiles p on p.id = t.user_id
+    order by (t.status = 'ouvert') desc, t.created_at desc limit 500;
+end $$;
+
+create or replace function public.platform_errors()
+returns table (id uuid, company_id uuid, company_name text, user_id uuid, user_name text, message text, stack text, url text,
+  user_agent text, app_version text, resolved boolean, at timestamptz)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_platform_admin() then raise exception 'Réservé au propriétaire de la plateforme.'; end if;
+  return query select e.id, e.company_id, coalesce(c.name, '—'), e.user_id, coalesce(p.name, '—'), e.message, e.stack, e.url, e.user_agent, e.app_version, e.resolved, e.at
+    from error_reports e left join companies c on c.id = e.company_id left join profiles p on p.id = e.user_id
+    order by e.at desc limit 1000;
+end $$;
+
+grant execute on function public.platform_tickets(), public.platform_errors() to authenticated;
+grant execute on function public.start_support(uuid, text), public.end_support(), public.platform_overview(),
+  public.platform_create_company(text, int), public.platform_set_company(uuid, text, date, text), public.my_company_status(),
+  public.is_platform_admin() to authenticated;

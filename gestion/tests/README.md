@@ -1,30 +1,19 @@
 # 🧪 Tests automatiques
 
-Relance-les après chaque modification : en une minute, ils vérifient que rien n'est cassé.
-
-## 1. L'appli dans un vrai navigateur (`e2e.js`)
-
-Le test joue un scénario complet en mode démo : pointage et corrections, congés, planning, devis → facture → note de crédit, intervention avec photo et signature, stock, notes de frais, droits des employés. Il vérifie aussi que chaque **PDF** produit est un vrai fichier PDF.
+À relancer **avant chaque mise en ligne**. En quelques minutes, ils vérifient que rien n'est cassé.
 
 ```bash
-npm install --no-save playwright
-npx playwright install chromium
-node gestion/tests/e2e.js
+cd gestion/tests
+npm install                       # une seule fois
+npx playwright install chromium   # une seule fois
 ```
 
-Résultat attendu : `✅ 39 vérifications réussies, aucune erreur JavaScript.`
-Pour garder les PDF produits : `PDF_DIR=/un/dossier node gestion/tests/e2e.js`.
+| Commande | Ce qui est testé | Résultat attendu |
+|---|---|---|
+| `npm run demo` | Toute l'appli en **mode démo** dans un vrai navigateur : pointage, congés, planning, factures et notes de crédit, interventions, stock, frais, droits des employés, console du propriétaire, accès support, suspension. Chaque PDF est vérifié. | `✅ 57 vérifications réussies` |
+| `PGURL=postgres://postgres@localhost:5432 npm run supabase` | Le **vrai mode Supabase** : vraie base PostgreSQL, vraies règles de sécurité, vraie bibliothèque supabase-js. Trois navigateurs séparés (propriétaire, patron, employé) jouent toute la vie d'un client : création de l'entreprise, inscriptions, pointage **sans réseau**, factures, demande d'aide, accès support, suspension. | `✅ 44 vérifications réussies en mode Supabase` |
+| `PSQL="psql -h localhost -U postgres" npm run sql` | Les **règles de sécurité** de `supabase/schema.sql`, une par une. | Seulement des `ERROR` annoncées par un commentaire `-- ERREUR` ou `-- doit échouer` (ce sont les tentatives interdites) |
 
-## 2. Les règles de sécurité de la base (`sql/`)
+Les deux derniers tests ont besoin d'un **PostgreSQL local**, mais **d'aucun compte Supabase**. Le dossier `supabase-local/` contient un petit serveur qui imite les API de Supabase utilisées par l'appli. Il sert **uniquement aux tests**, jamais en production.
 
-Ces tests rejouent `supabase/schema.sql` sur un PostgreSQL ordinaire, avec une petite simulation de Supabase. Ils n'ont **besoin d'aucun compte Supabase**. Ils vérifient :
-- qu'une entreprise ne voit jamais les données d'une autre ;
-- qu'un employé ne peut ni valider ses propres congés ou frais, ni modifier le planning ;
-- qu'une facture émise ne peut être ni modifiée ni supprimée, et que la numérotation n'a pas de trous ;
-- qu'une note de crédit annule la facture, et que chaque correction de pointage est journalisée avec son motif.
-
-```bash
-PSQL="psql -h localhost -U postgres" ./gestion/tests/sql/run.sh
-```
-
-Les lignes `ERROR` qui s'affichent sont **voulues** : ce sont les tentatives interdites, chacune annoncée par un commentaire `-- ERREUR` ou `-- doit échouer` dans le fichier de test.
+Pour garder les PDF produits par le test démo : `PDF_DIR=/un/dossier npm run demo`.

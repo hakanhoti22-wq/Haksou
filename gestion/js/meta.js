@@ -18,3 +18,6 @@ export const STATUS = {
   facture: { brouillon: ['Brouillon', ''], envoyee: ['Émise', 'info'], payee: ['Payée', 'ok'], retard: ['En retard', 'err'], annulee: ['Annulée', ''] },
   avoir: { brouillon: ['Brouillon', ''], emise: ['Émise', 'info'] },
 };
+
+/** Version affichée dans l'appli et jointe aux rapports d'erreur. */
+export const APP_VERSION = '1.2.0';

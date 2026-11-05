@@ -14,7 +14,7 @@ export function buildSeed(newId) {
   const company = {
     id: cid, created_at: stamp, name: 'Démo Services Sàrl', join_code: 'DEMO42',
     address: 'Route de l\'Ancienne-Papeterie 1\n1723 Marly', phone: '026 000 00 00', email: 'contact@demo-services.ch',
-    iban: 'CH93 0076 2011 6238 5295 7', currency: 'CHF', vat: 8.1, hourly_rate: 95, week_hours: 42, punch_self_edit: true,
+    iban: 'CH93 0076 2011 6238 5295 7', currency: 'CHF', vat: 8.1, hourly_rate: 95, week_hours: 42, punch_self_edit: true, status: 'actif', support_allowed: true,
     modules: [...ALL_MODULES],
   };
   const [boss, lea, karim] = [
@@ -108,5 +108,24 @@ export function buildSeed(newId) {
       details: { user_id: karim.id, type_avant: 'out', type: 'out', at_avant: before, at: after, note: fix.note } }));
   }
 
-  return { audit_log, companies: [company], profiles: [boss, lea, karim], punches, shifts, leaves, clients, items, movements, documents, interventions, expenses };
+  // Deuxième entreprise cliente (en essai) et propriétaire de la plateforme, pour la console
+  const c2 = { ...company, id: newId(), name: 'Boulangerie Rossier', join_code: 'PAIN77', admin_code: null, address: 'Rue de Lausanne 12\n1700 Fribourg',
+    phone: '026 111 22 33', email: 'info@boulangerie-rossier.ch', iban: '', status: 'essai', trial_ends_at: isoDate(day(12)), modules: ['pointage', 'conges', 'planning', 'stock'] };
+  const c2row = r => ({ ...row(r), company_id: c2.id });
+  const marc = c2row({ name: 'Marc Rossier', role: 'admin', email: 'marc@boulangerie-rossier.ch' });
+  const sofia = c2row({ name: 'Sofia Lopes', role: 'employe', email: 'sofia@boulangerie-rossier.ch' });
+  for (let n = -3; n <= -1; n++) for (const u of [marc, sofia]) {
+    punches.push(c2row({ user_id: u.id, type: 'in', at: at(n, 5, 30 + rnd(10)) }), c2row({ user_id: u.id, type: 'out', at: at(n, 13, rnd(20)) }));
+  }
+  const owner = { id: newId(), created_at: stamp, company_id: null, name: 'Hakan (propriétaire Haksou)', role: 'employe', email: 'hakan@haksou.ch', platform: true };
+  const support_tickets = [
+    c2row({ user_id: sofia.id, message: 'Bonjour, je ne trouve pas comment corriger mon pointage d\'hier, j\'ai oublié de pointer en partant.', context: '#/pointage · v1.2.0', status: 'ouvert', reply: '', replied_at: null }),
+    row({ user_id: lea.id, message: 'Comment ajouter notre logo sur les factures ?', context: '#/factures · v1.2.0', status: 'resolu', reply: 'Bonne idée, c\'est prévu dans une prochaine version. En attendant, le nom et l\'adresse de l\'entreprise apparaissent en haut.', replied_at: at(-2, 10, 5) }),
+  ];
+  const error_reports = [
+    c2row({ user_id: marc.id, message: 'TypeError: Cannot read properties of undefined (reading \'qty\')', stack: 'TypeError: Cannot read properties of undefined (reading \'qty\')\n    at stock.js:41:22', url: '#/stock · écran stock', user_agent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X)', app_version: '1.1.0', resolved: false, at: at(-1, 6, 12) }),
+  ];
+
+  return { support_tickets, error_reports, support_sessions: [], platform_notes: [{ company_id: c2.id, notes: 'Rencontré au marché de Fribourg. Intéressé par le planning. Prix évoqué : 9 CHF/employé/mois.', updated_at: stamp }],
+    audit_log, companies: [company, c2], profiles: [boss, lea, karim, marc, sofia, owner], punches, shifts, leaves, clients, items, movements, documents, interventions, expenses };
 }

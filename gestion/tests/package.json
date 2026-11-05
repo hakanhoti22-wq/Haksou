@@ -1,0 +1,14 @@
+{
+  "name": "haksou-pro-tests",
+  "private": true,
+  "description": "Tests automatiques de Haksou Pro (navigateur + base de données)",
+  "scripts": {
+    "demo": "node e2e.js",
+    "supabase": "node e2e-supabase.js",
+    "sql": "bash sql/run.sh"
+  },
+  "devDependencies": {
+    "pg": "^8.13.0",
+    "playwright": "^1.48.0"
+  }
+}

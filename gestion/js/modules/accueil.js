@@ -1,14 +1,15 @@
 // Tableau de bord : résumé de tous les modules activés.
 import { db, session, memberName } from '../db.js';
 import { MODULES } from '../meta.js';
-import { $, esc, isoDate, addDays, startOfWeek, startOfDay, fmtMin, fmtLongDay, money, toast } from '../utils.js';
+import { $, esc, fmtDate, isoDate, addDays, startOfWeek, startOfDay, fmtMin, fmtLongDay, money, toast } from '../utils.js';
 import { computeDays, isPresent } from './pointage.js';
+import { punchNow, pending, fetchOrFail } from '../punch.js';
 
 export async function render(el, ctx) {
   const on = id => session.company.modules.includes(id);
   const me = session.profile, today = isoDate(), now = new Date(), cur = session.company.currency || 'CHF';
   const wk = startOfWeek(now);
-  const safe = p => p.catch(() => []);
+  const safe = p => fetchOrFail(p).catch(() => []);
   const [punches, shifts, leaves, inter, docs, items, expenses] = await Promise.all([
     on('pointage') ? safe(db.list('punches', { gte: { at: (ctx.admin ? startOfDay(now) : wk).toISOString() } })) : [],
     on('planning') ? safe(db.list('shifts', { gte: { date: today }, lte: { date: isoDate(addDays(now, 6)) }, order: 'date' })) : [],
@@ -20,7 +21,7 @@ export async function render(el, ctx) {
   ]);
   const { outstanding, docStatus } = on('factures') && ctx.admin ? await import('./factures.js') : {};
 
-  const minePunches = punches.filter(p => p.user_id === me.id);
+  const minePunches = [...punches.filter(p => p.user_id === me.id), ...pending()];
   const present = isPresent(minePunches);
   const myDays = computeDays(minePunches, now);
   const todayMin = myDays[today]?.min || 0;
@@ -51,7 +52,8 @@ export async function render(el, ctx) {
 
   el.innerHTML = `
     <div class="hello"><h2 class="h-big">${hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir'} ${esc(me.name.split(' ')[0])} 👋</h2><p class="mut cap">${fmtLongDay(now)}</p></div>
-    ${on('pointage') ? `<div class="card hero row between"><div class="status"><span class="dot ${present ? 'in' : ''}"></span><div><b>${present ? 'Tu es pointé' : 'Tu n\'es pas pointé'}</b><div class="mut small">Aujourd'hui : ${fmtMin(todayMin)}</div></div></div>
+    ${ctx.admin && session.company.status === 'essai' && session.company.trial_ends_at ? `<div class="card notice info">🎁 <b>Période d'essai</b> jusqu'au ${fmtDate(session.company.trial_ends_at)}. Une question ? Bouton 🆘 Aide en haut à droite.</div>` : ''}
+    ${on('pointage') && !session.support ? `<div class="card hero row between"><div class="status"><span class="dot ${present ? 'in' : ''}"></span><div><b>${present ? 'Tu es pointé' : 'Tu n\'es pas pointé'}</b><div class="mut small">Aujourd'hui : ${fmtMin(todayMin)}</div></div></div>
       <button class="${present ? 'out' : 'in'}" id="punch">${present ? '⏹ Départ' : '▶︎ Arrivée'}</button></div>` : ''}
     <div class="dash">${tiles.join('')}</div>
     ${!session.company.modules.length ? '<div class="card">Aucun module activé. Va dans <a href="#/reglages">Réglages</a> pour en choisir.</div>' : ''}
@@ -60,7 +62,10 @@ export async function render(el, ctx) {
 
   $('#punch')?.addEventListener('click', async e => {
     e.target.disabled = true;
-    await db.insert('punches', { user_id: me.id, type: present ? 'out' : 'in' }); // heure fixée par le serveur
-    toast(present ? 'Départ enregistré 👋' : 'Arrivée enregistrée ✅'); ctx.refresh();
+    try {
+      const r = await punchNow(present ? 'out' : 'in');
+      toast((present ? 'Départ enregistré 👋' : 'Arrivée enregistrée ✅') + (r.queued ? ' · envoi dès le retour du réseau' : ''), r.queued ? 'info' : 'ok');
+    } catch (err) { toast(err.message, 'err'); }
+    ctx.refresh();
   });
 }

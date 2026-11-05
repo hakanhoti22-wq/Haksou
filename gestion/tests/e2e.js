@@ -44,7 +44,7 @@ const check = (cond, m) => { if (!cond) throw new Error('ÉCHEC : ' + m); ok(m);
   };
   const login = async who => {
     await go(''); await p.evaluate(() => localStorage.removeItem('haksou-pro-demo-user')); await p.reload();
-    await p.waitForSelector('.user-btn'); await p.click(`.user-btn >> text=${who}`); await p.waitForSelector('#view .hello');
+    await p.waitForSelector('.user-btn'); await p.click(`.user-btn >> text=${who}`); await p.waitForSelector('#view .hello, #view .tiles, .auth-card h1'); await p.waitForTimeout(300);
   };
 
   await p.goto(U); await p.evaluate(() => localStorage.clear());
@@ -142,6 +142,53 @@ const check = (cond, m) => { if (!cond) throw new Error('ÉCHEC : ' + m); ok(m);
   check(!(await text('#links')).includes('Équipe'), 'employé : pas de menu Équipe');
   await go('#/frais'); check(!(await text('#view')).includes('Léa'), 'employé : ne voit que ses frais');
   await go('#/planning'); check(!(await p.$('#copy')), 'employé : planning en lecture seule');
+  check(!(await text('#links')).includes('Console'), 'employé : pas d\'accès à la console du propriétaire');
+  await p.click('#helpBtn'); await p.fill('.modal [name=message]', 'Le bouton PDF ne marche pas chez moi'); await p.click('.modal [type=submit]');
+  check((await toastText()).includes('Demande envoyée'), 'employé : demande d\'aide envoyée depuis le bouton 🆘');
+  await p.evaluate(() => { setTimeout(() => { throw new Error('Bug de test volontaire'); }); }); await p.waitForTimeout(300);
+  errors.length = errors.filter(e => !e.includes('Bug de test volontaire')).length;   // erreur provoquée exprès
+
+  console.log('\nPropriétaire de la plateforme');
+  await login('propriétaire');
+  check((await text('#links')).trim().startsWith('🛰️') && (await text('.tiles')).includes('Entreprises'), 'console du propriétaire affichée');
+  check((await text('#tab')).includes('Démo Services') && (await text('#tab')).includes('Boulangerie Rossier'), 'toutes les entreprises clientes listées');
+  await p.click('[data-t=erreurs]'); await p.waitForTimeout(300);
+  check((await text('#tab')).includes('Bug de test volontaire'), 'erreur JavaScript remontée automatiquement dans la console');
+  await p.click('[data-resolve] >> nth=0'); await p.waitForTimeout(300); ok('erreur marquée comme corrigée');
+  await p.click('[data-t=aide]'); await p.waitForTimeout(300);
+  check((await text('#tab')).includes('Le bouton PDF ne marche pas'), 'demande d\'aide reçue avec le nom de l\'entreprise');
+  await p.click('[data-reply] >> nth=0'); await p.fill('.modal [name=reply]', 'Mets à jour l\'appli, c\'est corrigé !'); await p.click('.modal [type=submit]'); await p.waitForTimeout(300); ok('réponse envoyée');
+  await p.click('[data-t=entreprises]'); await p.waitForTimeout(300);
+  await p.click('#new'); await p.fill('.modal [name=name]', 'Garage Favre Sàrl'); await p.click('.modal [type=submit]'); await p.waitForTimeout(400);
+  const welcome = await p.inputValue('#welcome');
+  check(/code responsable : [A-Z0-9]{8}/.test(welcome), 'nouvelle entreprise cliente créée avec un message d\'accueil et un code responsable');
+  await p.click('.modal [data-close] >> nth=0'); await p.waitForTimeout(200);
+  // accès support
+  await p.click('[data-enter] >> nth=-1'); await p.click('.modal [type=submit]');
+  check((await toastText()).includes('Remplis'), 'accès support refusé sans motif');
+  await p.click('.modal [data-close] >> nth=0');
+  check(await p.evaluate(async () => { try { await (await import('./js/db.js')).platform.startSupport((await (await import('./js/db.js')).platform.overview())[0].id, '  '); return false; } catch { return true; } }), 'motif vide refusé aussi par la couche de données');
+  const demoId = await p.evaluate(async () => (await (await import('./js/db.js')).platform.overview()).find(c => c.name === 'Démo Services Sàrl').id);
+  await p.click(`[data-enter="${demoId}"]`); await p.fill('.modal [name=reason]', 'Appel de Hakan : test du support'); await p.click('.modal [type=submit]'); await p.waitForTimeout(600);
+  check((await text('#supportBar')).includes('Mode support') && (await text('#links')).includes('factures'), 'mode support : appli du client ouverte avec bandeau orange');
+  await go('#/clients'); await p.click('#new'); await p.fill('.modal [name=name]', 'Client ajouté par le support'); await p.click('.modal [type=submit]'); await p.waitForTimeout(300);
+  check((await text('#list')).includes('Client ajouté par le support'), 'mode support : correction faite dans l\'appli du client');
+  await p.click('#endSupport'); await p.waitForTimeout(500);
+  check(!(await p.$('#supportBar')) && (await text('.tiles')).includes('Entreprises'), 'fin du mode support, retour à la console');
+  // suspension
+  const bakeryId = await p.evaluate(async () => (await (await import('./js/db.js')).platform.overview()).find(c => c.name === 'Boulangerie Rossier').id);
+  await p.click(`[data-manage="${bakeryId}"]`); await p.selectOption('.modal [name=status]', 'suspendu'); await p.click('.modal [type=submit]'); await p.waitForTimeout(300);
+  await login('Sofia');
+  check((await text('#app')).includes('Compte suspendu'), 'entreprise suspendue : ses utilisateurs voient l\'écran « Compte suspendu »');
+  await login('Hakan (patron)');
+  await p.click('#helpBtn'); await p.waitForTimeout(300);
+  check((await text('.modal')).includes('Mets à jour l\'appli'), 'le client voit la réponse du support dans son bouton Aide');
+  await p.click('.modal [data-close] >> nth=0');
+  await go('#/reglages');
+  check((await text('#view')).includes('Appel de Hakan : test du support'), 'le patron voit l\'accès du support (motif, heure) dans ses Réglages');
+  await p.uncheck('#supportAllowed'); await p.waitForTimeout(300);
+  await login('propriétaire');
+  check(await p.isDisabled(`[data-enter="${demoId}"]`), 'support refusé par le client : bouton « Accéder » désactivé');
 
   await b.close(); server.close();
   if (errors.length) { console.log('\n❌ Erreurs JavaScript :\n' + errors.join('\n')); process.exit(1); }

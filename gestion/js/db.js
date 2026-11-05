@@ -6,14 +6,14 @@ import { isoDate } from './utils.js';
 export const DEMO = !SUPABASE_URL || !SUPABASE_ANON_KEY;
 
 /** Session courante : profil connecté, entreprise et membres de l'équipe. */
-export const session = { profile: null, company: null, members: [] };
+export const session = { profile: null, company: null, members: [], owner: false, support: null, suspended: false };
 export const isAdmin = () => session.profile?.role === 'admin';
-export const memberName = id => session.members.find(m => m.id === id)?.name || '—';
+export const memberName = id => session.members.find(m => m.id === id)?.name || (id && id === session.profile?.id ? session.profile.name : '—');
 
 const LS = 'haksou-pro-db', LS_USER = 'haksou-pro-demo-user';
 /** Tables où un employé ne voit que ses propres lignes (le patron voit tout). */
 const OWNED = new Set(['punches', 'leaves', 'expenses']);
-const newId = () => crypto.randomUUID?.() || 'id-' + Date.now().toString(36) + Math.random().toString(36).slice(2);
+export const newId = () => crypto.randomUUID?.() || 'id-' + Date.now().toString(36) + Math.random().toString(36).slice(2);
 const clone = o => JSON.parse(JSON.stringify(o));
 
 let sb = null, mem = null;
@@ -51,18 +51,25 @@ const err = m => { throw new Error(m); };
 const canEditPunch = () => isAdmin() || session.company?.punch_self_edit !== false;
 const punchChanged = (o, n) => o.at !== n.at || o.type !== n.type || !!o.deleted !== !!n.deleted;
 function audit(table, row, action, details = {}) {
-  (load().audit_log ||= []).push({ id: newId(), company_id: row.company_id, actor_id: session.profile?.id, table_name: table, row_id: row.id, action, details, at: new Date().toISOString() });
+  (load().audit_log ||= []).push({ id: newId(), company_id: row.company_id, actor_id: session.profile?.id, table_name: table, row_id: row.id, action, details, via_support: !!session.support, at: new Date().toISOString() });
 }
 const LOCK_MSG = 'Facture émise : elle ne peut plus être modifiée. Pour la corriger, crée une note de crédit.';
 const rules = {
   punches: {
     insert(r) {
       r.deleted = false; r.edited = false; r.at ||= new Date().toISOString();
+      if (r.offline) {
+        if (new Date(r.at) < Date.now() - 48 * 36e5 || new Date(r.at) > Date.now() + 3e5) err('Pointage hors ligne trop ancien : ajoute-le comme pointage oublié.');
+        r.manual = false; return;
+      }
       r.manual = Math.abs(new Date(r.at) - Date.now()) > 300000;
       if (r.manual && !canEditPunch()) err('Ton responsable a désactivé les corrections de pointage.');
       if (r.manual && !r.note?.trim()) err('Indique le motif de ce pointage oublié.');
     },
-    afterInsert(r) { if (r.manual) audit('punches', r, 'ajout', { user_id: r.user_id, type: r.type, at: r.at, note: r.note }); },
+    afterInsert(r) {
+      if (r.manual) audit('punches', r, 'ajout', { user_id: r.user_id, type: r.type, at: r.at, note: r.note });
+      else if (r.offline && Math.abs(new Date(r.at) - Date.now()) > 300000) audit('punches', r, 'hors_ligne', { user_id: r.user_id, type: r.type, at: r.at, recu: new Date().toISOString() });
+    },
     update(o, n) {
       if (!canEditPunch()) err('Ton responsable a désactivé les corrections de pointage.');
       if (o.deleted && !isAdmin()) err('Ce pointage a été supprimé.');
@@ -105,6 +112,7 @@ const local = {
   async get(t, id) { return (await this.list(t)).find(r => r.id === id) || null; },
   async insert(t, obj) {
     const d = load();
+    if (obj.id && (d[t] || []).some(x => x.id === obj.id)) err(`duplicate key value violates unique constraint "${t}_pkey"`);
     const row = { id: newId(), created_at: new Date().toISOString(), company_id: session.company?.id, ...obj };
     if (OWNED.has(t) && !row.user_id) row.user_id = session.profile.id;
     rules[t]?.insert?.(row);
@@ -189,12 +197,32 @@ export async function issueDocument(id) {
 }
 
 // ── Connexion ──────────────────────────────────────────────────
-async function setProfile(p) {
-  session.profile = p || null;
-  session.company = null; session.members = [];
-  if (!p?.company_id) return;
-  session.company = DEMO ? clone(load().companies.find(c => c.id === p.company_id))
-    : ok(await sb.from('companies').select('*').eq('id', p.company_id).single());
+const SUPPORT_HOURS = 2;
+/** Charge le profil, l'entreprise, et pour le propriétaire de la plateforme sa session de support éventuelle. */
+async function setProfile(p, user) {
+  Object.assign(session, { profile: null, company: null, members: [], owner: false, support: null, suspended: false });
+  if (!p && !user) return;
+  session.owner = DEMO ? !!p?.platform : !!ok(await sb.rpc('is_platform_admin'));
+  session.profile = p ? { ...p } : { id: user.id, name: 'Support Haksou', email: user.email, role: 'employe', company_id: null };
+  if (session.owner) {
+    const s = DEMO ? (load().support_sessions || []).filter(x => x.owner_id === p.id && !x.ended_at && x.expires_at > new Date().toISOString()).pop()
+      : ok(await sb.from('support_sessions').select('*').eq('owner_id', user.id).is('ended_at', null).gt('expires_at', new Date().toISOString()).order('started_at', { ascending: false }).limit(1))[0];
+    const target = s && (DEMO ? clone(load().companies.find(c => c.id === s.company_id)) : ok(await sb.from('companies').select('*').eq('id', s.company_id).maybeSingle()));
+    if (target?.support_allowed) {
+      session.support = { ...s, company_name: target.name };
+      session.company = target; session.profile.role = 'admin';
+      await refreshMembers();
+      return;
+    }
+  }
+  if (!session.profile.company_id) return;
+  session.company = DEMO ? clone(load().companies.find(c => c.id === p.company_id) || null)
+    : ok(await sb.from('companies').select('*').eq('id', p.company_id).maybeSingle());
+  if (!session.company || session.company.status === 'suspendu') {
+    session.company = null;
+    session.suspended = DEMO || (ok(await sb.rpc('my_company_status')) === 'suspendu');
+    return;
+  }
   await refreshMembers();
 }
 export async function refreshMembers() { session.members = await db.list('profiles', { order: 'name' }); }
@@ -203,23 +231,25 @@ export const auth = {
   user: null,
   async init() {
     if (DEMO) {
-      const id = localStorage.getItem(LS_USER);
-      await setProfile(load().profiles.find(p => p.id === id));
+      const id = localStorage.getItem(LS_USER), p = load().profiles.find(x => x.id === id);
+      if (p) await setProfile(p);
       return;
     }
-    const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
-    sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    await loadScript('../vendor/supabase.js');
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
     const { data } = await sb.auth.getSession();
     if (data.session) await this.loadProfile(data.session.user);
   },
+  async reload() { if (DEMO) { const p = load().profiles.find(x => x.id === session.profile?.id); await setProfile(p); } else await this.loadProfile(this.user); },
   async loadProfile(user) {
     this.user = user;
-    await setProfile(ok(await sb.from('profiles').select('*').eq('id', user.id).maybeSingle()));
+    await setProfile(ok(await sb.from('profiles').select('*').eq('id', user.id).maybeSingle()), user);
   },
   // démo
-  demoUsers: () => load().profiles,
+  demoUsers: () => load().profiles.filter(p => p.company_id || p.platform),
+  demoCompany: id => load().companies.find(c => c.id === id),
   async demoLogin(id) { localStorage.setItem(LS_USER, id); await setProfile(load().profiles.find(p => p.id === id)); },
-  resetDemo() { localStorage.removeItem(LS); localStorage.removeItem(LS_USER); mem = null; },
+  resetDemo() { localStorage.removeItem(LS); localStorage.removeItem(LS_USER); localStorage.removeItem('haksou-punch-queue'); mem = null; },
   // supabase
   async signIn(email, password) { const d = ok(await sb.auth.signInWithPassword({ email, password })); await this.loadProfile(d.user); },
   async signUp(email, password) {
@@ -235,6 +265,15 @@ export const auth = {
   async createCompany(name, userName) { ok(await sb.rpc('create_company', { p_name: name, p_user_name: userName })); await this.loadProfile(this.user); },
   async joinCompany(code, userName) { ok(await sb.rpc('join_company', { p_code: code, p_user_name: userName })); await this.loadProfile(this.user); },
 };
+
+function loadScript(rel) {
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = new URL(rel, import.meta.url).href;
+    s.onload = res; s.onerror = () => rej(new Error('Impossible de charger ' + rel + ' (vérifie la connexion).'));
+    document.head.appendChild(s);
+  });
+}
 
 // ── Équipe et entreprise ───────────────────────────────────────
 export const team = {
@@ -270,3 +309,125 @@ export const team = {
     await refreshMembers();
   },
 };
+
+// ── Console du propriétaire de la plateforme ───────────────────
+const now = () => new Date().toISOString();
+const needOwner = () => { if (!session.owner) err('Réservé au propriétaire de la plateforme.'); };
+const code = n => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b % 32]).join('');
+
+export const platform = {
+  /** Une ligne par entreprise cliente, avec ses indicateurs. */
+  async overview() {
+    needOwner();
+    if (!DEMO) return ok(await sb.rpc('platform_overview'));
+    const d = load(), week = Date.now() - 7 * 864e5, month = Date.now() - 30 * 864e5;
+    return d.companies.map(c => {
+      const of = t => (d[t] || []).filter(x => x.company_id === c.id);
+      const dates = [...of('punches').map(x => x.at), ...of('audit_log').filter(x => !x.via_support).map(x => x.at), ...of('documents').map(x => x.created_at)].sort();
+      return { id: c.id, name: c.name, status: c.status || 'actif', trial_ends_at: c.trial_ends_at || null, support_allowed: c.support_allowed !== false, created_at: c.created_at,
+        members: d.profiles.filter(p => p.company_id === c.id).length, admins: d.profiles.filter(p => p.company_id === c.id && p.role === 'admin').length,
+        punches_7d: of('punches').filter(x => new Date(x.at) > week).length, documents_30d: of('documents').filter(x => new Date(x.created_at) > month).length,
+        last_activity: dates.pop() || null, open_tickets: of('support_tickets').filter(t => t.status === 'ouvert').length,
+        errors_7d: of('error_reports').filter(e => new Date(e.at) > week).length, admin_code: c.admin_code || null,
+        notes: (d.platform_notes || []).find(n => n.company_id === c.id)?.notes || '' };
+    }).sort((a, b) => a.created_at < b.created_at ? 1 : -1);
+  },
+  async createCompany(name, trialDays) {
+    needOwner();
+    if (!DEMO) return ok(await sb.rpc('platform_create_company', { p_name: name, p_trial_days: trialDays }));
+    if (!name.trim()) err('Indique le nom de l\'entreprise.');
+    const d = load(), c = { id: newId(), created_at: now(), name: name.trim(), join_code: code(6), admin_code: code(8), address: '', phone: '', email: '', iban: '',
+      currency: 'CHF', vat: 8.1, hourly_rate: 95, week_hours: 42, punch_self_edit: true, support_allowed: true,
+      modules: ['pointage', 'conges', 'planning', 'interventions', 'factures', 'clients', 'stock', 'frais'],
+      status: trialDays > 0 ? 'essai' : 'actif', trial_ends_at: trialDays > 0 ? isoDate(new Date(Date.now() + trialDays * 864e5)) : null };
+    d.companies.push(c); save();
+    return { id: c.id, admin_code: c.admin_code, join_code: c.join_code };
+  },
+  async setCompany(id, status, trialEnds, notes) {
+    needOwner();
+    if (!DEMO) return ok(await sb.rpc('platform_set_company', { p_id: id, p_status: status, p_trial_ends_at: trialEnds || null, p_notes: notes || '' }));
+    const d = load(), c = d.companies.find(x => x.id === id);
+    Object.assign(c, { status, trial_ends_at: trialEnds || null });
+    d.platform_notes = (d.platform_notes || []).filter(n => n.company_id !== id).concat({ company_id: id, notes: notes || '', updated_at: now() });
+    save();
+  },
+  /** Entre dans l'appli d'une entreprise avec les droits d'un responsable (2 h max, motif obligatoire, visible par l'entreprise). */
+  async startSupport(companyId, reason) {
+    needOwner();
+    if (!reason?.trim()) err('Indique le motif de l\'accès (ex. appel du client pour…).');
+    if (!DEMO) ok(await sb.rpc('start_support', { p_company: companyId, p_reason: reason.trim() }));
+    else {
+      const d = load(), c = d.companies.find(x => x.id === companyId);
+      if (!c || c.support_allowed === false) err('Cette entreprise a désactivé l\'accès du support. Demande-lui de le réactiver dans Réglages.');
+      for (const s of d.support_sessions || []) if (s.owner_id === session.profile.id && !s.ended_at) s.ended_at = now();
+      const s = { id: newId(), owner_id: session.profile.id, company_id: companyId, reason: reason.trim(), started_at: now(), expires_at: new Date(Date.now() + SUPPORT_HOURS * 36e5).toISOString(), ended_at: null };
+      (d.support_sessions ||= []).push(s);
+      (d.audit_log ||= []).push({ id: newId(), company_id: companyId, actor_id: session.profile.id, table_name: 'support', row_id: s.id, action: 'debut', details: { reason: s.reason }, via_support: true, at: now() });
+      save();
+    }
+    await auth.reload();
+  },
+  async endSupport() {
+    if (!DEMO) ok(await sb.rpc('end_support'));
+    else {
+      const d = load();
+      for (const s of d.support_sessions || []) if (s.owner_id === session.profile.id && !s.ended_at) {
+        s.ended_at = now();
+        d.audit_log.push({ id: newId(), company_id: s.company_id, actor_id: session.profile.id, table_name: 'support', row_id: s.id, action: 'fin', details: {}, via_support: true, at: now() });
+      }
+      save();
+    }
+    await auth.reload();
+  },
+  async tickets() {
+    needOwner();
+    if (!DEMO) return ok(await sb.rpc('platform_tickets'));
+    const d = load();
+    return (d.support_tickets || []).map(t => ({ ...t, company_name: d.companies.find(c => c.id === t.company_id)?.name, user_name: d.profiles.find(p => p.id === t.user_id)?.name, user_email: d.profiles.find(p => p.id === t.user_id)?.email }))
+      .sort((a, b) => (a.status === 'ouvert' ? 0 : 1) - (b.status === 'ouvert' ? 0 : 1) || (a.created_at < b.created_at ? 1 : -1));
+  },
+  async replyTicket(id, reply, resolved) {
+    needOwner();
+    const patch = { reply, status: resolved ? 'resolu' : 'ouvert', replied_at: now() };
+    if (!DEMO) return ok(await sb.from('support_tickets').update(patch).eq('id', id));
+    Object.assign(load().support_tickets.find(t => t.id === id), patch); save();
+  },
+  async errors() {
+    needOwner();
+    if (!DEMO) return ok(await sb.rpc('platform_errors'));
+    const d = load();
+    return (d.error_reports || []).map(e => ({ ...e, company_name: d.companies.find(c => c.id === e.company_id)?.name || '—', user_name: d.profiles.find(p => p.id === e.user_id)?.name || '—' }))
+      .sort((a, b) => a.at < b.at ? 1 : -1);
+  },
+  async resolveErrors(message) {
+    needOwner();
+    if (!DEMO) return ok(await sb.from('error_reports').update({ resolved: true }).eq('message', message));
+    for (const e of load().error_reports || []) if (e.message === message) e.resolved = true;
+    save();
+  },
+};
+
+/** Demandes d'aide envoyées par l'entreprise (visibles par l'utilisateur et son responsable). */
+export const help = {
+  async send(message, context) {
+    const row = { message: message.trim(), context, status: 'ouvert', user_id: session.profile.id };
+    if (DEMO) return local.insert('support_tickets', row);
+    return ok(await sb.from('support_tickets').insert({ message: row.message, context, status: 'ouvert', user_id: session.profile.id }).select().single());
+  },
+  async mine() {
+    const rows = await db.list('support_tickets', { order: 'created_at', asc: false });
+    return isAdmin() ? rows : rows.filter(t => t.user_id === session.profile.id);
+  },
+  async supportHistory() {
+    if (DEMO) return (load().support_sessions || []).filter(s => s.company_id === session.company.id).sort((a, b) => a.started_at < b.started_at ? 1 : -1);
+    return ok(await sb.from('support_sessions').select('*').eq('company_id', session.company.id).order('started_at', { ascending: false }));
+  },
+};
+
+/** Enregistre une erreur technique (jamais bloquant). */
+export async function storeError(row) {
+  if (DEMO) { const d = load(); (d.error_reports ||= []).push({ id: newId(), company_id: session.company?.id || null, user_id: session.profile?.id || null, resolved: false, at: now(), ...row }); save(); return; }
+  if (!sb || !auth.user) return;
+  const { error } = await sb.from('error_reports').insert(row);
+  if (error) console.warn('Supervision : erreur non enregistrée', error.message);
+}

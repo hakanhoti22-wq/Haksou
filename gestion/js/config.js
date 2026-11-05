@@ -13,3 +13,6 @@
 
 export const SUPABASE_URL = '';
 export const SUPABASE_ANON_KEY = '';
+
+// Tes coordonnées, affichées aux clients (compte suspendu, aide).
+export const SUPPORT_CONTACT = { name: 'le support Haksou', email: '', phone: '' };
