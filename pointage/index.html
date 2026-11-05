@@ -46,6 +46,9 @@ label{display:block;font-size:14px;color:var(--mut);margin:10px 0 4px}
 .ev{display:flex;justify-content:space-between;align-items:center;font-size:14px;color:var(--mut);font-variant-numeric:tabular-nums;margin-top:3px}
 .ev b{font-weight:600;color:var(--txt)}
 .tag{font-size:12px;padding:1px 7px;border-radius:99px;background:#24324d;margin-left:6px}
+.ck{width:22px;height:22px;accent-color:var(--ko);flex:none;margin:0 10px 0 0}
+.day .h label,.ev label{display:flex;align-items:center;margin:0;color:inherit;font-size:inherit;cursor:pointer}
+#selBar{position:fixed;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom) + 64px);display:flex;gap:8px;z-index:1001;background:#0e1626;border:1px solid var(--line);border-radius:14px;padding:8px;box-shadow:0 8px 24px #0008}
 .x{background:none;color:var(--mut);padding:0 4px;width:auto;font-size:13px}
 code{display:block;word-break:break-all;background:#0e1626;border:1px solid var(--line);padding:10px;border-radius:10px;font-size:12px;margin:6px 0}
 nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:#0e1626ee;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:1000}
@@ -101,8 +104,10 @@ ol{padding-left:20px;margin:6px 0}li{margin:5px 0}
 
 <!-- ============ HISTORIQUE ============ -->
 <section id="t-hist" hidden>
-  <div class="row" style="justify-content:space-between"><h2 style="margin:0">Historique</h2><div class="row"><button class="sm" id="bRef">↻</button><button class="sm" id="bCsv">Export CSV</button></div></div>
+  <div class="row" style="justify-content:space-between"><h2 style="margin:0">Historique</h2><div class="row"><button class="sm" id="bSel">☑︎ Sélectionner</button><button class="sm" id="bRef">↻</button><button class="sm" id="bCsv">CSV</button></div></div>
+  <div class="mut" id="selHelp" style="margin-top:8px" hidden>Coche une journée entière ou des pointages un par un, puis touche « Supprimer ».</div>
   <div class="card" id="hist" style="margin-top:10px"></div>
+  <div id="selBar" hidden><button class="sm" id="bSelAll" style="flex:1">Tout</button><button class="out" id="bSelDel" style="flex:2;padding:10px">Supprimer (0)</button><button class="sm" id="bSelCancel" style="flex:1">Annuler</button></div>
 </section>
 
 <!-- ============ RÉGLAGES ============ -->
@@ -208,6 +213,7 @@ let cfg = { ...DEF, ...LS.get('pm_cfg', {}) };
 let events = LS.get('pm_events', []);   // [{row, t, a:'in'|'out'|'leave'|'pro'|'back', src}]
 let queue = LS.get('pm_queue', []);     // actions hors-ligne en attente
 const saveCfg = () => LS.set('pm_cfg', cfg);
+let selMode = false; const sel = new Set(); // sélection dans l'historique
 
 /* ---------- utilitaires ---------- */
 const pad = n => String(n).padStart(2, '0');
@@ -312,9 +318,17 @@ function renderHist() {
   if (!keys.length) { $('#hist').innerHTML = '<div class="mut">Aucun pointage pour l’instant.</div>'; return; }
   $('#hist').innerHTML = keys.map(k => {
     const d = new Date(k + 'T12:00');
-    return `<div class="day"><div class="h"><span>${d.toLocaleDateString('fr-CH', { weekday: 'long', day: 'numeric', month: 'long' })}</span><span>${dur(by[k].ms)}</span></div>` +
-      by[k].ev.map(e => `<div class="ev"><span><b>${hm(new Date(e.t))}</b> <span style="color:${EVL[e.a][1]}">${EVL[e.a][0]}</span>${e.src && e.src !== 'manuel' ? `<span class="tag">${e.src}</span>` : ''}</span>` +
-        (e.row ? `<button class="x" data-del="${e.row}" title="Supprimer">✕</button>` : '') + '</div>').join('') + '</div>';
+    const rows = by[k].ev.filter(e => e.row).map(e => e.row);
+    const all = rows.length && rows.every(r => sel.has(r));
+    const title = d.toLocaleDateString('fr-CH', { weekday: 'long', day: 'numeric', month: 'long' });
+    return `<div class="day"><div class="h">` +
+      (selMode ? `<label><input type="checkbox" class="ck" data-day="${rows.join(',')}" ${all ? 'checked' : ''}>${title}</label>` : `<span>${title}</span>`) +
+      `<span>${dur(by[k].ms)}</span></div>` +
+      by[k].ev.map(e => {
+        const txt = `<b>${hm(new Date(e.t))}</b>&nbsp;<span style="color:${EVL[e.a][1]}">${EVL[e.a][0]}</span>${e.src && e.src !== 'manuel' ? `<span class="tag">${e.src}</span>` : ''}`;
+        if (selMode) return `<div class="ev">${e.row ? `<label><input type="checkbox" class="ck" data-row="${e.row}" ${sel.has(e.row) ? 'checked' : ''}>${txt}</label>` : `<span>${txt}</span>`}</div>`;
+        return `<div class="ev"><span>${txt}</span>` + (e.row ? `<button class="x" data-del="${e.row}" title="Supprimer">✕</button>` : '') + '</div>';
+      }).join('') + '</div>';
   }).join('');
 }
 function renderUrls() {
@@ -356,9 +370,39 @@ $('#bOut').onclick = () => send('out', 'manuel');
 $('#bPro').onclick = () => send('pro', 'manuel');
 $('#bNo').onclick = () => send('out', 'manuel');
 $('#bRef').onclick = () => refresh();
+/* ---------- suppression (une ou plusieurs lignes) ---------- */
+function setSel(on) {
+  selMode = on; sel.clear();
+  $('#selBar').hidden = $('#selHelp').hidden = !on;
+  $('#bSel').textContent = on ? '✕ Fermer' : '☑︎ Sélectionner';
+  renderHist(); updSel();
+}
+function updSel() { $('#bSelDel').textContent = `Supprimer (${sel.size})`; $('#bSelDel').disabled = !sel.size; }
+async function deleteRows(rows) {
+  rows = [...new Set(rows.map(Number))].sort((a, b) => b - a); // du bas vers le haut : les numéros ne se décalent pas
+  let done = 0;
+  try {
+    for (const r of rows) { toast(`Suppression… ${done + 1}/${rows.length}`); await api({ action: 'delete', row: r }); done++; }
+    toast(`${done} pointage(s) supprimé(s) ✅`);
+  } catch (err) { toast(`Erreur après ${done} suppression(s) : ${err.message}`); }
+  await refresh(true);
+}
+$('#bSel').onclick = () => setSel(!selMode);
+$('#bSelCancel').onclick = () => setSel(false);
+$('#bSelAll').onclick = () => { const rows = events.filter(e => e.row).map(e => e.row); const all = rows.every(r => sel.has(r)); rows.forEach(r => all ? sel.delete(r) : sel.add(r)); renderHist(); updSel(); };
+$('#bSelDel').onclick = async () => {
+  if (!sel.size || !confirm(`Supprimer définitivement ${sel.size} pointage(s) ?`)) return;
+  const rows = [...sel]; setSel(false); await deleteRows(rows);
+};
+$('#hist').onchange = e => {
+  const c = e.target; if (!c.classList.contains('ck')) return;
+  if (c.dataset.day !== undefined) c.dataset.day.split(',').filter(Boolean).map(Number).forEach(r => c.checked ? sel.add(r) : sel.delete(r));
+  else c.checked ? sel.add(+c.dataset.row) : sel.delete(+c.dataset.row);
+  renderHist(); updSel();
+};
 $('#hist').onclick = async e => {
   const r = e.target.dataset.del; if (!r || !confirm('Supprimer ce pointage ?')) return;
-  try { await api({ action: 'delete', row: r }); await refresh(true); toast('Supprimé'); } catch (err) { toast(err.message); }
+  await deleteRows([r]);
 };
 $('#bCsv').onclick = () => {
   const rows = [['Date', 'Heure', 'Événement', 'Source']];
@@ -487,6 +531,7 @@ function importShared() {
 /* ---------- onglets ---------- */
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
   document.querySelectorAll('nav button').forEach(x => x.classList.toggle('cur', x === b));
+  if (selMode && b.dataset.tab !== 'hist') setSel(false);
   ['home', 'hist', 'set'].forEach(t => $('#t-' + t).hidden = t !== b.dataset.tab);
   if (b.dataset.tab === 'set') setTimeout(initMap, 50);
   if (b.dataset.tab === 'hist') refresh(true);
