@@ -261,6 +261,43 @@ ol{padding-left:20px;margin:6px 0}li{margin:5px 0}
       <label>④ URL détimbrer</label><code id="uOut">–</code><button class="sm" data-copy="uOut">Copier ④</button>
     </details>
   </div>
+
+  <h2>Bouton « Timbrer » &amp; Siri</h2>
+  <div class="card">
+    <div class="mut">Crée ces raccourcis une fois. Le <b>nom</b> du raccourci est la phrase à dire à Siri.</div>
+    <div class="step" style="margin-top:10px">
+      <b>Pour chaque raccourci ci-dessous :</b>
+      <ol style="margin-top:6px">
+        <li>App <b>Raccourcis</b> → onglet <b>Raccourcis</b> → <b>+</b>.</li>
+        <li><b>Ajouter une action</b> → <b>Obtenir le contenu de l’URL</b> → touche <b>URL</b> → colle l’adresse.</li>
+        <li>Ajoute l’action <b>Afficher le résultat</b> (Siri le lira à voix haute).</li>
+        <li>En haut, touche le nom → <b>Renommer</b> avec le nom indiqué → <b>OK</b>.</li>
+      </ol>
+    </div>
+    <label>⑤ « Timbrer » — arrivée ou départ selon ton état</label><code id="uTog">–</code><button class="sm" data-copy="uTog">Copier ⑤</button>
+    <label>⑥ « Je commence »</label><code id="uSayIn">–</code><button class="sm" data-copy="uSayIn">Copier ⑥</button>
+    <label>⑦ « Je pars »</label><code id="uSayOut">–</code><button class="sm" data-copy="uSayOut">Copier ⑦</button>
+    <label>⑧ « Mes heures » — bilan du jour et de la semaine</label><code id="uToday">–</code><button class="sm" data-copy="uToday">Copier ⑧</button>
+    <div class="step" style="margin-top:12px">
+      <b>Mettre « Timbrer » sur l’écran d’accueil :</b> appui long sur l’écran d’accueil → <b>Modifier</b> → <b>Ajouter un widget</b> → <b>Raccourcis</b> → choisis le petit widget → touche-le pour sélectionner « Timbrer ».
+      <div style="margin-top:8px"><b>Écran verrouillé / Centre de contrôle</b> (iOS 18 et plus) : ouvre le Centre de contrôle → <b>+</b> → <b>Ajouter une commande</b> → <b>Raccourcis</b> → « Timbrer ».</div>
+      <div style="margin-top:8px"><b>Apple Watch :</b> dans le raccourci, touche <b>ⓘ</b> → active <b>Afficher sur Apple Watch</b>.</div>
+      <div style="margin-top:8px"><b>Siri :</b> dis « Dis Siri, Timbrer », « Dis Siri, Je pars » ou « Dis Siri, Mes heures ».</div>
+    </div>
+  </div>
+
+  <h2>Relevé mensuel par mail</h2>
+  <div class="card">
+    <div class="mut">Le 1er de chaque mois vers 7h, le relevé PDF du mois précédent est envoyé automatiquement.</div>
+    <label>Envoyer à (vide = l’adresse de ton compte Google)</label><input type="email" id="mTo" placeholder="toi@exemple.ch" autocomplete="email">
+    <label>Copie à (ton chef, facultatif)</label><input type="email" id="mCc" placeholder="chef@exemple.ch">
+    <label class="chk"><input type="checkbox" id="mOn" checked> Envoi automatique activé</label>
+    <div class="grid" style="margin-top:12px"><button id="bMailSave">Enregistrer</button><button id="bMailTest">Envoyer un test</button></div>
+    <div class="step" style="margin-top:12px">
+      <b>Une seule fois, pour autoriser l’envoi :</b> ouvre ta Google Sheet → <b>Extensions → Apps Script</b> → en haut, choisis la fonction <b>installerMail</b> → <b>▶ Exécuter</b> → <b>Autoriser l’accès</b> (comme lors de l’installation).
+    </div>
+    <div class="mut" id="mailInfo" style="margin-top:8px"></div>
+  </div>
 </section>
 
 <div id="editBox" hidden>
@@ -319,6 +356,7 @@ let cfg = { ...DEF, ...LS.get('pm_cfg', {}) };
 let events = LS.get('pm_events', []);   // [{row, t, a:'in'|'out'|'leave'|'pro'|'back', src}]
 let queue = LS.get('pm_queue', []);     // actions hors-ligne en attente
 const saveCfg = () => LS.set('pm_cfg', cfg);
+const OLD_SCRIPT = 'Mets à jour le script Google (Déployer → Gérer les déploiements → ✏️ → Nouvelle version)';
 let selMode = false; const sel = new Set(); // sélection dans l'historique
 const monthKey = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
 let curMonth = monthKey(new Date()); // mois affiché dans l'historique
@@ -469,10 +507,15 @@ function renderUrls() {
   $('#uLeave').textContent = u({ action: 'leave' });
   $('#uPro').textContent = u({ action: 'pro' });
   $('#uOut').textContent = u({ action: 'out' });
+  const v = p => ok ? apiUrl({ ...p, say: '1', src: 'siri-widget' }) : 'Configure l’URL et le token';
+  $('#uTog').textContent = v({ action: 'toggle' });
+  $('#uSayIn').textContent = v({ action: 'in' });
+  $('#uSayOut').textContent = v({ action: 'out' });
+  $('#uToday').textContent = ok ? apiUrl({ action: 'today', say: '1', goal: cfg.weekH || 42 }) : 'Configure l’URL et le token';
 }
 
 /* ---------- actions ---------- */
-let syncErr = '';
+let syncErr = '', mailLoaded = false;
 async function refresh(silent) {
   if (!cfg.url) return render();
   $('#bRef').innerHTML = '<span class="spin">↻</span>';
@@ -485,6 +528,7 @@ async function refreshInner(silent) {
     const j = await api({ action: 'list', days: 400 });
     events = j.events; LS.set('pm_events', events); LS.set('pm_sync', Date.now()); syncErr = '';
     if (j.hours) { cfg.start = j.hours.start; cfg.end = j.hours.end; saveCfg(); fillHours(); }
+    if (!mailLoaded) api({ action: 'config' }).then(c => { mailLoaded = true; fillMail(c.mail); }).catch(() => {});
     render(); if (!silent) toast('À jour ✅');
   } catch (e) { syncErr = e.message; render(); if (!silent) toast(e.message); }
 }
@@ -708,7 +752,6 @@ $('#bAdd').onclick = () => { if (!cfg.url) return toast('Configure d’abord la 
 $('#edCancel').onclick = closeEdit;
 $('#editBox').onclick = e => { if (e.target.id === 'editBox') closeEdit(); };
 $('#edDel').onclick = async () => { const r = edRow; if (!confirm($('#edDel').textContent + ' ?')) return; closeEdit(); await deleteRows([r]); };
-const OLD_SCRIPT = 'Mets à jour le script Google (Déployer → Gérer les déploiements → ✏️ → Nouvelle version)';
 $('#edSave').onclick = async () => {
   const row = edRow; let req, msg;
   if (edMode === 'a') {
@@ -778,7 +821,7 @@ $('#bSave').onclick = async () => {
   try { await api({ action: 'list', days: 1 }); toast('Connexion OK ✅'); refresh(true); } catch (e) { toast('Échec : ' + e.message); }
 };
 $('#cWeekH').value = cfg.weekH || 42; $('#cName').value = cfg.name || '';
-$('#cWeekH').onchange = e => { const v = +e.target.value; if (v > 0 && v <= 80) { cfg.weekH = v; saveCfg(); render(); toast('Objectif : ' + v + ' h / semaine'); } };
+$('#cWeekH').onchange = e => { const v = +e.target.value; if (v > 0 && v <= 80) { cfg.weekH = v; saveCfg(); render(); renderUrls(); toast('Objectif : ' + v + ' h / semaine'); } };
 $('#cName').onchange = e => { cfg.name = e.target.value.trim(); saveCfg(); };
 $('#bHours').onclick = async () => {
   const s = $('#hStart').value, e = $('#hEnd').value;
@@ -786,6 +829,33 @@ $('#bHours').onclick = async () => {
   cfg.start = s; cfg.end = e; saveCfg(); render();
   try { await api({ action: 'config', start: s, end: e }); cfg.hoursDirty = false; saveCfg(); toast('Plage enregistrée ✅'); } catch (err) { toast('Enregistré sur le téléphone, mais pas dans la Sheet : ' + err.message); }
 };
+
+/* ---------- relevé mensuel par mail ---------- */
+function fillMail(m) {
+  if (!m) return;
+  $('#mTo').value = m.mailTo || ''; $('#mCc').value = m.mailCc || ''; $('#mOn').checked = m.mailOn !== false;
+  $('#mailInfo').textContent = m.mailOn === false ? 'Envoi automatique désactivé.' : `Prochain envoi le 1er du mois à ${m.mailTo || m.me || 'ton adresse Google'}${m.mailCc ? ', copie à ' + m.mailCc : ''}.`;
+}
+const okMail = v => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+$('#bMailSave').onclick = async () => {
+  const to = $('#mTo').value.trim(), cc = $('#mCc').value.trim();
+  if (!okMail(to) || !okMail(cc)) return toast('Adresse e-mail invalide');
+  try {
+    const j = await api({ action: 'config', mailTo: to, mailCc: cc, mailOn: $('#mOn').checked ? '1' : '0', name: cfg.name || '' });
+    if (!j.mail) throw new Error(OLD_SCRIPT);
+    fillMail(j.mail); toast('Réglages du mail enregistrés ✅');
+  } catch (e) { toast(e.message); }
+};
+$('#bMailTest').onclick = async () => {
+  $('#bMailTest').disabled = true; toast('Envoi du relevé du mois en cours…');
+  try {
+    const j = await api({ action: 'mail' });
+    if (!j.sent) throw new Error(OLD_SCRIPT);
+    toast(`Relevé envoyé à ${j.to}${j.cc ? ' (copie ' + j.cc + ')' : ''} ✅`);
+  } catch (e) { toast(e.message); }
+  finally { $('#bMailTest').disabled = false; }
+};
+$('#cName').addEventListener('change', () => { if (cfg.url) api({ action: 'config', name: cfg.name || '' }).catch(() => {}); });
 
 /* ---------- carte : dessin de la zone ---------- */
 let map, polyL, circL, vtx = [], drawing = false, draft = [];

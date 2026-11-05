@@ -18,6 +18,13 @@
  *   delete   supprime des lignes (row= ou rows=2,5,9)
  *   config   lit / enregistre la plage horaire (start=06:30&end=18:00)
  *   summary  reconstruit l'onglet « Résumé »
+ *   toggle   bouton « Timbrer » : arrivée si tu n'es pas timbré, départ sinon
+ *   today    bilan du jour et de la semaine (goal= objectif hebdo en heures)
+ *   mail     envoie le relevé PDF du mois en cours maintenant (test)
+ * Ajoute say=1 pour une phrase lisible (widget, Siri).
+ *
+ * Relevé mensuel par mail : exécute UNE FOIS la fonction « installerMail » (menu en haut → ▶ Exécuter)
+ * et autorise l'accès. Le relevé du mois précédent part ensuite le 1er de chaque mois vers 7h.
  *   list     historique (JSON)
  * Ajoute fmt=text pour une réponse en texte simple (utilisé par l'app Raccourcis).
  */
@@ -33,9 +40,13 @@ const COLS = 6; // Horodatage · Type · Source · Date · Heure · Durée absen
 
 function doGet(e) {
   const p = (e && e.parameter) || {};
-  const reply = (o, txt) => p.fmt === 'text'
-    ? ContentService.createTextOutput(txt || (o.ok ? 'OK' : 'ERREUR ' + o.error))
-    : ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
+  let sayFn = null; // phrase lisible (say=1), calculée au moment de répondre
+  const reply = (o, txt) => {
+    if (p.say === '1') return ContentService.createTextOutput(o.ok ? (sayFn ? sayFn(txt) : txt || 'OK') : 'Erreur : ' + o.error);
+    return p.fmt === 'text'
+      ? ContentService.createTextOutput(txt || (o.ok ? 'OK' : 'ERREUR ' + o.error))
+      : ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
+  };
   if (p.token !== TOKEN) return reply({ ok: false, error: 'Token invalide' });
 
   const lock = LockService.getScriptLock();
@@ -53,7 +64,20 @@ function doGet(e) {
     const setLast = code => sh.getRange(last.row, 2).setValue(LABEL[code]);
     const done = (o, txt) => { summary_(sh); return reply(o, txt); }; // après chaque écriture : Résumé à jour
 
-    switch (p.action) {
+    let action = p.action;
+    if (action === 'toggle') action = st === 'in' && last.a !== 'pro' && day_(last.t) === day_(now) ? 'out' : 'in';
+    if (p.say === '1') sayFn = code => {
+      const t = hm_(now), tot = () => fmtH_(todayMs_(sh));
+      return ({
+        ARRIVEE: `Arrivée timbrée à ${t} ✅`, RETOUR: `Retour timbré à ${t} ✅`,
+        DEJA: `Tu es déjà timbré depuis ${last ? hm_(last.t) : t}`,
+        DETIMBRE: `Départ timbré à ${t} ✅ Aujourd’hui : ${tot()}`,
+        QUESTION: `Sortie notée à ${t}. Trajet pro ? Réponds dans l’app Pointage.`,
+        PRO: 'Trajet pro noté, le timbrage continue', OK: action === 'out' ? 'Tu n’étais pas timbré' : 'OK'
+      })[code] || code || 'OK';
+    };
+
+    switch (action) {
       case 'in': {
         // Journée précédente jamais fermée → on la ferme d'abord.
         if (last && st !== 'out' && day_(last.t) !== day_(now)) {
@@ -131,9 +155,31 @@ function doGet(e) {
         return done({ ok: true, added: n });
       }
       case 'config': {
-        const ok = s => /^\d\d:\d\d$/.test(s || '');
-        if (ok(p.start) && ok(p.end)) PropertiesService.getScriptProperties().setProperties({ start: p.start, end: p.end });
-        return reply({ ok: true, hours: hours_() });
+        const ok = s => /^\d\d:\d\d$/.test(s || ''), pr = PropertiesService.getScriptProperties();
+        if (ok(p.start) && ok(p.end)) pr.setProperties({ start: p.start, end: p.end });
+        const m = {};
+        ['mailTo', 'mailCc', 'name', 'mailOn'].forEach(k => { if (p[k] !== undefined) m[k] = String(p[k]).trim(); });
+        if (Object.keys(m).length) pr.setProperties(m);
+        return reply({ ok: true, hours: hours_(), mail: mailCfg_() });
+      }
+      case 'today': {
+        const days = computeDays_(sh), t = day_(new Date()), mon = monday_(t), goal = Number(p.goal) || 0;
+        let w = 0;
+        Object.keys(days).forEach(k => { if (k >= mon && k <= t) w += days[k].work + days[k].abs; });
+        const d = days[t], todayMs = d ? d.work + d.abs : 0;
+        let txt = st === 'in' ? `Tu es au travail depuis ${hm_(firstToday_(days, t) || last.t)}. ` : st === 'pending' ? 'Sortie à confirmer dans l’app. ' : 'Tu n’es pas timbré. ';
+        txt += `Aujourd’hui : ${fmtH_(todayMs)}. Cette semaine : ${fmtH_(w)}`;
+        if (goal) txt += w >= goal * 36e5 ? `, objectif de ${goal} h atteint (+${fmtH_(w - goal * 36e5)}).` : ` sur ${goal} h, il reste ${fmtH_(goal * 36e5 - w)}.`;
+        else txt += '.';
+        return p.say === '1' || p.fmt === 'text' ? ContentService.createTextOutput(txt) : reply({ ok: true, text: txt, today: todayMs, week: w });
+      }
+      case 'mail': {
+        try {
+          const r = sendReport_(Utilities.formatDate(new Date(), TZ, 'yyyy-MM'));
+          return reply({ ok: true, sent: true, to: r.to, cc: r.cc });
+        } catch (err) {
+          return reply({ ok: false, error: /autoris|permission|authoriz/i.test(String(err)) ? 'Autorisation manquante : dans Apps Script, exécute une fois la fonction « installerMail »' : 'Envoi impossible : ' + err });
+        }
       }
       case 'summary': return done({ ok: true, summary: true });
       default: { // list
@@ -204,10 +250,8 @@ function endOfDay_(t, h) {
 }
 
 /* ---------- onglet « Résumé » : un tableau lisible, mis à jour automatiquement ---------- */
-function summary_(sh) {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const rs = ss.getSheetByName(SUMMARY) || ss.insertSheet(SUMMARY);
+// Par jour : première arrivée, dernier départ, temps de travail (ms), absences (ms), remarques.
+function computeDays_(sh) {
     const n = sh.getLastRow() - 1;
     const rows = n > 0 ? sh.getRange(2, 1, n, COLS).getValues() : [];
     const today = day_(new Date());
@@ -230,12 +274,23 @@ function summary_(sh) {
       }
     });
     if (open && day_(open) === today) get(today).work += Date.now() - open;
+    return days;
+}
+const MOIS_ = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+const hmD_ = ms => { const m = Math.round(ms / 6e4); return Math.floor(m / 60) + ':' + ('0' + m % 60).slice(-2); };
+function fmtH_(ms) { const m = Math.max(0, Math.round(ms / 6e4)); return Math.floor(m / 60) + ' h ' + ('0' + m % 60).slice(-2); }
+function isoWeek_(key) { const d = new Date(key + 'T12:00:00Z'), wd = (d.getUTCDay() + 6) % 7; d.setUTCDate(d.getUTCDate() - wd + 3); const y = new Date(Date.UTC(d.getUTCFullYear(), 0, 4)); return 1 + Math.round((d - y) / 6048e5); }
+function monday_(key) { const d = new Date(key + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() - (d.getUTCDay() + 6) % 7); return d.toISOString().slice(0, 10); }
+function todayMs_(sh) { const d = computeDays_(sh)[day_(new Date())]; return d ? d.work + d.abs : 0; }
+function firstToday_(days, t) { return days[t] && days[t].first; }
 
-    const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
-    const JOURS = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
-    const hmD = ms => { const m = Math.round(ms / 6e4); return Math.floor(m / 60) + ':' + ('0' + m % 60).slice(-2); };
+function summary_(sh) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const rs = ss.getSheetByName(SUMMARY) || ss.insertSheet(SUMMARY);
+    const days = computeDays_(sh);
+    const MOIS = MOIS_, JOURS = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'], hmD = hmD_, isoWeek = isoWeek_;
     const dec = ms => Math.round(ms / 36e3) / 100;
-    const isoWeek = key => { const d = new Date(key + 'T12:00:00Z'), wd = (d.getUTCDay() + 6) % 7; d.setUTCDate(d.getUTCDate() - wd + 3); const y = new Date(Date.UTC(d.getUTCFullYear(), 0, 4)); return 1 + Math.round((d - y) / 6048e5); };
 
     const out = [['Date', 'Jour', 'Arrivée', 'Départ', 'Remarques', 'Travail', 'Absence', 'Total', 'Total (h)']];
     const weekRows = [], monthRows = [];
@@ -261,4 +316,65 @@ function summary_(sh) {
     monthRows.forEach(r => rs.getRange(r, 1, 1, 9).setFontWeight('bold').setBackground('#dbeafe'));
     rs.setFrozenRows(1);
   } catch (err) { console.error('Résumé : ' + err); } // le pointage n'est jamais bloqué par le résumé
+}
+
+/* ---------- relevé mensuel PDF par mail ---------- */
+function mailCfg_() {
+  const pr = PropertiesService.getScriptProperties();
+  let me = '';
+  try { me = Session.getEffectiveUser().getEmail(); } catch (e) {}
+  return { mailTo: pr.getProperty('mailTo') || '', mailCc: pr.getProperty('mailCc') || '', name: pr.getProperty('name') || '', mailOn: pr.getProperty('mailOn') !== '0', me };
+}
+// Déclencheur : le 1er du mois, relevé du mois précédent.
+function monthlyReport() {
+  if (!mailCfg_().mailOn) return;
+  const now = new Date(), prev = new Date(now.getFullYear(), now.getMonth() - 1, 15);
+  sendReport_(Utilities.formatDate(prev, TZ, 'yyyy-MM'));
+}
+// À exécuter UNE FOIS depuis l'éditeur Apps Script (▶ Exécuter) pour autoriser les mails et programmer l'envoi.
+function installerMail() {
+  ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'monthlyReport').forEach(t => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('monthlyReport').timeBased().onMonthDay(1).atHour(7).inTimezone(TZ).create();
+  console.log('✅ Relevé mensuel programmé : le 1er de chaque mois vers 7h, vers ' + (mailCfg_().mailTo || mailCfg_().me));
+}
+function sendReport_(month) {
+  const c = mailCfg_(), to = c.mailTo || c.me;
+  if (!to) throw new Error('aucune adresse e-mail');
+  const rep = reportHtml_(month, c.name, computeDays_(sheet_()));
+  const [y, m] = month.split('-').map(Number), title = MOIS_[m - 1] + ' ' + y;
+  const pdf = Utilities.newBlob(rep.html, 'text/html', 'releve.html').getAs('application/pdf').setName('Releve-heures-' + month + (c.name ? '-' + c.name.replace(/\s+/g, '-') : '') + '.pdf');
+  MailApp.sendEmail({
+    to, cc: c.mailCc || '', name: 'Pointage MIC',
+    subject: 'Relevé d’heures – ' + title + (c.name ? ' – ' + c.name : ''),
+    htmlBody: 'Bonjour,<br><br>Voici le relevé d’heures de <b>' + title + '</b>' + (c.name ? ' de ' + c.name : '') + ' : <b>' + fmtH_(rep.total) + '</b> sur ' + rep.days + ' jour(s).<br><br>Le détail est dans le PDF joint.<br><br><i>Envoyé automatiquement par l’app Pointage MIC.</i>',
+    attachments: [pdf]
+  });
+  return { to, cc: c.mailCc || '', total: rep.total };
+}
+function reportHtml_(month, name, days) {
+  const esc = t => String(t).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+  const JOURS = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
+  const [y, m] = month.split('-').map(Number);
+  let rows = '', total = 0, wk = 0, wkNo = null, n = 0;
+  const flushW = () => { if (wkNo !== null) rows += '<tr class="wk"><td colspan="4">Total semaine ' + wkNo + '</td><td class="n">' + fmtH_(wk) + '</td></tr>'; wk = 0; };
+  Object.keys(days).filter(k => k.slice(0, 7) === month).sort().forEach(k => {
+    const d = days[k], w = isoWeek_(k), tot = d.work + d.abs;
+    if (w !== wkNo) { flushW(); wkNo = w; }
+    const [, mm, dd] = k.split('-');
+    rows += '<tr><td>' + JOURS[new Date(k + 'T12:00:00Z').getUTCDay()] + ' ' + dd + '.' + mm + '.</td><td class="n">' + (d.first ? hm_(d.first) : '–') + '</td><td class="n">' + (d.last ? hm_(d.last) : '–') +
+      '</td><td>' + esc(d.notes.join(' · ')) + '</td><td class="n">' + fmtH_(tot) + '</td></tr>';
+    total += tot; wk += tot; n++;
+  });
+  flushW();
+  const html = '<html><head><meta charset="utf-8"><style>' +
+    'body{font-family:Helvetica,Arial,sans-serif;font-size:10.5pt;color:#000;margin:0}h1{font-size:17pt;margin:0 0 4px}.sub{color:#444;margin-bottom:16px}' +
+    'table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #bbb;padding:5px 4px;text-align:left;vertical-align:top}' +
+    'th{border-bottom:2px solid #000;font-size:9pt;text-transform:uppercase}.n{text-align:right}tr.wk td{background:#f1f1f1;font-weight:bold}' +
+    'tfoot td{border-top:2px solid #000;border-bottom:0;font-weight:bold;font-size:12pt}.sign{margin-top:50px;color:#444}' +
+    '</style></head><body><h1>Relevé d’heures — ' + MOIS_[m - 1] + ' ' + y + '</h1>' +
+    '<div class="sub">' + (name ? esc(name) + ' · ' : '') + 'Marly Innovation Center · généré le ' + Utilities.formatDate(new Date(), TZ, 'dd.MM.yyyy') + '</div>' +
+    '<table><thead><tr><th>Jour</th><th class="n">Arrivée</th><th class="n">Départ</th><th>Remarques</th><th class="n">Total</th></tr></thead><tbody>' +
+    (rows || '<tr><td colspan="5">Aucun pointage ce mois-ci.</td></tr>') + '</tbody><tfoot><tr><td colspan="4">Total du mois · ' + n + ' jour(s)</td><td class="n">' + fmtH_(total) + '</td></tr></tfoot></table>' +
+    '<table class="sign"><tr><td style="border:0">Signature collaborateur : ____________________</td><td style="border:0;text-align:right">Visa : ____________________</td></tr></table></body></html>';
+  return { html, total, days: n };
 }
