@@ -1,7 +1,7 @@
 // Service worker : l'appli s'ouvre même sans réseau (les données Supabase restent en ligne).
-const C = 'haksou-pro-v1';
+const C = 'haksou-pro-v2';
 const SHELL = ['./', './index.html', './css/app.css', './manifest.webmanifest', './icon-192.png',
-  './js/app.js', './js/db.js', './js/config.js', './js/seed.js', './js/meta.js', './js/utils.js',
+  './js/app.js', './js/db.js', './js/pdf.js', './vendor/jspdf.umd.min.js', './js/config.js', './js/seed.js', './js/meta.js', './js/utils.js',
   ...['accueil', 'pointage', 'conges', 'planning', 'interventions', 'factures', 'clients', 'stock', 'frais', 'equipe', 'reglages'].map(m => `./js/modules/${m}.js`)];
 self.addEventListener('install', e => { e.waitUntil(caches.open(C).then(c => c.addAll(SHELL))); self.skipWaiting(); });
 self.addEventListener('activate', e => {

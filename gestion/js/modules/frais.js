@@ -1,7 +1,8 @@
 // Module 7 — Notes de frais.
 import { db, session, memberName } from '../db.js';
 import { STATUS } from '../meta.js';
-import { $, $$, esc, isoDate, fmtDate, fmtMonth, money, modal, toast, chip, empty, compressImage, downloadCSV, printHTML, printHeader, startOfMonth } from '../utils.js';
+import { createPDF, downloadFile } from '../pdf.js';
+import { $, $$, esc, isoDate, fmtDate, fmtMonth, money, modal, toast, chip, empty, compressImage, downloadCSV, startOfMonth } from '../utils.js';
 
 const CATS = ['Repas', 'Transport', 'Carburant', 'Parking', 'Hébergement', 'Matériel', 'Téléphone', 'Autre'];
 const cur = () => session.company.currency || 'CHF';
@@ -38,7 +39,7 @@ export async function render(el, ctx) {
       <div class="tiles"><div class="card"><div class="mut">En attente de validation</div><div class="num">${money(sum(pending), cur())}</div></div>
       <div class="card"><div class="mut">Validé, à me rembourser</div><div class="num">${money(sum(toPay), cur())}</div></div></div>`}
     <div class="section-h"><div class="weeknav"><button class="sm icon" id="prev">‹</button><b class="cap">${fmtMonth(month + '-01')}</b><button class="sm icon" id="next">›</button></div>
-      <div class="row"><button class="sm ghost" id="csv">⬇︎ CSV</button><button class="sm ghost" id="print">🖨 Rapport</button></div></div>
+      <div class="row"><button class="sm ghost" id="csv">⬇︎ CSV</button><button class="sm ghost" id="pdf">📄 Rapport PDF</button></div></div>
     <div class="card list">${inMonth.length ? inMonth.map(e => row(e)).join('') : empty('Aucune note de frais ce mois-ci.')}</div>
     ${inMonth.length ? `<div class="card"><h3>Résumé du mois</h3>${summary(inMonth, ctx.admin)}</div>` : ''}`;
 
@@ -50,19 +51,35 @@ export async function render(el, ctx) {
   $$('[data-st]', el).forEach(b => b.onclick = async () => { await db.update('expenses', b.dataset.id, { status: b.dataset.st }); toast(STATUS.expense[b.dataset.st][0]); ctx.refresh(); });
   $('#csv', el).onclick = () => downloadCSV(`frais-${month}.csv`, [['Date', 'Employé', 'Catégorie', 'Description', 'Montant', 'Statut'],
     ...inMonth.map(e => [e.date, memberName(e.user_id), e.category, e.description, e.amount, STATUS.expense[e.status]?.[0]])]);
-  $('#print', el).onclick = () => printHTML(`<div class="p-doc">${printHeader(session.company, 'Notes de frais', `<div class="cap">${fmtMonth(month + '-01')}</div>${ctx.admin ? '' : '<div>' + esc(me.name) + '</div>'}`)}
-    <table class="p-tbl"><thead><tr><th>Date</th><th>Employé</th><th>Catégorie</th><th>Description</th><th>Statut</th><th class="n">Montant</th></tr></thead>
-    <tbody>${inMonth.map(e => `<tr><td>${fmtDate(e.date)}</td><td>${esc(memberName(e.user_id))}</td><td>${esc(e.category)}</td><td>${esc(e.description)}</td><td>${STATUS.expense[e.status]?.[0]}</td><td class="n">${money(e.amount, cur())}</td></tr>`).join('')}</tbody></table>
-    ${summary(inMonth, ctx.admin)}
-    <div class="p-photos">${inMonth.filter(e => e.receipt).map(e => `<figure><img src="${e.receipt}"><figcaption>${fmtDate(e.date)} · ${money(e.amount, cur())}</figcaption></figure>`).join('')}</div></div>`);
+  $('#pdf', el).onclick = () => report(inMonth, ctx.admin).catch(e => toast(e.message, 'err'));
+}
+
+/** Totaux par catégorie et par employé (hors notes refusées). */
+function groups(list) {
+  const ok = list.filter(e => e.status !== 'refusee');
+  const by = key => Object.entries(ok.reduce((m, e) => { m[key(e)] = (m[key(e)] || 0) + +e.amount; return m; }, {})).sort((a, b) => b[1] - a[1]);
+  return { cat: by(e => e.category), emp: by(e => memberName(e.user_id)), total: ok.reduce((s, e) => s + +e.amount, 0) };
 }
 
 function summary(list, admin) {
-  const ok = list.filter(e => e.status !== 'refusee');
-  const group = key => Object.entries(ok.reduce((m, e) => { m[key(e)] = (m[key(e)] || 0) + +e.amount; return m; }, {})).sort((a, b) => b[1] - a[1]);
+  const g = groups(list);
   const tbl = (t, rows) => `<table class="p-tbl small-tbl"><thead><tr><th>${t}</th><th class="n">Total</th></tr></thead><tbody>${rows.map(([k, v]) => `<tr><td>${esc(k)}</td><td class="n">${money(v, cur())}</td></tr>`).join('')}</tbody></table>`;
-  return `<div class="grid2">${tbl('Catégorie', group(e => e.category))}${admin ? tbl('Employé', group(e => memberName(e.user_id))) : ''}</div>
-    <p><b>Total (hors refusés) : ${money(ok.reduce((s, e) => s + +e.amount, 0), cur())}</b></p>`;
+  return `<div class="grid2">${tbl('Catégorie', g.cat)}${admin ? tbl('Employé', g.emp) : ''}</div>
+    <p><b>Total (hors refusés) : ${money(g.total, cur())}</b></p>`;
+}
+
+/** Rapport mensuel en PDF, avec les photos des tickets en annexe. */
+async function report(list, admin) {
+  if (!list.length) throw new Error('Aucune note de frais ce mois-ci.');
+  const p = await createPDF(), g = groups(list);
+  p.header('Notes de frais', [fmtMonth(month + '-01').replace(/^./, c => c.toUpperCase()), admin ? '' : session.profile.name]);
+  p.table([{ label: 'Date', w: 22 }, { label: 'Employé', w: 34 }, { label: 'Catégorie', w: 26 }, { label: 'Description', w: '*' }, { label: 'Statut', w: 24 }, { label: 'Montant', w: 26, align: 'right' }],
+    list.map(e => [fmtDate(e.date), memberName(e.user_id), e.category, e.description || '', STATUS.expense[e.status]?.[0] || '', money(e.amount, cur())]));
+  p.table([{ label: 'Catégorie', w: '*' }, { label: 'Total', w: 32, align: 'right' }], [...g.cat.map(([k, v]) => [k, money(v, cur())]), { cells: ['Total (hors refusés)', money(g.total, cur())], bold: true }]);
+  if (admin) p.table([{ label: 'Employé', w: '*' }, { label: 'Total', w: 32, align: 'right' }], g.emp.map(([k, v]) => [k, money(v, cur())]));
+  const withReceipt = list.filter(e => e.receipt);
+  if (withReceipt.length) { p.ensure(70); p.text('Justificatifs', { bold: true, size: 12, after: 2 }); p.photos(withReceipt.map(e => e.receipt), { h: 70, captions: withReceipt.map(e => `${fmtDate(e.date)} · ${memberName(e.user_id)} · ${money(e.amount, cur())}`) }); }
+  downloadFile(p.finish(`notes-de-frais-${month}.pdf`));
 }
 
 function edit(e, ctx) {

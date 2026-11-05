@@ -1,6 +1,7 @@
 // Module 3 — Planning d'équipe (semaine).
 import { db, session } from '../db.js';
-import { $, $$, esc, isoDate, addDays, startOfWeek, fmtDay, hhmmToMin, fmtMin, modal, toast, printHTML, printHeader } from '../utils.js';
+import { $, $$, esc, isoDate, addDays, startOfWeek, fmtDay, hhmmToMin, fmtMin, modal, toast } from '../utils.js';
+import { createPDF, downloadFile } from '../pdf.js';
 
 let offset = 0;
 const dur = s => { let d = hhmmToMin(s.end_time) - hhmmToMin(s.start_time); if (d < 0) d += 1440; return d; };
@@ -22,7 +23,7 @@ export async function render(el, ctx) {
       <span class="grow"></span>
       ${offset ? '<button class="sm ghost" id="now">Aujourd\'hui</button>' : ''}
       ${ctx.admin ? '<button class="sm" id="copy">⧉ Copier la semaine précédente</button>' : ''}
-      <button class="sm" id="print">🖨 Imprimer</button>
+      <button class="sm" id="pdf">📄 PDF</button>
     </div>
     <div class="card scroll"><table class="tbl plan"><thead><tr><th>Employé</th>${dates.map(d => `<th class="${d === today ? 'today' : ''}">${fmtDay(d)}</th>`).join('')}<th class="n">Total</th></tr></thead>
     <tbody>${members.map(m => {
@@ -40,7 +41,19 @@ export async function render(el, ctx) {
   $('#prev').onclick = () => { offset--; ctx.refresh(); };
   $('#next').onclick = () => { offset++; ctx.refresh(); };
   $('#now')?.addEventListener('click', () => { offset = 0; ctx.refresh(); });
-  $('#print').onclick = () => printHTML(`${printHeader(session.company, 'Planning', `<div>Semaine du ${fmtDay(wk)}</div>`)}${$('.plan', el).outerHTML}`);
+  $('#pdf').onclick = async () => {
+    try {
+      const p = await createPDF({ landscape: true });
+      p.header('Planning', [`Semaine du ${fmtDay(wk)} au ${fmtDay(dates[6])}`]);
+      p.table([{ label: 'Employé', w: 38 }, ...dates.map(d => ({ label: fmtDay(d), w: '*' })), { label: 'Total', w: 18, align: 'right' }],
+        members.map(m => {
+          const mine = shifts.filter(s => s.user_id === m.id);
+          return [m.name, ...dates.map(d => [off(m.id, d) ? 'Congé : ' + off(m.id, d).kind : '', ...mine.filter(s => s.date === d).map(s => `${s.start_time}-${s.end_time}${s.note ? ' ' + s.note : ''}`)].filter(Boolean).join('\n')),
+            fmtMin(mine.reduce((t, s) => t + dur(s), 0))];
+        }), { size: 8.5 });
+      downloadFile(p.finish(`planning-${dates[0]}.pdf`));
+    } catch (e) { toast(e.message, 'err'); }
+  };
   if (!ctx.admin) return;
 
   $$('.cell', el).forEach(c => c.onclick = e => {

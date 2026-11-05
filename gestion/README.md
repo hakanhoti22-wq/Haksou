@@ -4,11 +4,11 @@ Une seule appli pour gérer une petite entreprise, sur téléphone comme sur ord
 
 | Module | Ce qu'il fait |
 |---|---|
-| ⏱️ **Pointage** | Arrivée et départ en un clic, heures du jour et de la semaine, pointages oubliés. Le responsable voit qui est présent, un tableau des heures de la semaine, et peut exporter le mois (CSV pour Excel ou la paie). |
+| ⏱️ **Pointage** | Arrivée et départ en un clic (heure fixée par le serveur), heures du jour et de la semaine. Corrections avec **motif obligatoire** et **journal** visible par le responsable, qui peut aussi les interdire. Tableau des heures de l'équipe, **relevé d'heures mensuel en PDF**, export CSV. |
 | 🌴 **Congés** | Demandes d'absence (vacances, maladie…), validation par le responsable, absences à venir, jours de vacances pris dans l'année. |
-| 📅 **Planning** | Horaires de la semaine par employé, répétition du lundi au vendredi, copie de la semaine précédente, congés affichés, impression. |
+| 📅 **Planning** | Horaires de la semaine par employé, répétition du lundi au vendredi, copie de la semaine précédente, congés affichés, PDF. |
 | 🔧 **Interventions** | Bons d'intervention : client, technicien, travaux, matériel, **photos**, **signature du client sur l'écran**, PDF, et transformation en facture en un clic. |
-| 🧾 **Devis & factures** | Lignes, articles du stock, heures de main d'œuvre, TVA, arrondi à 5 centimes en CHF, numérotation automatique (D-2026-001, F-2026-001), statuts, factures en retard, devis transformé en facture, PDF et e-mail. |
+| 🧾 **Devis & factures** | Lignes, articles du stock, heures de main d'œuvre, TVA, arrondi à 5 centimes en CHF, devis transformé en facture, factures en retard. **Factures conformes** : numéro définitif à l'émission (aucun trou), facture émise **verrouillée** (ni modification ni suppression), **notes de crédit** pour corriger ou annuler, historique de chaque document. Vrais **PDF**, envoyés en pièce jointe. |
 | 👥 **Clients** | Carnet d'adresses partagé (appel, e-mail, itinéraire). |
 | 📦 **Stock** | Articles, entrées et sorties avec historique, alertes de stock bas, valeur du stock, **scan de code-barres** par la caméra, inventaire CSV. |
 | 💳 **Notes de frais** | Photo du ticket, validation, remboursement, résumé mensuel par catégorie et par employé, rapport PDF et CSV. |
@@ -70,20 +70,43 @@ gestion/
 │   ├── db.js              données : même code pour la démo et pour Supabase
 │   ├── seed.js            données d'exemple de la démo
 │   ├── meta.js            liste des modules et des statuts
-│   ├── utils.js           dates, argent, fenêtres, photos, signature, impression
+│   ├── utils.js           dates, argent, fenêtres, photos, signature
+│   ├── pdf.js             création des PDF, téléchargement et partage
 │   └── modules/           un fichier par module
 │       ├── accueil.js  pointage.js  conges.js  planning.js
 │       ├── interventions.js  factures.js  clients.js
 │       └── stock.js  frais.js  equipe.js  reglages.js
+├── vendor/jspdf…          générateur PDF (licence MIT), inclus pour marcher hors ligne
 ├── supabase/schema.sql    tables + règles de sécurité + fonctions
+├── tests/                 tests automatiques (navigateur + base de données)
 ├── manifest.webmanifest   installation sur l'écran d'accueil
 └── sw.js                  ouverture hors ligne
 ```
 
 Pas de framework et pas de compilation : du HTML, du CSS et du JavaScript moderne, comme l'appli Pointage.
 
+## 🔒 Règles importantes
+| Règle | Pourquoi |
+|---|---|
+| Une facture brouillon n'a **pas de numéro**. Il est attribué au clic sur **Émettre** (F-2026-001, F-2026-002…). | La numérotation des factures doit être continue, sans trous. |
+| Une facture émise ne peut plus être **modifiée ni supprimée**. On peut seulement changer son statut (payée). | Les factures doivent être conservées telles quelles pendant 10 ans. |
+| Pour corriger une facture émise : **Note de crédit** (NC-2026-001), puis **Dupliquer** pour refaire une facture juste. Une note de crédit totale annule la facture. | C'est la méthode comptable correcte. |
+| Un pointage n'est **jamais effacé** : une suppression le masque, et chaque ajout après coup, correction ou suppression est **journalisé avec son motif**. | Le patron peut contrôler, et l'enregistrement du temps de travail est obligatoire. |
+| Ces règles sont appliquées **par la base de données** elle-même, pas seulement par l'écran. | Personne ne peut les contourner, même en bricolant l'appli. |
+
+## 📄 PDF et envoi
+Chaque document a un bouton **📄 PDF**, qui télécharge un vrai fichier. Sur les devis, factures et bons d'intervention, le bouton **📤 Envoyer** fonctionne ainsi :
+- sur **téléphone**, il ouvre le partage (Mail, WhatsApp…) avec le PDF déjà en pièce jointe ;
+- sur **ordinateur**, il télécharge le PDF et ouvre un e-mail prérempli, dans lequel il suffit de glisser le fichier.
+
+## 🧪 Tests
+- **Automatiques** : voir [`tests/README.md`](tests/README.md). Il y a 39 vérifications dans le navigateur, plus les tests des règles de sécurité de la base.
+- **Avec de vrais utilisateurs** : voir le guide [`TESTS-UTILISATEURS.md`](TESTS-UTILISATEURS.md).
+
+## 🔄 Mettre à jour une base Supabase existante
+Relance simplement tout `supabase/schema.sql` dans le SQL Editor. Il est prévu pour être relancé : il ajoute ce qui manque sans rien effacer.
+
 ## ℹ️ Limites actuelles (pistes pour la suite)
-- **PDF** : produit avec « Imprimer → Enregistrer en PDF » du téléphone ou de l'ordinateur. Le bouton E-mail prépare le message, mais le PDF est à joindre à la main.
 - **Photos et signatures** : réduites puis enregistrées dans la base. C'est parfait pour démarrer. Pour des milliers de photos, il faudra passer sur *Supabase Storage*.
 - **Mode démo** : la mémoire du navigateur est limitée (environ 5 Mo), donc pas trop de photos.
 - Idées pour plus tard : QR-facture suisse, rappels automatiques des factures impayées, notifications push, géolocalisation du pointage, export comptable, abonnement payant par entreprise.

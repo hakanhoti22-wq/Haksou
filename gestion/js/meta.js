@@ -15,5 +15,6 @@ export const STATUS = {
   expense: { en_attente: ['À valider', 'warn'], validee: ['Validée', 'info'], refusee: ['Refusée', 'err'], remboursee: ['Remboursée', 'ok'] },
   intervention: { planifiee: ['Planifiée', 'info'], en_cours: ['En cours', 'warn'], terminee: ['Terminée', 'ok'] },
   devis: { brouillon: ['Brouillon', ''], envoye: ['Envoyé', 'info'], accepte: ['Accepté', 'ok'], refuse: ['Refusé', 'err'] },
-  facture: { brouillon: ['Brouillon', ''], envoyee: ['Envoyée', 'info'], payee: ['Payée', 'ok'], retard: ['En retard', 'err'] },
+  facture: { brouillon: ['Brouillon', ''], envoyee: ['Émise', 'info'], payee: ['Payée', 'ok'], retard: ['En retard', 'err'], annulee: ['Annulée', ''] },
+  avoir: { brouillon: ['Brouillon', ''], emise: ['Émise', 'info'] },
 };

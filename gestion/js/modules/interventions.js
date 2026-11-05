@@ -1,7 +1,8 @@
 // Module 4 — Bons d'intervention (photos, signature du client, PDF).
 import { db, session, memberName } from '../db.js';
 import { STATUS } from '../meta.js';
-import { $, $$, esc, isoDate, fmtDate, fmtLongDay, fmtTime, modal, toast, chip, empty, options, compressImage, signaturePad, printHTML, printHeader } from '../utils.js';
+import { $, $$, esc, isoDate, fmtDate, fmtLongDay, fmtTime, modal, toast, chip, empty, options, compressImage, signaturePad } from '../utils.js';
+import { createPDF, downloadFile, sendFile } from '../pdf.js';
 import { editClient } from './clients.js';
 
 let filter = 'actives';
@@ -56,7 +57,7 @@ async function detail(el, ctx, id) {
   el.innerHTML = `
     <div class="toolbar">
       <a class="btn sm ghost" href="#/interventions">‹ Retour</a><span class="grow"></span>
-      <button class="sm" id="print">🖨 Bon PDF</button>
+      <button class="sm" id="pdf">📄 Bon PDF</button><button class="sm" id="send">📤 Envoyer</button>
       ${session.company.modules.includes('factures') ? '<button class="sm" id="invoice">🧾 Facturer</button>' : ''}
       <button class="sm icon danger" id="del" title="Supprimer">🗑</button>
     </div>
@@ -122,7 +123,14 @@ async function detail(el, ctx, id) {
   drawSig();
 
   $('#del').onclick = async () => { if (!confirm('Supprimer cette intervention ?')) return; await db.remove('interventions', i.id); toast('Supprimée'); ctx.go('#/interventions'); };
-  $('#print').onclick = () => printHTML(printBon(i, client()));
+  $('#pdf').onclick = async () => { try { downloadFile(await pdfBon(i, client())); } catch (e) { toast(e.message, 'err'); } };
+  $('#send').onclick = async () => {
+    try {
+      const c = client(), co = session.company;
+      await sendFile(await pdfBon(i, c), { to: c?.email, subject: `Bon d'intervention du ${fmtDate(i.date)} – ${co.name}`,
+        body: `Bonjour${c?.contact ? ' ' + c.contact : ''},\n\nVous trouverez ci-joint le bon d'intervention « ${i.title} » du ${fmtDate(i.date)}.\n\nMeilleures salutations\n${session.profile.name}\n${co.name}` });
+    } catch (e) { toast(e.message, 'err'); }
+  };
   $('#invoice')?.addEventListener('click', async () => {
     const { createDoc } = await import('./factures.js');
     const lines = [{ desc: `Intervention : ${i.title} (${fmtDate(i.date)})`, qty: +i.hours || 1, price: +session.company.hourly_rate || 0 }];
@@ -132,15 +140,20 @@ async function detail(el, ctx, id) {
   });
 }
 
-function printBon(i, c) {
-  return `<div class="p-doc">
-    ${printHeader(session.company, 'Bon d\'intervention', `<div>${fmtLongDay(i.date)}</div><div>Technicien : ${esc(memberName(i.user_id))}</div>`)}
-    <div class="p-client">${c ? `<b>${esc(c.name)}</b>${c.contact ? '<br>' + esc(c.contact) : ''}<br>${esc(c.address || '').replace(/\n/g, '<br>')}${c.phone ? '<br>' + esc(c.phone) : ''}` : ''}</div>
-    <h2 class="p-h2">${esc(i.title)}</h2>
-    ${[['Demande', i.description], ['Travaux réalisés', i.work_done], ['Matériel utilisé', i.materials]].filter(([, v]) => v).map(([t, v]) => `<div class="p-block"><b>${t}</b><p>${esc(v).replace(/\n/g, '<br>')}</p></div>`).join('')}
-    <div class="p-block"><b>Durée</b> : ${i.hours || 0} h</div>
-    ${i.photos?.length ? `<div class="p-photos">${i.photos.map(p => `<img src="${p}">`).join('')}</div>` : ''}
-    <div class="p-sign"><div>Signature du client${i.signer_name ? ` (${esc(i.signer_name)})` : ''}${i.signed_at ? ` – ${fmtDate(i.signed_at)} ${fmtTime(i.signed_at)}` : ''} :</div>
-      ${i.signature ? `<img src="${i.signature}" class="p-sigimg">` : '<div class="p-line"></div>'}</div>
-  </div>`;
+/** Bon d'intervention en PDF (avec photos et signature). */
+async function pdfBon(i, c) {
+  const p = await createPDF();
+  p.header('Bon d\'intervention', [fmtLongDay(i.date).replace(/^./, x => x.toUpperCase()), `Technicien : ${memberName(i.user_id)}`]);
+  p.address([c?.name, c?.contact, ...String(c?.address || '').split('\n'), c?.phone]);
+  p.text(i.title, { size: 13, bold: true, after: 3 });
+  for (const [t, v] of [['Demande du client', i.description], ['Travaux réalisés', i.work_done], ['Matériel utilisé', i.materials]].filter(([, v]) => v)) {
+    p.text(t, { bold: true, after: 0.5 }); p.text(v, { after: 3.5 });
+  }
+  p.text(`Durée : ${i.hours || 0} h`, { bold: true, after: 5 });
+  if (i.photos?.length) { p.ensure(60); p.text('Photos', { bold: true, after: 2 }); p.photos(i.photos); }
+  p.ensure(45); p.space(4);
+  p.text(`Signature du client${i.signer_name ? ` (${i.signer_name})` : ''}${i.signed_at ? ` – ${fmtDate(i.signed_at)} ${fmtTime(i.signed_at)}` : ''} :`, { after: 2 });
+  if (i.signature) p.y += p.image(i.signature, p.M, p.y, 70, 30) + 2;
+  else { p.space(16); p.doc.setDrawColor(0); p.doc.setLineWidth(0.3); p.doc.line(p.M, p.y, p.M + 75, p.y); }
+  return p.finish(`bon-intervention-${i.date || ''}-${i.title}.pdf`);
 }

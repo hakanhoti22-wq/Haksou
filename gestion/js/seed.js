@@ -14,7 +14,7 @@ export function buildSeed(newId) {
   const company = {
     id: cid, created_at: stamp, name: 'Démo Services Sàrl', join_code: 'DEMO42',
     address: 'Route de l\'Ancienne-Papeterie 1\n1723 Marly', phone: '026 000 00 00', email: 'contact@demo-services.ch',
-    iban: 'CH93 0076 2011 6238 5295 7', currency: 'CHF', vat: 8.1, hourly_rate: 95, week_hours: 42,
+    iban: 'CH93 0076 2011 6238 5295 7', currency: 'CHF', vat: 8.1, hourly_rate: 95, week_hours: 42, punch_self_edit: true,
     modules: [...ALL_MODULES],
   };
   const [boss, lea, karim] = [
@@ -98,5 +98,15 @@ export function buildSeed(newId) {
     row({ user_id: karim.id, date: isoDate(day(-12)), amount: 8, category: 'Parking', description: 'Parking Fribourg centre', receipt: null, status: 'remboursee' }),
   ];
 
-  return { companies: [company], profiles: [boss, lea, karim], punches, shifts, leaves, clients, items, movements, documents, interventions, expenses };
+  // Exemple de correction : Karim a oublié de pointer son départ avant-hier
+  const audit_log = [];
+  const fix = punches.filter(p => p.user_id === karim.id && p.type === 'out').slice(-2)[0];
+  if (fix) {
+    const before = fix.at, after = new Date(new Date(fix.at).getTime() - 25 * 6e4).toISOString();
+    Object.assign(fix, { at: after, edited: true, note: 'Oublié de pointer en partant du chantier' });
+    audit_log.push(row({ actor_id: karim.id, table_name: 'punches', row_id: fix.id, action: 'modification', at: stamp,
+      details: { user_id: karim.id, type_avant: 'out', type: 'out', at_avant: before, at: after, note: fix.note } }));
+  }
+
+  return { audit_log, companies: [company], profiles: [boss, lea, karim], punches, shifts, leaves, clients, items, movements, documents, interventions, expenses };
 }

@@ -118,18 +118,6 @@ export function compressImage(file, max = 1280, quality = 0.72) {
   });
 }
 
-/** Imprime (ou enregistre en PDF) un bloc HTML. */
-export function printHTML(html) {
-  const p = $('#print-area');
-  p.innerHTML = html;
-  const imgs = $$('img', p).filter(i => !i.complete);
-  Promise.all(imgs.map(i => new Promise(r => { i.onload = i.onerror = r; }))).then(() => {
-    // vidé seulement après l'impression : sur iPhone, print() n'est pas bloquant
-    window.addEventListener('afterprint', () => { p.innerHTML = ''; }, { once: true });
-    window.print();
-  });
-}
-
 /** Zone de signature au doigt / à la souris. */
 export function signaturePad(canvas) {
   const ctx = canvas.getContext('2d');
@@ -153,11 +141,3 @@ export function signaturePad(canvas) {
   canvas.addEventListener('pointerup', end); canvas.addEventListener('pointercancel', end);
   return { clear: () => { dirty = false; fit(); }, isEmpty: () => !dirty, toDataURL: () => canvas.toDataURL('image/png') };
 }
-
-/** Styles communs des documents imprimés. */
-export const printHeader = (company, title, sub = '') => `
-  <div class="p-head">
-    <div><div class="p-co">${esc(company.name)}</div>
-      <div class="p-small">${esc(company.address || '').replace(/\n/g, '<br>')}${company.phone ? '<br>' + esc(company.phone) : ''}${company.email ? '<br>' + esc(company.email) : ''}</div></div>
-    <div class="p-title"><h1>${esc(title)}</h1>${sub}</div>
-  </div>`;

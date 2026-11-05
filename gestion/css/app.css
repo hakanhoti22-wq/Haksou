@@ -252,39 +252,7 @@ main { margin-left: var(--nav); padding: 0 24px calc(env(safe-area-inset-bottom)
 .toast.err { border-left-color: var(--err); } .toast.info { border-left-color: var(--acc); }
 .toast.out { opacity: 0; transform: translateY(8px); }
 
-/* Impression (PDF) */
-#print-area { display: none; }
-@media print {
-  @page { size: A4; margin: 16mm 14mm; }
-  html, body { background: #fff !important; }
-  body > *:not(#print-area) { display: none !important; }
-  #print-area { display: block; color: #000; font: 10.5pt/1.4 -apple-system, Helvetica, Arial, sans-serif; }
-  #print-area * { color: #000; }
-  .p-head { display: flex; justify-content: space-between; gap: 20px; border-bottom: 2px solid #000; padding-bottom: 5mm; margin-bottom: 7mm; }
-  .p-co { font-size: 15pt; font-weight: 800; }
-  .p-small { font-size: 9pt; color: #333 !important; margin-top: 2mm; }
-  .p-title { text-align: right; }
-  .p-title h1 { font-size: 17pt; margin-bottom: 2mm; }
-  .p-client { margin: 0 0 8mm 55%; min-height: 22mm; }
-  .p-h2 { font-size: 13pt; margin: 0 0 4mm; text-transform: none; letter-spacing: 0; }
-  .p-tbl, #print-area .tbl { width: 100%; border-collapse: collapse; margin-bottom: 5mm; }
-  .p-tbl th, .p-tbl td, #print-area .tbl th, #print-area .tbl td { border-bottom: 1px solid #bbb; padding: 2mm 1.5mm; text-align: left; vertical-align: top; }
-  .p-tbl th, #print-area .tbl th { border-bottom: 2px solid #000; font-size: 8.5pt; text-transform: uppercase; }
-  #print-area .n { text-align: right; white-space: nowrap; }
-  .p-tot { margin-left: auto; width: 45%; border-collapse: collapse; }
-  .p-tot td { padding: 1.5mm; }
-  .p-tot tr.g td { border-top: 2px solid #000; font-weight: 800; font-size: 12pt; }
-  .p-notes { margin-top: 6mm; }
-  .p-pay, .p-block { margin-top: 5mm; }
-  .p-block p { margin: 1mm 0 0; }
-  .p-sign { margin-top: 12mm; page-break-inside: avoid; }
-  .p-line { border-bottom: 1px solid #000; height: 20mm; width: 70mm; }
-  .p-sigimg { max-height: 30mm; max-width: 80mm; }
-  .p-photos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3mm; margin-top: 6mm; }
-  .p-photos img { width: 100%; max-height: 55mm; object-fit: cover; }
-  .p-photos figure { margin: 0; page-break-inside: avoid; }
-  .p-photos figcaption { font-size: 8pt; }
-  #print-area .shift { border: 1px solid #999; background: none; padding: 1mm; font-size: 8pt; }
-  #print-area .shift small { color: #333; }
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; }
-}
+/* Bandeaux d'information */
+.notice { border-left: 4px solid var(--warn); font-size: 14px; padding: 12px 14px; }
+.notice.info { border-left-color: var(--acc); }
+input:disabled, select:disabled, textarea:disabled { background: transparent; border-style: dashed; color: var(--mut); cursor: not-allowed; opacity: 1; }
