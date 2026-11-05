@@ -84,7 +84,7 @@ Sur l'accueil, la barre **Cette semaine** montre ta progression vers ton objecti
 > Modifier, ajouter, les absences, le Résumé et la suppression groupée demandent la dernière version du script. Recolle `apps-script.gs` (en gardant ton TOKEN), puis Déployer → Gérer les déploiements → ✏️ → **Nouvelle version**.
 
 ## Bouton « Timbrer », Siri et Apple Watch
-Dans **Réglages → Bouton « Timbrer » & Siri**, l'app donne 4 adresses (⑤ à ⑧). Pour chacune, crée un raccourci dans l'app Raccourcis : **Obtenir le contenu de l'URL** + **Afficher le résultat**, puis renomme-le :
+Dans **Réglages → Bouton « Timbrer » & Siri**, l'app donne 4 adresses (⑤ à ⑧). Pour chacune, crée un raccourci dans l'app Raccourcis : **Obtenir le contenu de l'URL** + **Afficher une notification** (texte = *Contenu de l'URL*), et **Énoncer le texte** si tu veux que Siri lise la réponse. Puis renomme-le :
 - **Timbrer** : arrivée si tu n'es pas timbré, départ sinon. Mets-le en widget sur l'écran d'accueil, ou dans le Centre de contrôle (iOS 18+).
 - **Je commence** / **Je pars** : « Dis Siri, je pars ».
 - **Mes heures** : Siri lit ton total du jour et de la semaine.
