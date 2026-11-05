@@ -1,5 +1,5 @@
-const C = 'ongles-v2';
-const SHELL = ['./pro.html', './index.html', './common.js', './config.js', './style.css', './manifest.webmanifest', './icon.svg', './icon-180.png', './icon-192.png'];
+const C = 'ongles-v3';
+const SHELL = ['./pro.html', './index.html', './common.js', './config.js', './style.css', './manifest.webmanifest', './icon.svg', './marble.svg', './marble-dark.svg', './icon-180.png', './icon-192.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(C).then(c => c.addAll(SHELL))); self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('ongles-') && k !== C).map(k => caches.delete(k))))); self.clients.claim(); });
 self.addEventListener('fetch', e => {

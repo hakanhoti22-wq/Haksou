@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#f4eee5">
+<meta name="theme-color" content="#efe6d9">
 <title>Prendre rendez-vous</title>
 <link rel="icon" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-180.png">
@@ -11,30 +11,30 @@
 <style>
 body{padding:calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 110px);max-width:620px;margin:0 auto}
 header{text-align:center;padding:14px 0 6px}
-header .logo{width:56px;height:56px;border-radius:50%;display:block;margin:0 auto 14px}
-header h1{font-size:32px}
+header .logo{width:64px;height:64px;border-radius:50%;display:block;margin:0 auto 14px;box-shadow:0 0 0 1px #a8865c,0 0 0 4px rgba(255,250,242,.8),0 0 0 5px rgba(168,134,92,.5),0 12px 24px -10px rgba(45,28,16,.6)}
+header h1{font-size:34px}
 .infos{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:14px}
 .infos a{text-decoration:none;color:var(--mut);letter-spacing:.02em}
 .steps{display:flex;gap:6px;margin:18px 0 8px}
 .steps div{flex:1;text-align:center;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.14em;color:var(--mut);padding-bottom:8px;border-bottom:1px solid var(--line)}
-.steps div.on{color:var(--pri2);border-color:var(--pri);border-bottom-width:2px}
-.srv{display:flex;gap:12px;align-items:flex-start;cursor:pointer;transition:border-color .15s,background .15s}
-.srv.on{border-color:var(--pri);background:#fffdf9}
-.srv .tick{width:22px;height:22px;border-radius:50%;border:1px solid var(--mut);flex:none;display:flex;align-items:center;justify-content:center;color:#f7f1e8;font-size:12px;margin-top:3px}
-.srv.on .tick{background:var(--pri);border-color:var(--pri)}
+.steps div.on{color:var(--pri2);border-bottom:2px solid transparent;border-image:linear-gradient(90deg,#8c6a46,#d8bf98,#8c6a46) 1}
+.srv{display:flex;gap:12px;align-items:flex-start;cursor:pointer;transition:transform .15s,box-shadow .15s}
+.srv.on{border-color:var(--gold);box-shadow:var(--relief),0 0 0 1px var(--gold),0 14px 28px -14px rgba(60,40,25,.6);transform:translateY(-1px)}
+.srv .tick{width:22px;height:22px;border-radius:50%;border:1px solid rgba(133,113,93,.8);flex:none;display:flex;align-items:center;justify-content:center;color:var(--cream);font-size:12px;margin-top:3px;box-shadow:inset 0 1px 3px rgba(80,55,35,.2)}
+.srv.on .tick{background:var(--dark-bg);border-color:#3e2c20;box-shadow:var(--dark-relief)}
 .srv .prix{font-family:var(--serif);font-size:17px;white-space:nowrap}
-.bar{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(env(safe-area-inset-bottom) + 12px);background:rgba(244,238,229,.95);backdrop-filter:blur(10px);border-top:1px solid var(--line);z-index:50}
+.bar{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(env(safe-area-inset-bottom) + 12px);background:linear-gradient(180deg,rgba(255,251,244,.92),rgba(241,231,217,.94)),var(--marble) center/640px;backdrop-filter:blur(10px);border-top:1px solid rgba(168,134,92,.45);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 -10px 30px -12px rgba(45,28,16,.35);z-index:50}
 .bar .in{max-width:620px;margin:0 auto;display:flex;gap:12px;align-items:center}
 .day{display:flex;flex-direction:column;align-items:center;width:60px;padding:10px 0;border-radius:var(--r)}
 .day small{font-size:10px;text-transform:uppercase;letter-spacing:.12em;opacity:.75}
 .day b{font-size:22px;font-family:var(--serif);font-weight:400}
 .day:disabled{opacity:.35}
 .slots{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-.slot{background:transparent;color:var(--txt);border:1px solid var(--line);min-height:44px;padding:8px 0;font-size:15px;letter-spacing:.04em;font-weight:500}
-.slot.on{background:var(--pri);color:#f7f1e8;border-color:var(--pri)}
-.recap div{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px dashed var(--line)}
+.slot{background:var(--card-bg);color:var(--txt);border:1px solid rgba(190,163,128,.5);box-shadow:var(--relief);text-shadow:none;min-height:44px;padding:8px 0;font-size:15px;letter-spacing:.04em;font-weight:500}
+.slot.on{background:var(--dark-bg);color:var(--cream);border-color:#3e2c20;box-shadow:var(--dark-relief)}
+.recap div{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid rgba(190,163,128,.35)}
 .recap div:last-child{border:0}
-.big-ok{font-size:34px;text-align:center;margin:6px 0;color:var(--gold)}
+.big-ok{font-size:34px;text-align:center;margin:6px 0;background:var(--metal);background-size:260% 100%;-webkit-background-clip:text;background-clip:text;color:transparent}
 </style>
 </head>
 <body>
